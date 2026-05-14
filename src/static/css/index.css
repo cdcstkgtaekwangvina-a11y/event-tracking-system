@@ -1,0 +1,61 @@
+:root {
+  --background: #ffffff;
+  --card: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --primary: #030213;
+  --foreground: oklch(0.145 0 0);
+  --bg-home-page: #fbfafd;
+  --text-secondary: #666;
+  --login-bg: rgb(3, 3, 18);
+  --shadow: rgba(0, 0, 0, 0.1);
+  --input: rgb(242, 243, 244);
+}
+
+:root[data-theme="dark"] {
+  --background: oklch(0.145 0 0);
+  --card: oklch(0.145 0 0);
+  --border: oklch(0.269 0 0);
+  --primary: oklch(0.985 0 0);
+  --foreground: oklch(0.985 0 0);
+  --bg-home-page: oklch(0.145 0 0);
+  --text-secondary: #a9a9a9;
+  --login-bg: rgb(251, 250, 251);
+  --shadow: rgba(255, 255, 255, 0.867);
+  --input: #f6f6f6;
+}
+.primary_btn {
+  border: 1px solid var(--border);
+  box-shadow: 1px 1px 0px 1px var(--border);
+  cursor: pointer;
+  color: var(--foreground);
+  border-radius: 25%;
+  padding: 10px;
+  background-color: var(--background);
+  transition: all 0.2s ease;
+}
+.primary_btn:hover {
+  background-color: var(--border);
+}
+.outstanding_btn {
+  border: 1px solid var(--background);
+  box-shadow: 1px 1px 0px 1px var(--background);
+  cursor: pointer;
+  color: var(--background);
+  background-color: var(--primary);
+  border-radius: 25%;
+  padding: 10px;
+}
+.outstanding_btn:hover {
+  background-color: var(--border);
+}
+
+body {
+  font-family: "Noto Sans", sans-serif;
+  font-optical-sizing: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--background);
+  color: var(--foreground);
+}

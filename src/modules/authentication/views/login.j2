@@ -1,0 +1,228 @@
+{% extends "templates/index.j2" %}
+{% block title %}Đăng nhập{% endblock %}
+{% block body %}
+<div class="login">
+    <div class="buttons">
+        <div class="home-btn">
+            <a href="{{ url_for('home')}}" style="text-decoration: none;">
+                {% include "static/public/icons/home.svg"%}
+            </a>
+        </div>
+        {% include "templates/headers/toggle_theme.j2" %}
+    </div>
+    <div class="login-form">
+        <div class="login-info">
+            <div class="login-logo">
+                {% include "static/public/icons/login.svg"%}
+            </div>
+            <h2>Hệ thống Event tracking system</h2>
+            <p>Đăng nhập để tiếp tục</p>
+        </div>
+        <div class="form-input" x-data="{ isHide : true}">
+            <div class="input-items">
+                <label for="username_email">Tên đăng nhập hoặc email</label>
+                <input x-ref="username_email" name="username_email" type="text"
+                    placeholder="Nhập tên đăng nhập hoặc email" @keydown.space.prevent
+                    @keydown.enter.prevent="$refs.password.focus()" />
+            </div>
+
+            <div class="password-input">
+                <div class="input-items">
+                    <label for="password">Mật khẩu</label>
+                    <input x-ref="password" name="password" :type="isHide ? 'password' : 'text'"
+                        placeholder="Nhập mật khẩu" @keydown.space.prevent
+                        @keydown.enter.prevent="$refs.username_email.focus()" />
+                </div>
+                <button class="toggle-password" @click="isHide = !isHide" type="button">
+                    {% include "static/public/icons/visibility.svg"%}
+                </button>
+            </div>
+        </div>
+        <button class="login-btn">Đăng nhập</button>
+        <a class="forgot-password"
+            href="{{ url_for('forgot_password_view') }}?redirect={{ redirect|string|urlencode }}">Quên mật khẩu</a>
+    </div>
+
+</div>
+
+<style>
+    .login {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100dvh;
+        width: 100%;
+    }
+
+    .login-form {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border);
+        padding: 20px;
+        border-radius: 15px;
+        background-color: var(--background-header);
+        box-shadow: 0 5px 8px var(--shadow);
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        max-width: 400px;
+    }
+
+    .form-input {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .input-items {
+        display: flex;
+        flex-direction: column;
+        padding: 5px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+        gap: 5px;
+        color: var(--foreground);
+    }
+
+    .input-items input {
+        height: 30px;
+        border: none;
+        outline: 1px solid var(--border);
+        border-radius: 8px;
+        color: oklch(0.145 0 0);
+        padding: 10px;
+        background-color: var(--input);
+    }
+
+    .input-items input:focus {
+        box-shadow: 0px 5px 8px var(--shadow);
+        outline: 1px solid var(--border);
+        border: none;
+    }
+
+    .input-items label {
+        font-weight: bold;
+    }
+
+    .login-btn {
+        padding: 15px;
+        background-color: var(--login-bg);
+        border-radius: 10px;
+        color: var(--background);
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        width: 100%;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        font-weight: bold;
+        font-size: large;
+    }
+
+    .login-btn:hover {
+        transform: scale(1.01);
+    }
+
+    .buttons {
+        position: absolute;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        top: 10px;
+        margin: 0 10px;
+    }
+
+    .home-btn a {
+        padding: 10px;
+        background-color: var(--login-bg);
+        border-radius: 10px;
+        color: var(--background);
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        width: max-content;
+        font-weight: bold;
+        font-size: large;
+    }
+
+    .home-btn a:hover {
+        background-color: var(--text-secondary);
+    }
+
+    .login-logo {
+        padding: 15px;
+        background-color: var(--login-bg);
+        border-radius: 10px;
+        color: var(--background);
+        display: flex;
+        width: max-content;
+        justify-content: center;
+        align-items: center;
+        margin-top: 10px;
+        margin-bottom: 30px;
+        font-weight: bold;
+        font-size: large;
+    }
+
+    .login-info {
+        padding: 0px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 15px;
+        text-align: center;
+        gap: 5px;
+    }
+
+    .login-info h2 {
+        margin: 0;
+        padding: 0;
+        display: inline-block;
+        color: var(--foreground);
+    }
+
+    .login-info p {
+        margin: 0;
+        padding: 0;
+        color: var(--text-secondary);
+        display: inline-block;
+    }
+
+    .password-input {
+        position: relative;
+    }
+
+    .toggle-password {
+        background-color: var(--input);
+        border: none;
+        position: absolute;
+        right: 10px;
+        top: 48px;
+        cursor: pointer;
+        color: var(--text-secondary);
+    }
+
+    body {
+        overflow: hidden;
+    }
+
+    .forgot-password {
+        text-decoration: none;
+        margin-top: 10px;
+        color: var(--text-secondary)
+    }
+
+    .forgot-password:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}

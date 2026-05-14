@@ -1,0 +1,48 @@
+<div class="navbar">
+    {% include "templates/headers/title_logo.j2" %}
+    <div class="nav-item">
+        {% include "templates/headers/toggle_theme.j2" %}
+        <a x-data class="login-btn" href="{{ url_for('login_view') }}?redirect={{ request.url|string|urlencode }}" style="text-decoration: none;">
+            {% include "static/public/icons/login.svg"%} <span x-show="$store.screen.isMobile === false"><b>Đăng nhập</b></span>
+        </a>
+    </div>
+</div>
+<style>
+.navbar{
+    padding: 10px 5px;
+    display: flex;
+    justify-content: space-around;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    border-bottom: 1px var(--border);
+    box-shadow: 5px var(--border);
+    border-bottom: 1px solid var(--border); 
+    box-shadow: 0 2px 5px var(--border);
+    backdrop-filter: blur(10px); 
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 9999;
+}
+
+.login-btn{
+    padding: 15px;
+    background-color: var(--login-bg);
+    border-radius: 10px;
+    color: var(--background);
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+}
+.login-btn:hover{
+    transform: scale(1.01);
+}
+.nav-item{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+}
+</style>

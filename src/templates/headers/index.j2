@@ -1,0 +1,7 @@
+<div class="header">
+{% if is_navbar is not defined or is_navbar == True %}
+    {% include "templates/headers/navbar.j2" %}
+{% else %}
+    {% include "templates/headers/slidebar.j2" %}
+{% endif %}
+</div>

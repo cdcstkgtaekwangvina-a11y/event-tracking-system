@@ -1,0 +1,35 @@
+<div class="toggle" x-data="{ 
+        currTheme: localStorage.getItem('theme') || theme.light,
+        toggle() {
+            this.currTheme = this.currTheme === theme.light ? theme.dark : theme.light;
+            document.documentElement.setAttribute('data-theme', this.currTheme);
+            localStorage.setItem('theme', this.currTheme);
+        }
+    }" 
+    x-init="document.documentElement.setAttribute('data-theme', currTheme)">
+
+    <button @click="toggle()" class="toggle-btn">
+        <template x-if="currTheme === theme.dark">
+            {% include "/static/public/icons/light.svg" %}
+        </template>
+        <template x-if="currTheme === theme.light">
+            {% include "/static/public/icons/dark.svg" %}
+        </template>
+    </button>
+</div>
+
+<style>
+.toggle-btn {
+  border: 1px solid var(--border);
+  box-shadow: 1px 1px 0px 1px var(--border);
+  cursor: pointer;
+  color: var(--foreground);
+  border-radius: 25%;
+  padding: 8px 10px;
+  background-color: var(--background);
+  transition: all 0.2s ease;
+}
+.toggle-btn:hover {
+  background-color: var(--border);
+}
+</style>

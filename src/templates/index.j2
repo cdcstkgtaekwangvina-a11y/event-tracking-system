@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" sizes="180x180" href="/static/public/{% block logo %}app_logo.png{% endblock %}" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="/static/css/index.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" />
+
+  <meta name="keywords" content="python, fastapi, jinja2, check-in, điểm danh, sự kiện">
+  {% block meta %}
+  <meta name="description" content="Trang web điểm danh build bằng fastapi và jinja2">
+  {% endblock %}
+  <title>{% block title %}Event tracking system{% endblock %}</title>
+  <script src="{{ url_for('static', path='js/vendors/htmx.min.js') }}"></script>
+  <script src="{{ url_for('static', path='js/vendors/htmx.hx-ws.js') }}"></script>
+  <script defer src="{{ url_for('static', path='js/vendors/alpine.min.js') }}"></script>
+</head>
+
+<body>
+  {% block body %}
+  {% include "templates/headers/index.j2" %}
+  {% block content %}{% endblock %}
+  {% include "templates/footers/index.j2" %}
+  {% endblock %}
+</body>
+<script type="module">
+  import { fetchHelper } from "/static/js/fetch_helper.js"
+  document.body.className = document.body.className + " " + currentTheme();
+
+  fetchHelper.baseUrl = "{{ base_url }}"
+  window.fetchHelper = fetchHelper
+</script>
+<script src="/static/js/theme.js"></script>
+<script src="/static/js/check_mobile.js"></script>
+
+</html>
