@@ -1,0 +1,50 @@
+/* Emoji Picker */
+    .emoji-popover {
+        padding: 8px;
+        min-width: 220px;
+    }
+
+    .emoji-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border, #cbd5e1);
+        padding-bottom: 4px;
+        margin-bottom: 6px;
+        gap: 4px;
+    }
+
+    .emoji-tab {
+        background: transparent;
+        border: none;
+        padding: 4px 8px;
+        font-size: 14px;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    .emoji-tab:hover,
+    .emoji-tab.active {
+        background: var(--border, #f1f5f9);
+    }
+
+    .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 4px;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    .emoji-item {
+        background: transparent;
+        border: none;
+        font-size: 18px;
+        padding: 4px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: transform 0.1s ease;
+    }
+
+    .emoji-item:hover {
+        transform: scale(1.2);
+        background: var(--border, #f1f5f9);
+    }

@@ -28,6 +28,9 @@ update_env:
 export_env:
 	@conda env export --prefix $(ENV_PATH) --no-builds | findstr /V /B "prefix: name:" > environment.yml
 
+export_vercel:
+	pip freeze > requirements.txt
+
 clean:
 ifeq ($(OS),Windows_NT)
 	@echo "Dang xoa moi truong tren Windows..."
@@ -49,3 +52,12 @@ update_db:
 	alembic upgrade head
 add_db:
 	alembic revision --autogenerate -m "$(m)"
+
+seed:
+	python -m database.seeds.seed_db
+
+remove_cache:
+	python -c "import pathlib, shutil; [shutil.rmtree(p) for p in pathlib.Path('.').rglob('__pycache__')]; [p.unlink() for p in pathlib.Path('.').rglob('*.py[co]')]"
+
+
+	

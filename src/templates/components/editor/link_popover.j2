@@ -1,0 +1,37 @@
+<!-- Link Dialog -->
+<div class="dropdown-wrapper" @click.outside="activeDropdown === 'link' && (activeDropdown = null)"
+    @dropdown-link-open.window="url = myEditor.getAttributes('link').href || ''; activeDropdown = 'link'">
+    <button type="button" class="btn" :class="isActive('link') && 'active'" title="Chèn liên kết"
+        @click="url = myEditor.getAttributes('link').href || ''; toggleDropdown('link')">
+        🔗 Link
+    </button>
+    <div class="dropdown-menu link-popover" x-show="activeDropdown === 'link'" x-transition>
+        <div class="popover-title">Chèn/Sửa liên kết</div>
+        <input type="url" placeholder="Nhập đường dẫn URL..." x-model="url" class="popover-input">
+        <label class="popover-checkbox">
+            <input type="checkbox" x-model="newTab"> Mở trong tab mới
+        </label>
+        <div class="popover-actions">
+            <button type="button" class="popover-btn primary" @click="saveLink(url, newTab); closeDropdown()">Áp
+                dụng</button>
+            <button type="button" class="popover-btn danger" x-show="isActive('link')"
+                @click="myEditor.chain().focus().unsetLink().run(); closeDropdown()">Gỡ bỏ</button>
+        </div>
+    </div>
+</div>
+<style>
+    .popover-input {
+        width: 95%;
+        padding: 6px 8px;
+        border: 1px solid var(--border, #cbd5e1);
+        border-radius: 6px;
+        font-size: 13px;
+        outline: none;
+        background: var(--background, #fff);
+        color: var(--foreground, #000);
+    }
+
+    .popover-input:focus {
+        border-color: #3b82f6;
+    }
+</style>

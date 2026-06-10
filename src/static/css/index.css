@@ -9,6 +9,19 @@
   --login-bg: rgb(3, 3, 18);
   --shadow: rgba(0, 0, 0, 0.1);
   --input: rgb(242, 243, 244);
+  --logout: red;
+  --logout-bg: rgb(255, 234, 234);
+
+  /* Notify component tokens */
+  --nc-success: #22c55e;
+  --nc-error:   #ef4444;
+  --nc-warning: #f97316;
+  --nc-info:    #3b82f6;
+  --nc-radius:  12px;
+  --nc-radius-sm: 8px;
+  --nc-shadow-toast: 0 10px 30px -5px rgba(0, 0, 0, 0.12), 0 4px 10px -3px rgba(0, 0, 0, 0.07);
+  --nc-shadow-modal: 0 25px 50px -10px rgba(0, 0, 0, 0.18);
+  --nc-overlay-bg:   rgba(0, 0, 0, 0.45);
 }
 
 :root[data-theme="dark"] {
@@ -22,6 +35,17 @@
   --login-bg: rgb(251, 250, 251);
   --shadow: rgba(255, 255, 255, 0.867);
   --input: #f6f6f6;
+  --logout: #f87171;                   
+  --logout-bg: rgba(248, 113, 113, 0.15);
+
+  /* Notify dark mode overrides */
+  --nc-success: #4ade80;
+  --nc-error:   #f87171;
+  --nc-warning: #fb923c;
+  --nc-info:    #60a5fa;
+  --nc-shadow-toast: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 4px 10px -3px rgba(0, 0, 0, 0.3);
+  --nc-shadow-modal: 0 25px 50px -10px rgba(0, 0, 0, 0.6);
+  --nc-overlay-bg:   rgba(0, 0, 0, 0.65);
 }
 .primary_btn {
   border: 1px solid var(--border);
@@ -58,4 +82,11 @@ body {
   align-items: center;
   background-color: var(--background);
   color: var(--foreground);
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit; 
 }

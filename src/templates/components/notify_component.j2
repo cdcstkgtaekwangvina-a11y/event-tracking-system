@@ -1,0 +1,617 @@
+{# ============================================================
+   Notify Component – Toast + Modal/Confirm
+   Logic: Alpine.js  |  Container: Jinja2
+   Màu dùng CSS vars từ index.css (:root)
+   ============================================================ #}
+
+{# ─── TOAST CONTAINER ──────────────────────────────────────── #}
+<div
+    id="toast-container"
+    x-data="toastManager"
+    class="nc-toast-container"
+    aria-live="polite"
+    aria-label="Thông báo"
+>
+    <template x-for="toast in toasts" :key="toast.id">
+        <div
+            class="nc-toast"
+            :class="`nc-toast--${toast.type}`"
+            x-show="toast.visible"
+            x-transition:enter="nc-toast-enter"
+            x-transition:enter-start="nc-toast-enter-start"
+            x-transition:enter-end="nc-toast-enter-end"
+            x-transition:leave="nc-toast-leave"
+            x-transition:leave-start="nc-toast-leave-start"
+            x-transition:leave-end="nc-toast-leave-end"
+            role="alert"
+        >
+            {# Icon #}
+            <span class="nc-toast__icon" x-html="getIcon(toast.type)" aria-hidden="true"></span>
+
+            {# Content #}
+            <div class="nc-toast__body">
+                <div class="nc-toast__title" x-text="toast.title"></div>
+                <div
+                    class="nc-toast__desc"
+                    x-show="toast.description"
+                    x-text="toast.description"
+                ></div>
+            </div>
+
+            {# Action button (optional) #}
+            <template x-if="toast.action">
+                <button
+                    class="nc-toast__action"
+                    @click="toast.action.onClick(); dismiss(toast.id)"
+                    x-text="toast.action.label"
+                ></button>
+            </template>
+
+            {# Close button – ẩn khi type = loading #}
+            <template x-if="toast.type !== 'loading'">
+                <button
+                    class="nc-toast__close"
+                    @click="dismiss(toast.id)"
+                    aria-label="Đóng thông báo"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </template>
+        </div>
+    </template>
+</div>
+
+{# ─── MODAL / CONFIRM DIALOG ───────────────────────────────── #}
+<div
+    id="modal-container"
+    x-data="modalManager"
+    @show-modal.window="open($event.detail)"
+    x-cloak
+>
+    {# Overlay #}
+    <div
+        class="nc-modal-overlay"
+        x-show="visible"
+        x-transition:enter="nc-overlay-enter"
+        x-transition:enter-start="nc-overlay-enter-start"
+        x-transition:enter-end="nc-overlay-enter-end"
+        x-transition:leave="nc-overlay-leave"
+        x-transition:leave-start="nc-overlay-leave-start"
+        x-transition:leave-end="nc-overlay-leave-end"
+        @click.self="type !== 'confirm' && close()"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="title"
+    >
+        {# Dialog box #}
+        <div
+            class="nc-modal"
+            x-show="visible"
+            x-transition:enter="nc-modal-enter"
+            x-transition:enter-start="nc-modal-enter-start"
+            x-transition:enter-end="nc-modal-enter-end"
+            x-transition:leave="nc-modal-leave"
+            x-transition:leave-start="nc-modal-leave-start"
+            x-transition:leave-end="nc-modal-leave-end"
+            @click.stop
+        >
+            {# Header #}
+            <div class="nc-modal__header">
+                <div class="nc-modal__icon" :class="`nc-modal__icon--${type}`" x-html="getIcon(type)" aria-hidden="true"></div>
+                <div>
+                    <div class="nc-modal__title" x-text="title"></div>
+                    <div class="nc-modal__subtitle" x-show="subtitle" x-text="subtitle"></div>
+                </div>
+            </div>
+
+            {# Body #}
+            <div class="nc-modal__body" x-show="message" x-text="message"></div>
+
+            {# Footer #}
+            <div class="nc-modal__footer">
+                {# Confirm type: Hủy + Xác nhận #}
+                <template x-if="type === 'confirm'">
+                    <div class="nc-modal__actions">
+                        <button
+                            class="nc-modal__btn nc-modal__btn--secondary"
+                            @click="resolve(false)"
+                        >Hủy</button>
+                        <button
+                            class="nc-modal__btn nc-modal__btn--primary"
+                            @click="resolve(true)"
+                        >Xác nhận</button>
+                    </div>
+                </template>
+
+                {# Alert / info / warning / error: chỉ có Đóng #}
+                <template x-if="type !== 'confirm'">
+                    <div class="nc-modal__actions nc-modal__actions--end">
+                        <button
+                            class="nc-modal__btn"
+                            :class="getBtnClass(type)"
+                            @click="close()"
+                        >Đóng</button>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ─── STYLES ───────────────────────────────────────────────── #}
+<style>
+/* ── Cloak ────────────────────────────────────────────────── */
+[x-cloak] { display: none !important; }
+
+/* ── Tokens fallback (phòng khi index.css chưa load trước) ─ */
+:root {
+    --nc-success:     #22c55e;
+    --nc-error:       #ef4444;
+    --nc-warning:     #f97316;
+    --nc-info:        #3b82f6;
+    --nc-radius:      12px;
+    --nc-radius-sm:   8px;
+    --nc-shadow-toast: 0 10px 30px -5px rgba(0,0,0,.12), 0 4px 10px -3px rgba(0,0,0,.07);
+    --nc-shadow-modal: 0 25px 50px -10px rgba(0,0,0,.18);
+    --nc-overlay-bg:   rgba(0,0,0,.45);
+}
+
+/* ══════════════════ TOAST ══════════════════════════════════ */
+
+.nc-toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: .625rem;
+    max-width: 380px;
+    width: 100%;
+    pointer-events: none;
+}
+
+.nc-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: .875rem 1rem;
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--nc-radius);
+    box-shadow: var(--nc-shadow-toast);
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+    min-height: 60px;
+    border-left-width: 3px;
+}
+
+/* Accent left border per type */
+.nc-toast--success { border-left-color: var(--nc-success); }
+.nc-toast--error   { border-left-color: var(--nc-error); }
+.nc-toast--warning { border-left-color: var(--nc-warning); }
+.nc-toast--info    { border-left-color: var(--nc-info); }
+.nc-toast--loading { border-left-color: var(--border); }
+
+/* Icon */
+.nc-toast__icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.nc-toast--success .nc-toast__icon { color: var(--nc-success); }
+.nc-toast--error   .nc-toast__icon { color: var(--nc-error); }
+.nc-toast--warning .nc-toast__icon { color: var(--nc-warning); }
+.nc-toast--info    .nc-toast__icon { color: var(--nc-info); }
+.nc-toast--loading .nc-toast__icon { color: var(--text-secondary); }
+
+/* Body */
+.nc-toast__body  { flex: 1; min-width: 0; }
+.nc-toast__title {
+    font-size: .875rem;
+    font-weight: 500;
+    color: var(--foreground);
+    line-height: 1.3;
+}
+.nc-toast__desc {
+    font-size: .8125rem;
+    margin-top: .2rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* Action button */
+.nc-toast__action {
+    flex-shrink: 0;
+    padding: .3rem .7rem;
+    font-size: .8125rem;
+    font-weight: 500;
+    color: var(--primary);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--nc-radius-sm);
+    cursor: pointer;
+    transition: background .18s ease;
+}
+.nc-toast__action:hover { background: var(--border); }
+
+/* Close button */
+.nc-toast__close {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--nc-radius-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: background .18s ease, color .18s ease;
+    padding: 0;
+}
+.nc-toast__close:hover {
+    background: var(--border);
+    color: var(--foreground);
+}
+
+/* Loading spinner (SVG animation) */
+@keyframes nc-spin { to { transform: rotate(360deg); } }
+.nc-toast--loading .nc-toast__icon svg { animation: nc-spin .8s linear infinite; }
+
+/* Toast transitions */
+.nc-toast-enter        { transition: all .28s cubic-bezier(.22,1,.36,1); }
+.nc-toast-enter-start  { opacity: 0; transform: translateX(100%); }
+.nc-toast-enter-end    { opacity: 1; transform: translateX(0); }
+.nc-toast-leave        { transition: all .22s ease-in; }
+.nc-toast-leave-start  { opacity: 1; transform: translateX(0); }
+.nc-toast-leave-end    { opacity: 0; transform: translateX(100%); }
+
+/* Responsive toast */
+@media (max-width: 640px) {
+    .nc-toast-container { left: .75rem; right: .75rem; max-width: none; }
+}
+
+/* ══════════════════ MODAL ══════════════════════════════════ */
+
+.nc-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--nc-overlay-bg);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    padding: 1rem;
+}
+
+.nc-modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--nc-radius);
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--nc-shadow-modal);
+}
+
+/* Header */
+.nc-modal__header {
+    display: flex;
+    align-items: flex-start;
+    gap: .875rem;
+    margin-bottom: 1rem;
+}
+.nc-modal__icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.nc-modal__icon--info    { background: rgba(59,130,246,.1);  color: var(--nc-info); }
+.nc-modal__icon--success { background: rgba(34,197,94,.1);   color: var(--nc-success); }
+.nc-modal__icon--warning { background: rgba(249,115,22,.1);  color: var(--nc-warning); }
+.nc-modal__icon--error   { background: rgba(239,68,68,.1);   color: var(--nc-error); }
+.nc-modal__icon--confirm { background: rgba(59,130,246,.1);  color: var(--nc-info); }
+
+.nc-modal__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+    line-height: 1.3;
+}
+.nc-modal__subtitle {
+    font-size: .8125rem;
+    color: var(--text-secondary);
+    margin-top: .2rem;
+}
+
+/* Body */
+.nc-modal__body {
+    font-size: .875rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+
+/* Footer */
+.nc-modal__footer { }
+.nc-modal__actions {
+    display: flex;
+    gap: .625rem;
+}
+.nc-modal__actions--end { justify-content: flex-end; }
+
+/* Buttons */
+.nc-modal__btn {
+    flex: 1;
+    padding: .55rem 1.25rem;
+    border-radius: var(--nc-radius-sm);
+    font-size: .875rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all .18s ease;
+}
+.nc-modal__btn--primary {
+    background: var(--primary);
+    color: var(--background);
+}
+.nc-modal__btn--primary:hover { opacity: .85; }
+
+.nc-modal__btn--secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--foreground);
+}
+.nc-modal__btn--secondary:hover { background: var(--border); }
+
+/* Type-based close button colors */
+.nc-modal__btn--success { background: var(--nc-success); color: #fff; }
+.nc-modal__btn--success:hover { opacity: .85; }
+.nc-modal__btn--error   { background: var(--nc-error);   color: #fff; }
+.nc-modal__btn--error:hover   { opacity: .85; }
+.nc-modal__btn--warning { background: var(--nc-warning); color: #fff; }
+.nc-modal__btn--warning:hover { opacity: .85; }
+.nc-modal__btn--info    { background: var(--nc-info);    color: #fff; }
+.nc-modal__btn--info:hover    { opacity: .85; }
+
+/* Overlay transitions */
+.nc-overlay-enter        { transition: opacity .22s ease-out; }
+.nc-overlay-enter-start  { opacity: 0; }
+.nc-overlay-enter-end    { opacity: 1; }
+.nc-overlay-leave        { transition: opacity .18s ease-in; }
+.nc-overlay-leave-start  { opacity: 1; }
+.nc-overlay-leave-end    { opacity: 0; }
+
+/* Modal box transitions */
+.nc-modal-enter        { transition: all .25s cubic-bezier(.22,1,.36,1); }
+.nc-modal-enter-start  { opacity: 0; transform: scale(.94); }
+.nc-modal-enter-end    { opacity: 1; transform: scale(1); }
+.nc-modal-leave        { transition: all .18s ease-in; }
+.nc-modal-leave-start  { opacity: 1; transform: scale(1); }
+.nc-modal-leave-end    { opacity: 0; transform: scale(.94); }
+
+/* ══════════════════ DARK MODE ══════════════════════════════ */
+/* Trigger: <html data-theme="dark"> hoặc <body data-theme="dark"> */
+
+:root[data-theme="dark"] .nc-toast,
+[data-theme="dark"] .nc-toast {
+    /* Toast glass effect đậm hơn khi dark */
+    background-color: oklch(0.19 0 0);
+    border-color: oklch(0.3 0 0);
+    box-shadow: var(--nc-shadow-toast, 0 10px 30px -5px rgba(0,0,0,.5));
+}
+
+/* Icon bg bubble trong modal – tối hơn để contrast với dark card */
+:root[data-theme="dark"] .nc-modal__icon--info,
+[data-theme="dark"] .nc-modal__icon--info    { background: rgba(96,165,250,.15); }
+
+:root[data-theme="dark"] .nc-modal__icon--success,
+[data-theme="dark"] .nc-modal__icon--success { background: rgba(74,222,128,.15); }
+
+:root[data-theme="dark"] .nc-modal__icon--warning,
+[data-theme="dark"] .nc-modal__icon--warning { background: rgba(251,146,60,.15); }
+
+:root[data-theme="dark"] .nc-modal__icon--error,
+[data-theme="dark"] .nc-modal__icon--error   { background: rgba(248,113,113,.15); }
+
+:root[data-theme="dark"] .nc-modal__icon--confirm,
+[data-theme="dark"] .nc-modal__icon--confirm { background: rgba(96,165,250,.15); }
+
+/* Modal dark – border sáng hơn 1 chút */
+:root[data-theme="dark"] .nc-modal,
+[data-theme="dark"] .nc-modal {
+    border-color: oklch(0.32 0 0);
+}
+
+/* Toast action/close hover trong dark */
+:root[data-theme="dark"] .nc-toast__close:hover,
+[data-theme="dark"] .nc-toast__close:hover {
+    background: oklch(0.3 0 0);
+}
+:root[data-theme="dark"] .nc-toast__action:hover,
+[data-theme="dark"] .nc-toast__action:hover {
+    background: oklch(0.3 0 0);
+}
+</style>
+
+{# ─── ALPINE LOGIC ─────────────────────────────────────────── #}
+<script>
+document.addEventListener('alpine:init', () => {
+
+    /* ══════════════ TOAST MANAGER ══════════════════════════ */
+    Alpine.data('toastManager', () => ({
+        toasts: [],
+
+        /**
+         * Public API – dispatch từ bất kỳ đâu:
+         *   window.dispatchEvent(new CustomEvent('show-toast', {
+         *       detail: { type, title, description, duration, action }
+         *   }))
+         * Hoặc gọi trực tiếp: Alpine.store('notify').toast(...)
+         */
+        init() {
+            window.addEventListener('show-toast', (e) => this.add(e.detail));
+            window.addEventListener('dismiss-toast', (e) => this.dismiss(e.detail.id));
+
+            // Expose add/dismiss ra ngoài Alpine scope qua store
+            Alpine.store('toastBus', {
+                add:     (data) => this.add(data),
+                dismiss: (id)   => this.dismiss(id),
+            });
+        },
+
+        add(data) {
+            const id   = '_t' + Date.now() + Math.random().toString(36).slice(2, 6);
+            const type = data.type || 'info';  // success | error | warning | info | loading
+            const duration = (type === 'loading' || data.duration === 0)
+                ? 0
+                : (data.duration || 4000);
+
+            const toast = { id, type, visible: true, ...data };
+            this.toasts.push(toast);
+
+            if (duration > 0) {
+                setTimeout(() => this.dismiss(id), duration);
+            }
+            return id;
+        },
+
+        dismiss(id) {
+            const t = this.toasts.find(t => t.id === id);
+            if (t) t.visible = false;
+            // Xóa khỏi DOM sau khi animation kết thúc
+            setTimeout(() => {
+                this.toasts = this.toasts.filter(t => t.id !== id);
+            }, 300);
+        },
+
+        getIcon(type) {
+            const icons = {
+                success: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+                error:   `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+                warning: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+                info:    `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+                loading: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`,
+            };
+            return icons[type] || icons.info;
+        },
+    }));
+
+    /* ══════════════ MODAL MANAGER ══════════════════════════ */
+    Alpine.data('modalManager', () => ({
+        visible: false,
+        type: 'info',       // info | success | warning | error | confirm
+        title: '',
+        subtitle: '',
+        message: '',
+        _resolveCallback: null,
+
+        open(data) {
+            this.type     = data.type    || 'info';
+            this.title    = data.title   || '';
+            this.subtitle = data.subtitle || '';
+            this.message  = data.message || data.text || '';
+            this._resolveCallback = data.onResult || null;
+            this.visible  = true;
+        },
+
+        close() {
+            this.visible = false;
+        },
+
+        resolve(val) {
+            this.visible = false;
+            window.dispatchEvent(new CustomEvent('modal-result', { detail: { approved: val } }));
+            if (typeof this._resolveCallback === 'function') {
+                this._resolveCallback(val);
+            }
+        },
+
+        getBtnClass(type) {
+            return `nc-modal__btn--${type}`;
+        },
+
+        getIcon(type) {
+            const icons = {
+                success: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+                error:   `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+                warning: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+                info:    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+                confirm: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+            };
+            return icons[type] || icons.info;
+        },
+    }));
+
+    /* ══════════════ GLOBAL HELPER (window.notify) ══════════ */
+    /**
+     * Sử dụng trong JS bất kỳ:
+     *
+     * notify.toast.success('Lưu thành công', 'Dữ liệu đã được cập nhật')
+     * notify.toast.error('Lỗi kết nối')
+     * notify.toast.warning('Cảnh báo', 'Kiểm tra lại thông tin', 6000)
+     * notify.toast.loading('Đang tải...')           // trả về id
+     * notify.toast.dismiss(id)
+     *
+     * notify.modal.show({ type:'confirm', title:'Xóa?', message:'Không thể hoàn tác' })
+     *     .then(approved => { if (approved) deleteItem() })
+     */
+    window.notify = {
+        toast: {
+            _fire(type, title, description, duration, action) {
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: { type, title, description, duration, action }
+                }));
+            },
+            success(title, description, duration)  { this._fire('success', title, description, duration); },
+            error(title, description, duration)    { this._fire('error',   title, description, duration); },
+            warning(title, description, duration)  { this._fire('warning', title, description, duration); },
+            info(title, description, duration)     { this._fire('info',    title, description, duration); },
+            loading(title, description) {
+                // Dùng store để lấy id thực từ add()
+                const bus = Alpine.store('toastBus');
+                if (bus) return bus.add({ type: 'loading', title, description, duration: 0 });
+                // Fallback nếu store chưa ready
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: { type: 'loading', title, description, duration: 0 }
+                }));
+                return null;
+            },
+            dismiss(id) {
+                if (!id) return;
+                const bus = Alpine.store('toastBus');
+                if (bus) { bus.dismiss(id); return; }
+                // Fallback qua event
+                window.dispatchEvent(new CustomEvent('dismiss-toast', { detail: { id } }));
+            },
+        },
+        modal: {
+            show(data) {
+                return new Promise((resolve) => {
+                    window.dispatchEvent(new CustomEvent('show-modal', {
+                        detail: { ...data, onResult: resolve }
+                    }));
+                });
+            },
+            confirm(title, message) {
+                return this.show({ type: 'confirm', title, message });
+            },
+        },
+    };
+});
+</script>

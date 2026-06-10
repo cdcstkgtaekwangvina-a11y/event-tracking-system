@@ -3,6 +3,14 @@ const getToken = (name) => {
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(";").shift();
 };
+async function returnValue(res){
+  if(res.status == 204)
+    return {status_code:204};
+  const data = await res.json();
+  if(data.detail)
+    return data.detail;
+  return data;
+}
 export const fetchHelper = {
   baseUrl: "",
   async get(
@@ -13,7 +21,7 @@ export const fetchHelper = {
     try {
       const queryString = new URLSearchParams(payload).toString();
       const fullPath = queryString ? `${path}?${queryString}` : path;
-      const res = await fetch(`${this.baseUrl}${fullPath}`, {
+      const res = await fetch(`${this.baseUrl}/${fullPath}`, {
         method: "GET",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
@@ -23,7 +31,7 @@ export const fetchHelper = {
         },
       });
 
-      return await res.json();
+      return  await returnValue(res);
     } catch (error) {
       console.error("Error fetching data:", error);
       return null;
@@ -31,7 +39,7 @@ export const fetchHelper = {
   },
   async post(path = "", payload = {}, options = { requireAuth: false }) {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(`${this.baseUrl}/${path}`, {
         method: "POST",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
@@ -41,7 +49,7 @@ export const fetchHelper = {
         },
         body: JSON.stringify(payload),
       });
-      return await res.json();
+      return  await returnValue(res);
     } catch (error) {
       console.error("Error fetching data:", error);
       return null;
@@ -49,7 +57,7 @@ export const fetchHelper = {
   },
   async put(path = "", payload = {}, options = { requireAuth: false }) {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(`${this.baseUrl}/${path}`, {
         method: "PUT",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
@@ -60,7 +68,7 @@ export const fetchHelper = {
         body: JSON.stringify(payload),
       });
 
-      return await res.json();
+      return  await returnValue(res);
     } catch (error) {
       console.error("Error fetching data:", error);
       return null;
@@ -68,7 +76,7 @@ export const fetchHelper = {
   },
   async patch(path = "", payload = {}, options = { requireAuth: false }) {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(`${this.baseUrl}/${path}`, {
         method: "PUT",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
@@ -79,7 +87,7 @@ export const fetchHelper = {
         body: JSON.stringify(payload),
       });
 
-      return await res.json();
+      return  await returnValue(res);
     } catch (error) {
       console.error("Error fetching data:", error);
       return null;
@@ -87,7 +95,7 @@ export const fetchHelper = {
   },
   async delete(path = "", payload = {}, options = { requireAuth: false }) {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(`${this.baseUrl}/${path}`, {
         method: "DELETE",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
@@ -98,7 +106,7 @@ export const fetchHelper = {
         body: JSON.stringify(payload),
       });
 
-      return await res.json();
+      return  await returnValue(res);
     } catch (error) {
       console.error("Error fetching data:", error);
       return null;

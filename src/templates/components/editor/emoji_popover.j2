@@ -1,0 +1,47 @@
+<!-- Emoji Picker -->
+<div class="dropdown-wrapper" @click.outside="activeDropdown === 'emoji' && (activeDropdown = null)">
+    <button type="button" class="btn" title="Chèn Emoji" @click="toggleDropdown('emoji')">
+        😊 Emoji
+    </button>
+    <div class="dropdown-menu emoji-popover" x-show="activeDropdown === 'emoji'" x-transition>
+        <div class="emoji-tabs">
+            <button type="button" class="emoji-tab" :class="emojiActiveTab === 'smileys' && 'active'"
+                @click="emojiActiveTab = 'smileys'">😀</button>
+            <button type="button" class="emoji-tab" :class="emojiActiveTab === 'symbols' && 'active'"
+                @click="emojiActiveTab = 'symbols'">➡️</button>
+            <button type="button" class="emoji-tab" :class="emojiActiveTab === 'animals' && 'active'"
+                @click="emojiActiveTab = 'animals'">🐶</button>
+            <button type="button" class="emoji-tab" :class="emojiActiveTab === 'objects' && 'active'"
+                @click="emojiActiveTab = 'objects'">💻</button>
+        </div>
+
+        <div class="emoji-grid" x-show="emojiActiveTab === 'smileys'">
+            <template
+                x-for="e in ['😀','😂','😍','😎','😊','👍','🎉','❤️','🌟','🔥','🚀','💡','🧐','🤔','👏','😭','😅','😉','🥳','🙌']">
+                <button type="button" class="emoji-item" x-text="e"
+                    @click="myEditor.chain().focus().insertContent(e).run(); closeDropdown()"></button>
+            </template>
+        </div>
+        <div class="emoji-grid" x-show="emojiActiveTab === 'symbols'">
+            <template
+                x-for="e in ['➡️','⚠️','❌','✅','ℹ️','🔔','📌','⚙️','💬','📅','📊','🔒','📎','✏️','🔍','🔄','❌','✔️','🚀','☀️']">
+                <button type="button" class="emoji-item" x-text="e"
+                    @click="myEditor.chain().focus().insertContent(e).run(); closeDropdown()"></button>
+            </template>
+        </div>
+        <div class="emoji-grid" x-show="emojiActiveTab === 'animals'">
+            <template
+                x-for="e in ['🐶','🐱','🦁','🐼','🌴','🌸','☀️','🌧️','🌊','🌎','🦊','🐨','🐒','🍀','🍁','⚡','🦁','🐯','🐨','🌵']">
+                <button type="button" class="emoji-item" x-text="e"
+                    @click="myEditor.chain().focus().insertContent(e).run(); closeDropdown()"></button>
+            </template>
+        </div>
+        <div class="emoji-grid" x-show="emojiActiveTab === 'objects'">
+            <template
+                x-for="e in ['💻','📱','✉️','✏️','📂','🔑','🎁','🏆','✈️','🛒','☕','🍕','💵','📦','🎨','🎬','🎤','🎧','🎨','💼']">
+                <button type="button" class="emoji-item" x-text="e"
+                    @click="myEditor.chain().focus().insertContent(e).run(); closeDropdown()"></button>
+            </template>
+        </div>
+    </div>
+</div>

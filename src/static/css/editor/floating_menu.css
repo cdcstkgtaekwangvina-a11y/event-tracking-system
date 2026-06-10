@@ -1,0 +1,54 @@
+/* Floating Menu */
+    .floating-menu {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 4px 6px;
+        background: var(--background, #fff);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
+        z-index: 50;
+        animation: floatingMenuIn 0.15s ease-out;
+    }
+
+    @keyframes floatingMenuIn {
+        from {
+            opacity: 0;
+            transform: translateY(4px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .floating-menu .fm-btn {
+        background: transparent;
+        border: none;
+        padding: 5px 8px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 5px;
+        cursor: pointer;
+        color: var(--text-secondary, #64748b);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.12s ease;
+        white-space: nowrap;
+    }
+
+    .floating-menu .fm-btn:hover {
+        background: var(--border, #f1f5f9);
+        color: var(--foreground, #0f172a);
+    }
+
+    .floating-menu .fm-divider {
+        width: 1px;
+        height: 18px;
+        background: var(--border, #e2e8f0);
+        margin: 0 2px;
+    }

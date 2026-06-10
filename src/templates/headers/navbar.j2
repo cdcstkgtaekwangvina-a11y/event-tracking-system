@@ -1,48 +1,188 @@
 <div class="navbar">
     {% include "templates/headers/title_logo.j2" %}
-    <div class="nav-item">
-        {% include "templates/headers/toggle_theme.j2" %}
-        <a x-data class="login-btn" href="{{ url_for('login_view') }}?redirect={{ request.url|string|urlencode }}" style="text-decoration: none;">
-            {% include "static/public/icons/login.svg"%} <span x-show="$store.screen.isMobile === false"><b>Đăng nhập</b></span>
+    <div class="nav-item"
+        x-data="{darkModeText:null, lightModeText: null, customStyle: null, isSidebar: false, openDropdown: false}">
+        <div style="flex-grow: 1;">
+            {% include "templates/headers/toggle_theme.j2" %}
+        </div>
+        {% if is_authenticated%}
+        <div class="dropdown-container">
+            <button :class="'avatar ' + (openDropdown ? 'border' : '')" @click="openDropdown = !openDropdown">
+                {% if user.avatar_url or user.file_url%}
+                <img class="avatar-img" src="{{ user.file_url if user.file_url else user.avatar_url }}"
+                    alt="{{ user.name }}">
+                {% else %}
+                {% include "static/public/icons/avatar.svg" %}
+                {% endif %}
+                <span x-show="$store.screen.isMobile === false" style="font-weight: bold;">
+                    {{ user.name if user.name else user.email }}
+                </span>
+            </button>
+            <div class="dropdown border" x-show="openDropdown" x-transition @click.outside="openDropdown = false">
+                <a href="{{ url_for('me') }}" class="dropdown-button"
+                    style="text-decoration: none; color: var(--foreground);">
+                    {% include "static/public/icons/account.svg"%}
+                    <span>Tài khoản</span></a>
+                {% if user.role and user.role == 'ADMIN' or user.role == 'SUPPER_ADMIN' %}
+                <a href="{{ url_for('admin_dashboard') }}" class="dropdown-button"
+                    style="text-decoration: none; color: var(--foreground);">
+                    {% include "static/public/icons/manage.svg"%}
+                    <span>Quản lý</span></a>
+                {% endif %}
+                <button class="dropdown-button logout">{% include "static/public/icons/logout.svg" %}
+                    <span>Đăng xuất</span></button>
+            </div>
+        </div>
+        {% else%}
+        <a class="login-btn" href="{{ url_for('login_view') }}?redirect={{ request.url|string|urlencode }}"
+            style="text-decoration: none;">
+            {% include "static/public/icons/login.svg"%}
+            <span x-show="$store.screen.isMobile === false" style="font-weight: bold;">Đăng nhập</span>
         </a>
+        {% endif %}
     </div>
 </div>
 <style>
-.navbar{
-    padding: 10px 5px;
-    display: flex;
-    justify-content: space-around;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    border-bottom: 1px var(--border);
-    box-shadow: 5px var(--border);
-    border-bottom: 1px solid var(--border); 
-    box-shadow: 0 2px 5px var(--border);
-    backdrop-filter: blur(10px); 
-    -webkit-backdrop-filter: blur(10px);
-    z-index: 9999;
-}
+    .navbar {
+        padding: 10px 5px;
+        display: flex;
+        justify-content: space-around;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 9999;
+    }
 
-.login-btn{
-    padding: 15px;
-    background-color: var(--login-bg);
-    border-radius: 10px;
-    color: var(--background);
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 5px;
-}
-.login-btn:hover{
-    transform: scale(1.01);
-}
-.nav-item{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 5px;
-}
+    .navbar::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--background);
+        border-bottom: 1px solid var(--border);
+        box-shadow: 0 2px 5px var(--border);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+
+        z-index: -1;
+        pointer-events: none;
+    }
+
+    .login-btn {
+        padding: 12px 15px;
+        background-color: var(--login-bg);
+        border-radius: 10px;
+        color: var(--background);
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        width: fit-content;
+        flex-grow: 2;
+    }
+
+    .login-btn:hover {
+        transform: scale(1.01);
+    }
+
+    .logout {
+        color: red;
+    }
+
+    .logout:hover {
+        color: var(--logout);
+        background-color: var(--logout-bg);
+    }
+
+    .nav-item {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .dropdown-container {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        outline: 0;
+        border: 0;
+    }
+
+    .dropdown {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 5px;
+        border-radius: 10px;
+        padding: 10px;
+        z-index: 999999 !important;
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        background-color: var(--background);
+        gap: 5px;
+    }
+
+    .dropdown-button {
+        display: flex;
+        justify-content: start;
+        align-items: center;
+        padding: 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        background-color: var(--background);
+        box-sizing: border-box;
+        white-space: nowrap;
+        outline: 0;
+        border: 0;
+        width: 100%;
+    }
+
+    .dropdown-button:hover {
+        outline: 1px solid var(--border);
+        box-shadow: 0 5px 10px var(--border);
+        box-sizing: border-box;
+    }
+
+    .avatar {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        color: var(--foreground);
+        background-color: transparent;
+        outline: 0;
+        border: 0;
+    }
+
+    .avatar:hover {
+        outline: 1px solid var(--border);
+        box-shadow: 0 5px 10px var(--border);
+        box-sizing: border-box;
+    }
+
+    .avatar-img {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        outline: solid 1px var(--foreground);
+        border-radius: 50%;
+    }
+
+    .border {
+        outline: 1px solid var(--border);
+        box-shadow: 0 5px 10px var(--border);
+        box-sizing: border-box;
+    }
 </style>

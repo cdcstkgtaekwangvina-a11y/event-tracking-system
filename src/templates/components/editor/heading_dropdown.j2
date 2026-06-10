@@ -1,0 +1,30 @@
+<!-- Header Levels Dropdown -->
+<div class="dropdown-wrapper" @click.outside="activeDropdown === 'heading' && (activeDropdown = null)">
+    <button type="button" class="btn dropdown-btn" @click="toggleDropdown('heading')">
+        <span x-text="getCurrentHeadingLabel()">Định dạng</span>
+        <span class="arrow">▼</span>
+    </button>
+    <div class="dropdown-menu" x-show="activeDropdown === 'heading'" x-transition>
+        <button type="button" class="dropdown-item" :class="isActive('paragraph') && 'selected'"
+            @click="myEditor.chain().focus().setParagraph().run(); closeDropdown()">
+            <span style="font-weight: normal;">Đoạn văn (P)</span>
+        </button>
+        <div class="dropdown-divider"></div>
+        <button type="button" class="dropdown-item" :class="isActive('heading', { level: 1 }) && 'selected'"
+            @click="myEditor.chain().focus().toggleHeading({ level: 1 }).run(); closeDropdown()">
+            <span style="font-size: 1.4em; font-weight: bold; margin: 0;">Tiêu đề 1 (H1)</span>
+        </button>
+        <button type="button" class="dropdown-item" :class="isActive('heading', { level: 2 }) && 'selected'"
+            @click="myEditor.chain().focus().toggleHeading({ level: 2 }).run(); closeDropdown()">
+            <span style="font-size: 1.25em; font-weight: bold; margin: 0;">Tiêu đề 2 (H2)</span>
+        </button>
+        <button type="button" class="dropdown-item" :class="isActive('heading', { level: 3 }) && 'selected'"
+            @click="myEditor.chain().focus().toggleHeading({ level: 3 }).run(); closeDropdown()">
+            <span style="font-size: 1.15em; font-weight: bold; margin: 0;">Tiêu đề 3 (H3)</span>
+        </button>
+        <button type="button" class="dropdown-item" :class="isActive('heading', { level: 4 }) && 'selected'"
+            @click="myEditor.chain().focus().toggleHeading({ level: 4 }).run(); closeDropdown()">
+            <span style="font-size: 1.05em; font-weight: bold; margin: 0;">Tiêu đề 4 (H4)</span>
+        </button>
+    </div>
+</div>

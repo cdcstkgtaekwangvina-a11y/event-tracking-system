@@ -1,0 +1,12 @@
+{% extends "templates/index.j2" %}
+{% block title %}{% block admin_title %}{% endblock %}{% endblock %}
+
+{% block body %}
+<div style="display: flex; flex-direction: row;">
+    {% include "templates/headers/sidebar.j2" %}
+    <div id="admin-main-content" class="admin-main-content">
+        {% block admin_body %}{% endblock %}
+    </div>
+</div>
+<link rel="stylesheet" href="/static/css/admin_container.css">
+{% endblock %}

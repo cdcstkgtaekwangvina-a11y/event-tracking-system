@@ -1,0 +1,44 @@
+<!-- Table Selector and Operations -->
+<div class="dropdown-wrapper"
+    @click.outside="activeDropdown === 'table' && (activeDropdown = null); activeDropdown === 'table' && tableGrid.reset()">
+    <button type="button" class="btn dropdown-btn" @click="toggleDropdown('table')">
+        <span>📊 Bảng</span>
+        <span class="arrow">▼</span>
+    </button>
+    <div class="dropdown-menu table-grid-dropdown" x-show="activeDropdown === 'table'" x-transition>
+        <div class="grid-container" @mouseleave="tableGrid.reset()">
+            <template x-for="r in 8" :key="r">
+                <div class="grid-row">
+                    <template x-for="c in 8" :key="c">
+                        <div class="grid-cell"
+                            :class="(r <= tableGrid.hoveredRow && c <= tableGrid.hoveredCol) ? 'cell-active' : ''"
+                            @mouseenter="tableGrid.hover(r, c)" @click="tableGrid.click(r, c); closeDropdown()">
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+        <div class="grid-label"
+            x-text="tableGrid.hoveredRow > 0 ? tableGrid.hoveredRow + ' x ' + tableGrid.hoveredCol : 'Chọn kích thước bảng'">
+        </div>
+
+        <template x-if="isActive('table')">
+            <div>
+                <div class="dropdown-divider"></div>
+                <div class="table-ops">
+                    <button type="button" class="dropdown-item" title="Thêm cột bên phải"
+                        @click="myEditor.chain().focus().addColumnAfter().run()">➡️ Cột+</button>
+                    <button type="button" class="dropdown-item" title="Xóa cột"
+                        @click="myEditor.chain().focus().deleteColumn().run()">❌ Cột</button>
+                    <button type="button" class="dropdown-item" title="Thêm dòng bên dưới"
+                        @click="myEditor.chain().focus().addRowAfter().run()">⬇️ Dòng+</button>
+                    <button type="button" class="dropdown-item" title="Xóa dòng"
+                        @click="myEditor.chain().focus().deleteRow().run()">❌ Dòng</button>
+                    <button type="button" class="dropdown-item delete-table-btn" title="Xóa bảng"
+                        @click="myEditor.chain().focus().deleteTable().run(); closeDropdown()">🗑️ Xóa
+                        Bảng</button>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>

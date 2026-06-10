@@ -18,25 +18,21 @@
   {% block meta %}
   <meta name="description" content="Trang web điểm danh build bằng fastapi và jinja2">
   {% endblock %}
-  <title>{% block title %}Event tracking system{% endblock %}</title>
+  <title id="page-title">{% block title %}Event tracking system{% endblock %}</title>
   <script src="{{ url_for('static', path='js/vendors/htmx.min.js') }}"></script>
   <script src="{{ url_for('static', path='js/vendors/htmx.hx-ws.js') }}"></script>
   <script defer src="{{ url_for('static', path='js/vendors/alpine.min.js') }}"></script>
 </head>
 
 <body>
-  {% block body %}
-  {% include "templates/headers/index.j2" %}
-  {% block content %}{% endblock %}
-  {% include "templates/footers/index.j2" %}
-  {% endblock %}
+  {% block body %}{% endblock %}
 </body>
 <script type="module">
   import { fetchHelper } from "/static/js/fetch_helper.js"
   document.body.className = document.body.className + " " + currentTheme();
 
-  fetchHelper.baseUrl = "{{ base_url }}"
-  window.fetchHelper = fetchHelper
+  fetchHelper.baseUrl = "{{ base_url }}" + "/api";
+  window.fetchHelper = fetchHelper;
 </script>
 <script src="/static/js/theme.js"></script>
 <script src="/static/js/check_mobile.js"></script>

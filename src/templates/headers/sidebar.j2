@@ -1,0 +1,205 @@
+<div x-data="{
+    isSidebar: localStorage.getItem('isSidebar') == 'false' ? false : true,
+    lightModeText: 'Chế độ sáng', 
+    darkModeText: 'Chế độ tối', 
+    expandedStyle: 'box-shadow: none; border-radius: 10px; width: 90%; display: flex; align-items: center; gap: 5px; border: 0px;',
+    customStyle: null,
+    init() {
+        this.customStyle = this.isSidebar ? this.expandedStyle : null;
+    },
+    toggle_sidebar(){ 
+        this.isSidebar = !this.isSidebar;
+        this.customStyle = this.isSidebar ? this.expandedStyle : null;
+        localStorage.setItem('isSidebar', this.isSidebar); 
+    }
+    }">
+    <div x-show="!isSidebar && $store.screen.isMobile" x-transition.opacity.duration.200ms class="navbar">
+        <button class="toggle-sidebar" @click="toggle_sidebar">
+            {% include "static/public/icons/sidebar.svg" %}
+        </button>
+    </div>
+
+    <div class="sidebar" :class="{
+            'sidebar-expanded': isSidebar && !$store.screen.isMobile,
+            'sidebar-collapsed': !isSidebar && !$store.screen.isMobile,
+            'sidebar-mobile-open': isSidebar && $store.screen.isMobile,
+            'sidebar-mobile-closed': !isSidebar && $store.screen.isMobile
+         }">
+
+        <div class="header-sidebar">
+            <a href="{{ url_for('home') }}" class="logo-wrapper" x-show="isSidebar || $store.screen.isMobile"
+                x-transition.opacity.duration.150ms>
+                <img style="width: 90px;" src="{{ url_for('static', path='public/app_logo.png') }}" alt="logo">
+            </a>
+
+            <button class="toggle-sidebar flex-center" @click="toggle_sidebar">
+                {% include "static/public/icons/sidebar.svg" %}
+            </button>
+        </div>
+
+        <div class="sidebar-body">
+            {% for page in ADMIN_PAGES %}
+            <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
+                hx-push-url="true">
+
+                <span class="icon-wrapper flex-center">
+                    {% include "static/public/icons/" ~ page.icon %}
+                </span>
+
+                <span class="menu-text" x-show="isSidebar || $store.screen.isMobile"
+                    x-transition.opacity.duration.200ms>
+                    {{ page.name }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="sidebar-footer">
+            {% include "templates/headers/toggle_theme.j2" %}
+        </div>
+    </div>
+</div>
+
+<style>
+    /* KHUNG HOẠT HÌNH GỐC CỦA SIDEBAR */
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background-color: var(--background);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-shadow: 2px 0 5px var(--border);
+        z-index: 50;
+        overflow-x: hidden;
+        box-sizing: border-box;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+            transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+
+    .sidebar-expanded {
+        width: 230px;
+        transform: translateX(0);
+    }
+
+    .sidebar-collapsed {
+        width: 60px;
+        transform: translateX(0);
+    }
+
+    .sidebar-mobile-open {
+        width: 100%;
+        transform: translateX(0);
+    }
+
+    .sidebar-mobile-closed {
+        width: 100%;
+        transform: translateX(-100%);
+    }
+
+    .header-sidebar {
+        height: 60px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 15px;
+        box-sizing: border-box;
+        border-bottom: solid 1px var(--border);
+    }
+
+    .logo-wrapper {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .toggle-sidebar {
+        width: 30px;
+        height: 30px;
+        color: var(--foreground);
+        background-color: transparent;
+        border: 0;
+        margin: 0;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    /* BODY VÀ MENU ITEMS */
+    .sidebar-body {
+        width: 100%;
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .sidebar-body-item {
+        width: 90%;
+        height: 44px;
+        padding: 0 12px;
+        border-radius: 10px;
+        box-sizing: border-box;
+        color: var(--foreground);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s;
+    }
+
+    .sidebar-body-item:hover {
+        background-color: var(--border);
+    }
+
+    .icon-wrapper {
+        width: 24px;
+        height: 24px;
+        flex-shrink: 0;
+    }
+
+    .menu-text {
+        white-space: nowrap;
+    }
+
+    /* FOOTER SIDEBAR */
+    .sidebar-footer {
+        position: absolute;
+        bottom: 0;
+        box-sizing: border-box;
+        border-top: solid 1px var(--border);
+        width: 100%;
+        padding: 10px 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* TOP NAVBAR MOBILE */
+    .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50px;
+        background-color: var(--background);
+        border-bottom: 1px solid var(--border);
+        padding: 0 15px;
+        display: flex;
+        align-items: center;
+        z-index: 40;
+    }
+
+    .flex-center {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>

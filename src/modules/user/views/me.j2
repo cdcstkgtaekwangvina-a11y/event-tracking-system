@@ -1,0 +1,6 @@
+{% extends "templates/index.j2"%}
+
+{% block title %}{{ user.username if user.username else user.email }}{% endblock %}
+{% block body %}
+{{ user }}
+{% endblock %}

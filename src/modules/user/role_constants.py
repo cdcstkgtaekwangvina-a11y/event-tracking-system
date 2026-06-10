@@ -1,6 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
-class ROLE(str, Enum):
-    COMMON = "common"
-    ADMIN = "admin"
-    SUPER_ADMIN = "super_admin"
+
+class ROLE(StrEnum):
+    COMMON = "COMMON"
+    ADMIN = "ADMIN"
+    SUPER_ADMIN = "SUPPER_ADMIN"
