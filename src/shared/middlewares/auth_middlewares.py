@@ -86,4 +86,7 @@ class RequireAuth:
                 if self.is_required_auth:
                     return AuthContext(payload=payload, is_valid=False)
 
+        req.state.user = payload.user
+        req.state.is_authenticated = payload.valid
+
         return AuthContext(payload=payload, is_valid=payload.valid)

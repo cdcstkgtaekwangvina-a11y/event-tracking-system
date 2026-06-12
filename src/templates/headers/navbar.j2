@@ -1,35 +1,55 @@
 <div class="navbar">
     {% include "templates/headers/title_logo.j2" %}
-    <div class="nav-item"
-        x-data="{darkModeText:null, lightModeText: null, customStyle: null, isSidebar: false, openDropdown: false}">
+    <div class="nav-item" x-data="{
+        darkModeText:null, 
+        lightModeText: null, 
+        customStyle: null, 
+        isSidebar: false, 
+        openDropdown: false, 
+        async log_out(){
+        const approved = await notify.modal.confirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?');
+        if (approved) {
+            const response = await fetchHelper.post('auth/logout', {});
+            if (response.status_code === 204) {
+                notify.toast.success('Đăng xuất thành công', 'Đang chuyển hướng...');
+                setTimeout(() => {
+                    window.location.href = '{{ url_for('home') }}';
+                }, 500);
+            } else {
+                notify.toast.error('Đăng xuất thất bại', 'Đã có lỗi xảy ra, vui lòng thử lại');
+            }
+        }
+    },}">
         <div style="flex-grow: 1;">
             {% include "templates/headers/toggle_theme.j2" %}
         </div>
-        {% if is_authenticated%}
+        {% if auth.is_authenticated%}
         <div class="dropdown-container">
             <button :class="'avatar ' + (openDropdown ? 'border' : '')" @click="openDropdown = !openDropdown">
-                {% if user.avatar_url or user.file_url%}
-                <img class="avatar-img" src="{{ user.file_url if user.file_url else user.avatar_url }}"
-                    alt="{{ user.name }}">
+                {% if auth.user.avatar_url or auth.user.file_url%}
+                <img class="avatar-img" src="{{ auth.user.file_url if auth.user.file_url else auth.user.avatar_url }}"
+                    alt="{{ auth.user.name }}">
                 {% else %}
                 {% include "static/public/icons/avatar.svg" %}
                 {% endif %}
                 <span x-show="$store.screen.isMobile === false" style="font-weight: bold;">
-                    {{ user.name if user.name else user.email }}
+                    {{ auth.user.name if auth.user.name else auth.user.email }}
                 </span>
             </button>
-            <div class="dropdown border" x-show="openDropdown" x-transition @click.outside="openDropdown = false">
+            <div class="dropdown border" x-show="openDropdown" x-transition.opacity.duration.300ms
+                @click.outside="openDropdown = false">
                 <a href="{{ url_for('me') }}" class="dropdown-button"
                     style="text-decoration: none; color: var(--foreground);">
                     {% include "static/public/icons/account.svg"%}
                     <span>Tài khoản</span></a>
-                {% if user.role and user.role == 'ADMIN' or user.role == 'SUPPER_ADMIN' %}
+                {% if auth.user.role and auth.user.role == 'ADMIN' or auth.user.role == 'SUPPER_ADMIN' %}
                 <a href="{{ url_for('admin_dashboard') }}" class="dropdown-button"
                     style="text-decoration: none; color: var(--foreground);">
                     {% include "static/public/icons/manage.svg"%}
                     <span>Quản lý</span></a>
                 {% endif %}
-                <button class="dropdown-button logout">{% include "static/public/icons/logout.svg" %}
+                <button class="dropdown-button logout" @click="await log_out()">
+                    {% include "static/public/icons/logout.svg" %}
                     <span>Đăng xuất</span></button>
             </div>
         </div>

@@ -1,3 +1,8 @@
+{% if not auth.is_authenticated %}
+<script>
+    window.location.href = "/404";
+</script>
+{% else %}
 {% extends "templates/index.j2" %}
 {% block title %}{% block admin_title %}{% endblock %}{% endblock %}
 
@@ -10,3 +15,4 @@
 </div>
 <link rel="stylesheet" href="/static/css/admin_container.css">
 {% endblock %}
+{% endif %}

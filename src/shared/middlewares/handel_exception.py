@@ -1,5 +1,9 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import FastAPI, Request, status
+from fastapi.responses import (
+    JSONResponse,
+    HTMLResponse,
+    RedirectResponse,
+)  # Thêm RedirectResponse
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
@@ -47,24 +51,23 @@ def handle_exceptions(app: FastAPI, templates: Jinja2Templates) -> FastAPI:
 
         response_class = getattr(route, "response_class", None) if route else None
         is_api = str(req.url.path).startswith("/api")
-
         if response_class == HTMLResponse or not is_api:
-            try:
-                if status_code == 404:
-                    return templates.TemplateResponse(
-                        request=req,
-                        name="templates/not_found.j2",
-                        status_code=404,
-                        context={"message": "Trang bạn tìm kiếm không tồn tại"},
-                    )
-                return templates.TemplateResponse(
-                    request=req,
-                    name="templates/error.j2",
-                    context={"message": "Lỗi server, vui lòng thử lại sau!"},
-                    status_code=status_code,
+            if req.url.path in ["/404", "/error"]:
+                return HTMLResponse(
+                    content="<h1>Hệ thống gặp sự cố!</h1>", status_code=500
                 )
-            except Exception as t_err:
-                logger.error(f"Lỗi khi render template thông báo lỗi: {t_err}")
+
+            if status_code == 404:
+                response = RedirectResponse(
+                    url="/404", status_code=status.HTTP_302_FOUND
+                )
+                return response
+
+            response = RedirectResponse(url="/error", status_code=status.HTTP_302_FOUND)
+            response.set_cookie(
+                key="error_permitted", value="true", max_age=10, httponly=True
+            )
+            return response
 
         return JSONResponse(status_code=status_code, content={"detail": detail})
 
