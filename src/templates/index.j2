@@ -26,6 +26,7 @@
 
 <body>
   {% block body %}{% endblock %}
+  {% include "templates/components/notify_component.j2" %}
 </body>
 <script type="module">
   import { fetchHelper } from "/static/js/fetch_helper.js"

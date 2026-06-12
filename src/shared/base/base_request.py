@@ -19,6 +19,17 @@ class BaseRequest(Request):
         background: BackgroundTask | None = None,
     ) -> HTMLResponse:
         templates = self.get_templates()
+        if context is None:
+            context = {}
+        context.setdefault(
+            "auth",
+            {
+                "is_authenticated": getattr(self.state, "is_authenticated", False),
+                "user": getattr(self.state, "user", None),
+            },
+        )
+        context.setdefault("request", self)
+        context.setdefault("req", self)
         return templates.TemplateResponse(
             request=self,
             name=name,

@@ -101,6 +101,15 @@ class AuthenticationServices:
         )
         return res
 
+    def logout(self, response: Response) -> BaseResponse[None]:
+        res = BaseResponse.no_content(message="Đăng xuất thành công")
+        res.delete_cookie(
+            key="access_token",
+            httponly=True,
+            samesite="lax",
+        )
+        return res
+
     def verify_token(self, token: str, algorithm: str = "HS256") -> TokenData:
         if token.strip() == "":
             return TokenData(

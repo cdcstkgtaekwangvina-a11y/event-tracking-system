@@ -50,3 +50,11 @@ class AuthenticationController:
         response: Response,
     ):
         return await self.services.login(req, response)
+
+    @router.post_api("logout")
+    def logout(
+        self,
+        response: Response,
+        auth: AuthContext = Depends(RequireAuth(is_required_auth=True)),
+    ):
+        return self.services.logout(response)
