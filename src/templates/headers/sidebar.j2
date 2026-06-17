@@ -6,7 +6,7 @@
     customStyle: null,
     openDropdown: false,
     async log_out(){
-        const approved = await notify.modal.confirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?');
+        const approved = await notify.modal.confirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?',{confirmText: 'Đăng xuất', cancelText: 'Ở lại', confirmClass: 'nc-modal__btn--danger', icon: 'error'});
         if (approved) {
             const response = await fetchHelper.post('auth/logout', {});
             if (response.status_code === 204) {
@@ -83,7 +83,8 @@
                         %}
                         <span>Đăng xuất</span></button>
                 </div>
-                <button class="avatar" :class="{'border': openDropdown}" @click="openDropdown = !openDropdown">
+                <button class="avatar" :class="{'border': openDropdown}" @click="openDropdown = !openDropdown"
+                    :style="`width: 90%; ${$store.screen.isMobile ? 'align-items: start;' : 'align-items: center;'}`">
                     {% if auth.user.avatar_url or auth.user.file_url%}
                     <img class="avatar-img"
                         src="{{ auth.user.file_url if auth.user.file_url else auth.user.avatar_url }}"
@@ -91,9 +92,14 @@
                     {% else %}
                     {% include "static/public/icons/avatar.svg" %}
                     {% endif %}
-                    <span x-show="$store.screen.isMobile === false && isSidebar === true " style="font-weight: bold;">
-                        {% set display_name = auth.user.name if auth.user.name else auth.user.email %}
-                        {{ display_name[:15] ~ '...' if display_name | length > 15 else display_name }}
+                    <span x-show="isSidebar === true " x-data="{name: '{{ auth.user.name if auth.user.name else auth.user.email }}', 
+                        displayName(){
+                            const nameLength = this.name?.length || 0;
+                            if($store.screen.isMobile){
+                                return `${this.name?.substring(0, 30)}${nameLength > 30 ? '...' : ''}`
+                            }
+                            return `${this.name?.substring(0, 15)}${nameLength > 15 ? '...' : ''}`
+                        }}" style="font-weight: bold;" x-text="displayName()">
                     </span>
                 </button>
             </div>
@@ -247,9 +253,10 @@
 
     .dropdown-container {
         position: relative;
+        width: 100%;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: start;
         align-items: center;
         outline: 0;
         border: 0;
@@ -295,7 +302,6 @@
 
     .avatar {
         display: flex;
-        align-items: center;
         gap: 5px;
         padding: 10px;
         border-radius: 10px;
