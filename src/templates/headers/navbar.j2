@@ -7,7 +7,7 @@
         isSidebar: false, 
         openDropdown: false, 
         async log_out(){
-        const approved = await notify.modal.confirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?');
+        const approved = await notify.modal.confirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?',{confirmText: 'Đăng xuất', cancelText: 'Ở lại', confirmClass: 'nc-modal__btn--danger', icon: 'error'});
         if (approved) {
             const response = await fetchHelper.post('auth/logout', {});
             if (response.status_code === 204) {

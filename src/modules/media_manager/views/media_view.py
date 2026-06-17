@@ -6,9 +6,14 @@ from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
 )
 from ..media_services import MediaServices
+from src.shared.middlewares.auth_middlewares import RequireAuth
 
 TAG_NAME = "admin/media"
-router = BaseRouter(controller=TAG_NAME, tags=[TAG_NAME])
+router = BaseRouter(
+    controller=TAG_NAME,
+    tags=[TAG_NAME],
+    dependencies=[Depends(RequireAuth(is_required_auth=True))],
+)
 base_path = "modules/media_manager/views/"
 
 
@@ -18,8 +23,7 @@ class MediaViews:
 
     @router.get(name="media_manager")
     def media_manager(self, req: BaseRequest):
-        templates = req.app.state.templates
-        return templates.TemplateResponse(req, name=f"{base_path}index.j2")
+        return req.response_html(name=f"{base_path}index.j2")
 
     @router.get("items/html")
     async def list_items_html(
