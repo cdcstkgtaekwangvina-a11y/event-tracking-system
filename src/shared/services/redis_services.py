@@ -22,7 +22,7 @@ class RedisServices:
             self.url, max_connections=30, decode_responses=True
         )
         self.client = redis.Redis.from_pool(connection_pool=pool)
-        self.tag_prefix = "cache:tag:"
+        self.tag_version_prefix = "tag_version:"
 
     @staticmethod
     def _orjson_default(obj: Any) -> Any:
@@ -34,6 +34,65 @@ class RedisServices:
             return str(obj)
         raise TypeError(f"Type {obj.__class__.__name__} not serializable")
 
+    # ──────────────────────────────────────────────
+    # Tag Version helpers
+    # ──────────────────────────────────────────────
+
+    async def _get_tag_versions(self, tags: Sequence[str]) -> dict[str, int]:
+        """Fetch current versions for a list of tags in one pipeline round-trip.
+
+        Returns a dict mapping tag_name -> version (int).
+        Tags that don't exist yet in Redis are treated as version 0.
+        """
+        if not tags:
+            return {}
+
+        async with self.client.pipeline(transaction=False) as pipe:
+            for tag in tags:
+                pipe.get(f"{self.tag_version_prefix}{tag}")
+            results = await pipe.execute()
+
+        return {
+            str(tag): int(version) if version is not None else 0
+            for tag, version in zip(tags, results)
+        }
+
+    async def _validate_tag_versions(self, saved_tags: dict[str, int]) -> bool:
+        """Compare saved tag versions against live versions in Redis.
+
+        Returns True if ALL versions match, False otherwise.
+        Per the spec: if current version is null (key doesn't exist)
+        OR differs from saved version -> data is stale.
+        """
+        if not saved_tags:
+            return True
+
+        tag_names = list(saved_tags.keys())
+
+        async with self.client.pipeline(transaction=False) as pipe:
+            for tag in tag_names:
+                pipe.get(f"{self.tag_version_prefix}{tag}")
+            results = await pipe.execute()
+
+        for tag, current_raw in zip(tag_names, results):
+            saved_version = saved_tags[tag]
+
+            # null (key không tồn tại) -> dữ liệu lỗi thời
+            if current_raw is None:
+                return False
+
+            current_version = int(current_raw)
+
+            # Version khác -> dữ liệu lỗi thời
+            if current_version != saved_version:
+                return False
+
+        return True
+
+    # ──────────────────────────────────────────────
+    # SET: Lưu envelope kèm tag versions snapshot
+    # ──────────────────────────────────────────────
+
     async def _set_envelope(
         self,
         key: str,
@@ -42,21 +101,39 @@ class RedisServices:
         tags: Optional[Sequence[str]] = None,
         **kwargs,
     ):
+        tag_versions = await self._get_tag_versions(tags) if tags else {}
+
+        if tags:
+            async with self.client.pipeline(transaction=False) as pipe:
+                for tag in tags:
+                    tag_key = f"{self.tag_version_prefix}{tag}"
+                    pipe.setnx(tag_key, 0)
+                    pipe.expire(tag_key, 86400)
+                await pipe.execute()
+
+            tag_versions = await self._get_tag_versions(tags)
+
         envelope = {
             "value": value,
             "logical_expires_at": logical_expires_at,
-            "tags": tags or [],
+            "tags": tag_versions,  # dict {tag_name: version} thay vì list
         }
         serialized_data = orjson.dumps(envelope, default=self._orjson_default)
 
-        await self.client.set(key, serialized_data)
+        # Calculate physical TTL for Redis key auto-expiration
+        if logical_expires_at is not None:
+            now = datetime.now().timestamp()
+            # Add 300s buffer so stale-while-revalidate can still use expired data
+            physical_ttl = int(logical_expires_at - now) + 300
+            physical_ttl = max(physical_ttl, 60)  # minimum 60s
+            await self.client.set(key, serialized_data, ex=physical_ttl)
+        else:
+            # Safety net: even "no expiry" keys get a 24h TTL to prevent unbounded growth
+            await self.client.set(key, serialized_data, ex=86400)
 
-        if tags:
-            for tag in tags:
-                tag_key = f"{self.tag_prefix}{tag}"
-                await self.client.sadd(tag_key, key)
-
-                await self.client.expire(tag_key, 86400)
+    # ──────────────────────────────────────────────
+    # GET: Lấy dữ liệu + xác thực tag versions
+    # ──────────────────────────────────────────────
 
     async def get_or_set_async[T](
         self,
@@ -85,8 +162,20 @@ class RedisServices:
                 if isinstance(envelope, dict) and "value" in envelope:
                     cached_value = envelope["value"]
                     exp_at = envelope.get("logical_expires_at")
+                    saved_tags = envelope.get("tags", {})
 
-                    if exp_at is None or now < exp_at:
+                    # Bước 1: Kiểm tra thời gian hết hạn logic
+                    time_valid = exp_at is None or now < exp_at
+
+                    # Bước 2: Kiểm tra tag versions (Logical Invalidation)
+                    tags_valid = (
+                        await self._validate_tag_versions(saved_tags)
+                        if saved_tags
+                        else True
+                    )
+
+                    if time_valid and tags_valid:
+                        # Cache HIT - dữ liệu còn hợp lệ
                         if (
                             model_class
                             and issubclass(model_class, BaseModel)
@@ -95,6 +184,8 @@ class RedisServices:
                             return model_class(**cast(dict[str, Any], cached_value))
                         return cast(T, cached_value)
 
+                    # Cache MISS (hết hạn thời gian hoặc tag version thay đổi)
+                    # -> Gọi DB để lấy dữ liệu mới
                     try:
                         new_data = await async_func()
                         await self._set_envelope(
@@ -128,6 +219,7 @@ class RedisServices:
             except (orjson.JSONDecodeError, TypeError):
                 pass
 
+        # Không có cache -> gọi DB lần đầu
         try:
             new_data = await async_func()
             await self._set_envelope(key, new_data, logical_expires_at, tags, **kwargs)
@@ -145,40 +237,30 @@ class RedisServices:
             logger.error("Cả Cache và DB đều thất bại cho key '%s'", key, exc_info=True)
             raise db_err
 
+    # ──────────────────────────────────────────────
+    # INVALIDATE: Vô hiệu hóa logic theo tag
+    # ──────────────────────────────────────────────
+
     async def remove_async(self, key: str) -> bool:
         return await self.client.delete(key) > 0
 
-    async def remove_tags_async(self, tags: Sequence[str] | str) -> bool:
+    async def invalidate_tags_async(self, tags: Sequence[str] | str) -> None:
+        """Vô hiệu hóa logic toàn bộ cache thuộc về các tag.
+
+        Chỉ cần INCR version của tag. Không SCAN, không DEL.
+        Tất cả dữ liệu cũ sẽ tự động bị coi là "lỗi thời" khi đọc,
+        và sẽ tự hết hạn theo TTL vật lý.
+        """
         if isinstance(tags, str):
             tags = [tags]
 
         if not tags:
-            return False
+            return
 
         async with self.client.pipeline(transaction=False) as pipe:
             for tag in tags:
-                pipe.smembers(f"{self.tag_prefix}{tag}")
-            all_tag_members = await pipe.execute()
-
-        keys_to_delete = set()
-        tag_keys_to_delete = []
-
-        for tag, members in zip(tags, all_tag_members):
-            if members:
-                keys_to_delete.update(members)
-                tag_keys_to_delete.append(f"{self.tag_prefix}{tag}")
-
-        if not keys_to_delete and not tag_keys_to_delete:
-            return False
-
-        async with self.client.pipeline(transaction=True) as pipe:
-            if keys_to_delete:
-                pipe.delete(*keys_to_delete)
-            if tag_keys_to_delete:
-                pipe.delete(*tag_keys_to_delete)
-            results = await pipe.execute()
-
-        return sum(results) > 0
+                pipe.incr(f"{self.tag_version_prefix}{tag}")
+            await pipe.execute()
 
 
 RedisDep = Annotated[RedisServices, Depends()]
