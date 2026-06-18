@@ -1,0 +1,59 @@
+<div class="media-header">
+    <h2>Quản lý File</h2>
+    <div class="media-header-buttons">
+        <button type="button" class="upload-button">
+            {% include "static/public/icons/upload.svg" %}
+            <span>Tải lên</span></button>
+        <button type="button" class="create-folder-button">Tạo thư mục</button>
+    </div>
+</div>
+
+
+<style>
+    .media-header-buttons {
+        display: flex;
+        gap: 10px;
+    }
+
+    .media-header {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        align-items: center;
+        margin-right: 10px;
+    }
+
+    .upload-button {
+        border-radius: 10px;
+        padding: 8px 15px;
+        background-color: var(--foreground);
+        color: var(--background);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .upload-button:hover {
+        background-color: var(--text-secondary);
+    }
+
+    .create-folder-button {
+        border-radius: 10px;
+        padding: 8px 15px;
+        background-color: var(--border);
+        color: var(--foreground);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        outline: 0;
+        border: 0;
+    }
+
+    .create-folder-button:hover {
+        background-color: var(--text-secondary);
+    }
+</style>

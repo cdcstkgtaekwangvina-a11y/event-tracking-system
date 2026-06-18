@@ -21,11 +21,22 @@
     },
     init() {
     this.customStyle = this.isSidebar ? this.expandedStyle : 'box-shadow: none; border: 0; border-radius: 25%;';
+    this.updateMainMargin();
+    },
+    updateMainMargin() {
+        const main = document.getElementById('admin-main-content');
+        if (!main) return;
+        if (this.$store.screen && this.$store.screen.isMobile) {
+            main.style.marginLeft = '0px';
+        } else {
+            main.style.marginLeft = this.isSidebar ? '230px' : '60px';
+        }
     },
     toggle_sidebar(){
     this.isSidebar = !this.isSidebar;
     this.customStyle = this.isSidebar ? this.expandedStyle : 'box-shadow: none; border: 0; border-radius: 25%;';
     localStorage.setItem('isSidebar', this.isSidebar);
+    this.updateMainMargin();
     }
     }">
     <div x-show="!isSidebar && $store.screen.isMobile" x-transition.opacity.duration.200ms class="navbar">

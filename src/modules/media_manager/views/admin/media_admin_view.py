@@ -5,7 +5,7 @@ from src.shared.helpers.cbv import clean_cbv
 from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
 )
-from ..media_services import MediaServices
+from src.modules.media_manager.media_services import MediaServices
 from src.shared.middlewares.auth_middlewares import RequireAuth
 
 TAG_NAME = "admin/media"
@@ -14,7 +14,7 @@ router = BaseRouter(
     tags=[TAG_NAME],
     dependencies=[Depends(RequireAuth(is_required_auth=True))],
 )
-base_path = "modules/media_manager/views/"
+base_path = "modules/media_manager/views/admin/"
 
 
 @clean_cbv(router)

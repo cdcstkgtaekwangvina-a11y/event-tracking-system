@@ -2,5 +2,13 @@
 "templates/layouts/admin_blank.j2"%}
 {% block admin_title %}Quản lý Media{% endblock %}
 {% block admin_body %}
-<h1>Quản lý Media</h1>
+{% include "modules/media_manager/views/admin/header.j2" %}
+<div class="media-body"></div>
+
+<style>
+    .media-body {
+        width: 100%;
+        background-color: var(--background);
+    }
+</style>
 {% endblock %}

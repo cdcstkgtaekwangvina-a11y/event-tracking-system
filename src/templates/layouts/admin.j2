@@ -7,7 +7,7 @@
 {% block title %}{% block admin_title %}{% endblock %}{% endblock %}
 
 {% block body %}
-<div style="display: flex; flex-direction: row;">
+<div style="display: flex; flex-direction: row; width: 100%; height: 100%;">
     {% include "templates/headers/sidebar.j2" %}
     <div id="admin-main-content" class="admin-main-content">
         {% block admin_body %}{% endblock %}
