@@ -47,6 +47,35 @@
   --nc-shadow-modal: 0 25px 50px -10px rgba(0, 0, 0, 0.6);
   --nc-overlay-bg:   rgba(0, 0, 0, 0.65);
 }
+
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('../public/fonts/MaterialSymbolsOutlined.woff2') format('woff2'); 
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px; 
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  font-variation-settings: 
+    'FILL' 0,   
+    'wght' 400, 
+    'GRAD' 0,  
+    'opsz' 24;
+}
+
+
 .primary_btn {
   border: 1px solid var(--border);
   box-shadow: 1px 1px 0px 1px var(--border);
