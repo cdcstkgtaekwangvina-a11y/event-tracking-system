@@ -14,10 +14,10 @@
         :style="!customStyle ? 'box-shadow: 1px 1px 0px 1px var(--border); border-radius: 25%;' : customStyle">
 
         <template x-if="currTheme === 'dark'">
-            {% include "/static/public/icons/light.svg" %}
+            <span class="material-symbols-outlined">light_mode</span>
         </template>
         <template x-if="currTheme === 'light'">
-            {% include "/static/public/icons/dark.svg" %}
+            <span class="material-symbols-outlined">dark_mode</span>
         </template>
 
         <span class="menu-text" x-text="currTheme === 'dark' ? darkModeText : lightModeText"

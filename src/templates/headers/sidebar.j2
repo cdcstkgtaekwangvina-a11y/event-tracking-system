@@ -41,7 +41,7 @@
     }">
     <div x-show="!isSidebar && $store.screen.isMobile" x-transition.opacity.duration.200ms class="navbar">
         <button class="toggle-sidebar" @click="toggle_sidebar">
-            {% include "static/public/icons/sidebar.svg" %}
+            <span class="material-symbols-outlined">menu</span>
         </button>
     </div>
 
@@ -59,7 +59,7 @@
             </a>
 
             <button class="toggle-sidebar flex-center" @click="toggle_sidebar">
-                {% include "static/public/icons/sidebar.svg" %}
+                <span class="material-symbols-outlined">menu</span>
             </button>
         </div>
 
@@ -68,8 +68,8 @@
             <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
                 hx-push-url="true">
 
-                <span class="icon-wrapper flex-center">
-                    {% include "static/public/icons/" ~ page.icon %}
+                <span class="material-symbols-outlined">
+                    {{ page.icon }}
                 </span>
 
                 <span class="menu-text" x-show="isSidebar || $store.screen.isMobile"
@@ -87,11 +87,10 @@
                     @click.outside="openDropdown = false">
                     <a href="{{ url_for('me') }}" class="dropdown-button"
                         style="text-decoration: none; color: var(--foreground);">
-                        {% include "static/public/icons/account.svg"%}
+                        <span class="material-symbols-outlined">account_circle</span>
                         <span>Tài khoản</span></a>
-                    <button class="dropdown-button logout" @click="await log_out()">{% include
-                        "static/public/icons/logout.svg"
-                        %}
+                    <button class="dropdown-button logout" @click="await log_out()">
+                        <span class="material-symbols-outlined">logout</span>
                         <span>Đăng xuất</span></button>
                 </div>
                 <button class="avatar" :class="{'border': openDropdown}" @click="openDropdown = !openDropdown"
@@ -101,7 +100,7 @@
                         src="{{ auth.user.file_url if auth.user.file_url else auth.user.avatar_url }}"
                         alt="{{ auth.user.name }}">
                     {% else %}
-                    {% include "static/public/icons/avatar.svg" %}
+                    <span class="material-symbols-outlined">account_circle</span>
                     {% endif %}
                     <span x-show="isSidebar === true " x-data="{name: '{{ auth.user.name if auth.user.name else auth.user.email }}', 
                         displayName(){
