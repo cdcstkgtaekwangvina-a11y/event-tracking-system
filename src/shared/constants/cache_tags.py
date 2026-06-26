@@ -7,3 +7,4 @@ class CacheTags(StrEnum):
     EMPLOYEE = "employee"
     MEDIA = "media"
     QUEUE_JOB = "queue_job"
+    SETTING = "setting"

@@ -33,7 +33,7 @@
         cursor: pointer;
         color: var(--foreground);
         padding: 8px 10px;
-        background-color: var(--background);
+        background-color: {{ toggle_bg | default('var(--background)')}};
         transition: all 0.2s ease;
         font-family: inherit;
         font-size: inherit;
@@ -42,6 +42,6 @@
     }
 
     .toggle-btn:hover {
-        background-color: var(--border);
+        background-color: {{ toggle_bg_hover | default('var(--border)')}};
     }
 </style>

@@ -1,4 +1,3 @@
-from sqlalchemy.exc import SQLAlchemyError
 from src.shared.helpers.time_extensions import get_now_vn
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import SQLModel, select
@@ -16,7 +15,7 @@ from typing import (
     TYPE_CHECKING,
     Callable,
 )
-from sqlalchemy import func, exists, or_, desc, asc, String, update
+from sqlalchemy import func, exists, or_, desc, asc, String, update, and_
 from fastapi import HTTPException
 from src.shared.schemas.pagination_schemas import (
     PaginationRequest,
@@ -71,7 +70,7 @@ class BaseCrud(Generic[T]):
 
         return isinstance(model, type) and issubclass(model, UpdatedAtModel)
 
-    def is_has_primary_key(self, model: Type[T]) -> TypeGuard[Type[PrimaryModel]]:
+    def is_has_primary_key(self, model: Type[T]) -> TypeGuard[Type[PrimaryModel[Any]]]:
         from database.models.base_model import PrimaryModel
 
         return isinstance(model, type) and issubclass(model, PrimaryModel)
@@ -88,7 +87,12 @@ class BaseCrud(Generic[T]):
     def select(self, *columns: Any) -> Self: ...
 
     def select(self, *args: Any, logic_column: Optional[List[Any]] = None) -> Self:
-        if len(args) == 1 and isclass(args[0]) and issubclass(args[0], BaseModel):
+        if (
+            len(args) == 1
+            and isclass(args[0])
+            and issubclass(args[0], BaseModel)
+            and args[0] != self.model
+        ):
             self.dto_class = args[0]
             table_class = self.model
 
@@ -106,15 +110,20 @@ class BaseCrud(Generic[T]):
                 ]
                 columns.extend(sanitized_logic)
 
-            self.statement = select(*columns)
+            self.statement = select(*columns).select_from(self.model)
         else:
             self.dto_class = None
-            self.statement = select(*args)
+            self.statement = select(*args).select_from(self.model)
 
         return self
 
     def where(self, *conditions: Any) -> Self:
         self.statement = self.statement.where(*conditions)
+        return self
+
+    def options(self, *opts: Any) -> Self:
+        if self.statement is not None:
+            self.statement = self.statement.options(*opts)
         return self
 
     def order_by(self, *ordering: Any) -> Self:
@@ -163,7 +172,7 @@ class BaseCrud(Generic[T]):
         try:
             yield
             await self.session.commit()
-        except SQLAlchemyError as e:
+        except Exception as e:
             await self.session.rollback()
             logger.error(e)
             raise e
@@ -184,20 +193,29 @@ class BaseCrud(Generic[T]):
 
         return db_obj
 
-    async def find_one(self, soft_delete: bool = True) -> Optional[T]:
+    async def find_one(
+        self,
+        statement: SelectOfScalar[Any] | Select[Any] | None = None,
+        soft_delete: bool = True,
+    ) -> Optional[T]:
+
+        if statement is not None:
+            self.statement = statement
+
         if self.is_has_soft_delete(self.model) and soft_delete:
             self.statement = self.statement.where(self.model.deleted_at == None)
 
         result = await self.session.exec(self.statement)
-        return result.first()
+        return result.one()
 
     async def find_by_id(self, id: Any, soft_delete: bool = True) -> Optional[T]:
         statement = self.statement if self.statement is not None else select(self.model)
 
         m = self.model
 
-        if self.is_has_soft_delete(m) and soft_delete:
-            statement = statement.where(m.deleted_at == None)
+        if self.is_has_soft_delete(m):
+            if hasattr(m, "deleted_at"):
+                statement = statement.where(m.deleted_at == None)
 
         if self.is_has_primary_key(self.model):
             primary_key_attr = getattr(self.model, "id")
@@ -209,14 +227,20 @@ class BaseCrud(Generic[T]):
 
         result = await self.session.exec(statement)
         self.statement = select(self.model)
+
         return result.first()
 
-    async def find_many(self, soft_delete: bool = True) -> Sequence[T]:
-        if self.statement is None:
-            self.statement = select(self.model)
+    async def find_many(
+        self,
+        statement: SelectOfScalar[Any] | Select[Any] | None = None,
+        soft_delete: bool = True,
+    ) -> Sequence[T]:
+        if statement is not None:
+            self.statement = statement
         if self.is_has_soft_delete(self.model) and soft_delete:
             self.statement = self.statement.where(self.model.deleted_at == None)
         result = await self.session.exec(self.statement)
+        self.statement = select(self.model)
         return result.all()
 
     async def update(
@@ -250,8 +274,22 @@ class BaseCrud(Generic[T]):
             await self.session.commit()
         return db_obj
 
-    async def delete(self, soft_delete: bool = True, autocommit: bool = True) -> bool:
-        db_obj = await self.find_one()
+    async def delete(
+        self,
+        id: Any = None,
+        data: Any = None,
+        soft_delete: bool = True,
+        autocommit: bool = True,
+    ) -> bool:
+        db_obj: Any = None
+
+        if data is not None:
+            db_obj = data
+        elif id is not None:
+            db_obj = await self.find_by_id(id, soft_delete=soft_delete)
+        else:
+            db_obj = await self.find_one(soft_delete=soft_delete)
+
         if db_obj is None:
             return False
         if soft_delete:
@@ -266,16 +304,30 @@ class BaseCrud(Generic[T]):
                 await self.session.commit()
             return True
 
-    async def any_async(self, soft_delete: bool = True) -> bool:
-        if self.statement is None:
-            self.statement = select(self.model)
+    async def any_async(
+        self,
+        statement: SelectOfScalar[Any] | Select[Any] | None = None,
+        soft_delete: bool = True,
+    ) -> bool:
+        if statement is None:
+            if self.statement is None:
+                statement = select(self.model)
+
+        else:
+            self.statement = statement
         if self.is_has_soft_delete(self.model) and soft_delete:
             self.statement = self.statement.where(self.model.deleted_at == None)
         stmt = select(exists(self.statement))
         result = await self.session.exec(stmt)
         return bool(result.first())
 
-    async def count_async(self, soft_delete: bool = True) -> int:
+    async def count_async(
+        self,
+        statement: SelectOfScalar[Any] | Select[Any] | None = None,
+        soft_delete: bool = True,
+    ) -> int:
+        if statement is not None:
+            self.statement = statement
         if self.statement is None:
             self.statement = select(self.model)
         if self.is_has_soft_delete(self.model) and soft_delete:
@@ -285,10 +337,12 @@ class BaseCrud(Generic[T]):
         return result.one() or 0
 
     async def pagination_async(
-        self, pagination: PaginationRequest, soft_delete: bool = True
+        self,
+        pagination: PaginationRequest,
+        search_fields: Optional[list[str]] = None,
+        search_conditions: Optional[list[Any]] = None,
+        soft_delete: bool = True,
     ) -> PaginationResponse:
-        if pagination.page <= 0 or pagination.limit <= 0:
-            raise HTTPException(status_code=400, detail="Invalid pagination")
 
         if self.statement is None:
             self.statement = select(self.model)
@@ -296,26 +350,53 @@ class BaseCrud(Generic[T]):
         if self.is_has_soft_delete(self.model) and soft_delete:
             self.statement = self.statement.where(self.model.deleted_at == None)
 
+        # 1. XỬ LÝ FILTERS
         if pagination.filters:
             for f in pagination.filters:
-                if f.field and hasattr(self.model, f.field):
-                    column = getattr(self.model, f.field)
-                    self.statement = self.statement.where(column == f.value)
+                if f.field:
+                    if hasattr(self.model, f.field):
+                        column = getattr(self.model, f.field)
+                        self.statement = cast(Any, self.statement).where(
+                            column == f.value
+                        )
+                    elif "." in f.field:
+                        parts = f.field.split(".", 1)
+                        if hasattr(self.model, parts[0]):
+                            base_col = getattr(self.model, parts[0])
+                            self.statement = cast(Any, self.statement).where(
+                                base_col[parts[1]].astext == str(f.value)
+                            )
 
+        # 2. XỬ LÝ SEARCH (Đã dọn dẹp logic lặp)
         if pagination.search:
-            search_conditions = []
-            table = getattr(self.model, "__table__", None)
-            if table is not None:
-                for column in table.columns:
-                    if isinstance(column.type, String):
-                        search_conditions.append(column.ilike(f"%{pagination.search}%"))
+            if search_conditions is None:
+                search_conditions = []
+
+            if not search_conditions:
+                if search_fields is not None:
+                    for field in search_fields:
+                        if hasattr(self.model, field):
+                            column = getattr(self.model, field)
+                            search_conditions.append(
+                                column.ilike(f"%{pagination.search}%")
+                            )
+                else:
+                    table = getattr(self.model, "__table__", None)
+                    if table is not None:
+                        for column in table.columns:
+                            if isinstance(column.type, String):
+                                search_conditions.append(
+                                    column.ilike(f"%{pagination.search}%")
+                                )
 
             if search_conditions:
                 self.statement = self.statement.where(or_(*search_conditions))
 
+        # 3. ĐẾM TỔNG SỐ BẢN GHI (COUNT)
         count_statement = select(func.count()).select_from(self.statement.subquery())
         total = (await self.session.exec(count_statement)).one() or 0
 
+        # 4. XỬ LÝ ORDER BY (Đã fix lỗi crash tiềm ẩn)
         if pagination.sort_field and hasattr(self.model, pagination.sort_field):
             sort_column = getattr(self.model, pagination.sort_field)
             if pagination.is_desc:
@@ -323,116 +404,211 @@ class BaseCrud(Generic[T]):
             else:
                 self.statement = self.statement.order_by(asc(sort_column))
         else:
-            sort_col: Any = cast(Any, self.model)
+            sort_col = None
             if self.is_has_updated_at(self.model):
                 sort_col = cast(Any, self.model.updated_at)
             elif self.is_has_created_at(self.model):
                 sort_col = cast(Any, self.model.created_at)
+            else:
+                # Fallback an toàn về khóa chính (id) nếu không có timestamp
+                sort_col = cast(Any, getattr(self.model, "id", None))
 
-            self.statement = self.statement.order_by(
-                desc(sort_col) if pagination.is_desc else asc(sort_col)
-            )
+            if sort_col is not None:
+                self.statement = self.statement.order_by(
+                    desc(sort_col) if pagination.is_desc else asc(sort_col)
+                )
 
+        # 5. ÁP DỤNG LIMIT & OFFSET
         offset = (pagination.page - 1) * pagination.limit
         self.statement = self.statement.offset(offset).limit(pagination.limit)
+
+        # 6. EXECUTE QUERY VÀ TRẢ KẾT QUẢ
         result = await self.session.exec(self.statement)
         data = result.all()
+
         if self.dto_class and data:
             data = [
                 self.dto_class.model_validate(row, from_attributes=True) for row in data
             ]
+
         return PaginationResponse(
             page=pagination.page,
             limit=pagination.limit,
             total=total,
             total_items=total,
-            data=list(data) or None,
+            data=list(data) if data else None,
         )
 
     async def cursor_pagination_async(
         self,
         cursor_request: CursorPaginationRequest,
         cursor_field: Optional[str] = None,
+        search_fields: Optional[list[str]] = None,
+        search_conditions: Optional[list[Any]] = None,
         soft_delete: bool = True,
     ) -> CursorPaginationResponse:
+
         if self.statement is None:
             self.statement = select(self.model)
 
         if self.is_has_soft_delete(self.model) and soft_delete:
             self.statement = self.statement.where(self.model.deleted_at == None)
 
+        # 1. XỬ LÝ FILTER
+        if cursor_request.filters:
+            for f in cursor_request.filters:
+                if f.field:
+                    if hasattr(self.model, f.field):
+                        column = getattr(self.model, f.field)
+                        self.statement = cast(Any, self.statement).where(
+                            column == f.value
+                        )
+                    elif "." in f.field:
+                        parts = f.field.split(".", 1)
+                        if hasattr(self.model, parts[0]):
+                            base_col = getattr(self.model, parts[0])
+                            self.statement = cast(Any, self.statement).where(
+                                base_col[parts[1]].astext == str(f.value)
+                            )
+
+        # 2. XỬ LÝ SEARCH (Đã dọn dẹp logic bị lặp)
+        if cursor_request.search:
+            if search_conditions is None:
+                search_conditions = []
+
+            # Chỉ tự động build điều kiện search nếu danh sách rỗng
+            if not search_conditions:
+                if search_fields is not None:
+                    for field in search_fields:
+                        if hasattr(self.model, field):
+                            column = getattr(self.model, field)
+                            search_conditions.append(
+                                column.ilike(f"%{cursor_request.search}%")
+                            )
+                else:
+                    table = getattr(self.model, "__table__", None)
+                    if table is not None:
+                        for column in table.columns:
+                            if isinstance(column.type, String):
+                                search_conditions.append(
+                                    column.ilike(f"%{cursor_request.search}%")
+                                )
+
+            if search_conditions:
+                self.statement = self.statement.where(or_(*search_conditions))
+
         stmt = cast(Any, self.statement)
         limit = cursor_request.limit
-        is_desc = cursor_request.is_desc
+        is_cursor_desc = cursor_request.is_cursor_desc
 
+        # 3. QUYẾT ĐỊNH TRƯỜNG DỮ LIỆU ĐỂ SORT (LOGIC BẠN YÊU CẦU)
+        if cursor_field is None:
+            if self.is_has_updated_at(self.model):
+                cursor_field = "updated_at"
+            else:
+                cursor_field = "created_at"
+
+        # Nếu sort_field có giá trị -> dùng sort_field. Nếu null -> dùng cursor_field.
+        final_sort_field = getattr(cursor_request, "sort_field", None) or cursor_field
+
+        sort_column = getattr(self.model, final_sort_field, None)
+
+        # Hỗ trợ sort qua JSON field, VD: media_metadata.sizes
+        if sort_column is None and final_sort_field and "." in final_sort_field:
+            parts = final_sort_field.split(".", 1)
+            if hasattr(self.model, parts[0]):
+                base_col = getattr(self.model, parts[0])
+                from sqlalchemy import Integer
+
+                # Mặc định ép sang Integer để sort kích thước, bạn có thể điều chỉnh sau
+                sort_column = base_col[parts[1]].astext.cast(Integer)
+
+        primary_key = cast(Any, getattr(self.model, "id", None))
+
+        # 4. PARSE CURSOR
         cursor_time = None
         cursor_id = None
         if cursor_request.cursor:
             parts = cursor_request.cursor.split("_", 1)
             if len(parts) == 2:
                 try:
-                    cursor_time = parts[0]
+                    cursor_time_str = parts[0]
+                    # Khôi phục dấu + bị mất do URL decode (VD: 2026-06-26 03:04:15 00:00 -> +00:00)
+                    if len(cursor_time_str) >= 25 and cursor_time_str.rfind(' ') > 19:
+                        last_space = cursor_time_str.rfind(' ')
+                        cursor_time_str = cursor_time_str[:last_space] + '+' + cursor_time_str[last_space+1:]
+                    
+                    try:
+                        from datetime import datetime
+                        cursor_time = datetime.fromisoformat(cursor_time_str)
+                    except Exception:
+                        cursor_time = parts[0]  # Fallback
+                    
                     cursor_id = int(parts[1])
                 except Exception:
-                    cursor_time = None
-                    cursor_id = None
+                    pass  # Parse lỗi thì bỏ qua, coi như fetch từ đầu
             else:
                 try:
                     cursor_time = parts[0]
                 except Exception:
-                    cursor_time = None
-                    cursor_id = None
+                    pass
 
-        sort_field_name = cursor_field
-        if sort_field_name is None:
-            if self.is_has_updated_at(self.model):
-                sort_field_name = "updated_at"
+        # 5. ÁP DỤNG ORDER BY
+        if sort_column is not None and primary_key is not None:
+            if is_cursor_desc:
+                stmt = stmt.order_by(desc(sort_column), desc(primary_key))
             else:
-                sort_field_name = "created_at"
+                stmt = stmt.order_by(asc(sort_column), asc(primary_key))
 
-        sort_column = getattr(self.model, sort_field_name, None)
-
-        if sort_column is not None:
-            sort_column = cast(Any, sort_column)
-            stmt = stmt.order_by(desc(sort_column) if is_desc else asc(sort_column))
-
-        primary_key = getattr(self.model, "id", None)
-        primary_key = cast(Any, primary_key)
-
-        if cursor_id is not None and primary_key is not None:
-            if is_desc:
+        # 6. ÁP DỤNG ĐIỀU KIỆN WHERE CHO PAGINATION
+        if (
+            cursor_id is not None
+            and cursor_time is not None
+            and primary_key is not None
+        ):
+            if is_cursor_desc:
                 stmt = stmt.where(
                     or_(
                         cast(Any, sort_column) < cursor_time,
-                        cast(Any, sort_column) == cursor_time,
-                        cast(Any, primary_key) < cursor_id,
+                        and_(
+                            cast(Any, sort_column) == cursor_time,
+                            cast(Any, primary_key) < cursor_id,
+                        ),
                     )
                 )
             else:
                 stmt = stmt.where(
                     or_(
                         cast(Any, sort_column) > cursor_time,
-                        cast(Any, sort_column) == cursor_time,
-                        cast(Any, primary_key) > cursor_id,
+                        and_(
+                            cast(Any, sort_column) == cursor_time,
+                            cast(Any, primary_key) > cursor_id,
+                        ),
                     )
                 )
 
+        # 7. EXECUTE QUERY
         stmt = stmt.limit(limit)
         result = await self.session.exec(stmt)
         data = result.all()
+
         if self.dto_class and data:
             data = [
                 self.dto_class.model_validate(row, from_attributes=True) for row in data
             ]
 
+        # 8. SINH NEXT CURSOR
         next_cursor = None
         has_more = False
         if data:
             last = data[-1]
-            last_sort = getattr(last, sort_field_name, None)
+            # Lấy giá trị sort của dòng cuối dựa trên final_sort_field
+            last_sort = getattr(last, final_sort_field, None)
             last_id = getattr(last, "id", None)
+
             sort_val = last_sort if last_sort is not None else ""
             id_val = last_id if last_id is not None else 0
+
             next_cursor = f"{sort_val}_{id_val}"
             has_more = len(data) >= limit
 

@@ -3,8 +3,7 @@ from .users import Users
 from .employees import Employees
 from .events import Events
 from .events_employees import EventsEmployees
-from .folders import Folders
-from .files import Files
+from .media import Medias
 from .settings import Settings
 from .queue_jobs import QueueJob
 
@@ -13,8 +12,7 @@ __all__ = [
     "Employees",
     "Events",
     "EventsEmployees",
-    "Folders",
-    "Files",
+    "Medias",
     "Settings",
     "QueueJob",
 ]

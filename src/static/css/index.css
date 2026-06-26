@@ -11,6 +11,7 @@
   --input: rgb(242, 243, 244);
   --logout: red;
   --logout-bg: rgb(255, 234, 234);
+  --sidebar-bg: #FAFAFA;
 
   /* Notify component tokens */
   --nc-success: #22c55e;
@@ -37,6 +38,7 @@
   --input: #f6f6f6;
   --logout: #f87171;                   
   --logout-bg: rgba(248, 113, 113, 0.15);
+  --sidebar-bg: #171717;
 
   /* Notify dark mode overrides */
   --nc-success: #4ade80;

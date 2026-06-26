@@ -1,0 +1,69 @@
+<div class="modal-backdrop hidden" id="media-modal-backdrop"
+     x-data="{
+         mode: 'folder',
+         parentId: new URLSearchParams(window.location.search).get('folder_id') || '',
+         open(options = {}) {
+             this.mode = options.mode || 'folder';
+             this.parentId = options.folderId || new URLSearchParams(window.location.search).get('folder_id') || '';
+             document.getElementById('media-modal-backdrop')?.classList.remove('hidden');
+         },
+         close() {
+             document.getElementById('media-modal-backdrop')?.classList.add('hidden');
+         },
+         submit() {
+             const form = document.querySelector('#media-modal-backdrop form');
+             if (!form) return;
+             const data = new FormData(form);
+             fetch('{{ url_for('media_manager') }}/create', {
+                 method: 'POST',
+                 body: data,
+                 headers: {
+                     'X-Requested-With': 'XMLHttpRequest',
+                     'HX-Request': 'true',
+                 },
+             })
+             .then(res => {
+                 if (!res.ok) return res.json().then(j => { throw new Error(j?.message || 'Lỗi') });
+                 return res;
+             })
+             .then(() => {
+                 const params = new URLSearchParams(window.location.search);
+                 const url = '{{ url_for('media_manager') }}/items/html?' + params.toString();
+                 const container = document.getElementById('media-items-container');
+                 container && (container.innerHTML = '<div class=media-loading><span>Đang tải...</span></div>');
+                 htmx.ajax('GET', url, {
+                     target: '#media-items-container',
+                     swap: 'innerHTML',
+                 });
+                 this.close();
+             })
+             .catch(err => {
+                 alert(err.message || 'Có lỗi xảy ra');
+             });
+         }
+     }">
+    <div class="modal-content" @click.outside="close">
+        <div class="modal-header">
+            <h3 x-text="mode === 'folder' ? 'Tạo thư mục' : 'Tải lên file'">Tạo thư mục</h3>
+            <button class="modal-close" @click="close" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form class="media-create-form"
+              @submit.prevent="submit">
+            <input type="hidden" name="folder_id" :value="parentId" />
+            <div class="form-group" x-show="mode === 'file'">
+                <label>File</label>
+                <input type="file" name="file" />
+            </div>
+            <div class="form-group" x-show="mode === 'folder'">
+                <label>Tên</label>
+                <input type="text" name="name" required maxlength="800" autocomplete="off" />
+            </div>
+            <div class="form-actions">
+                <button type="button" class="secondary-btn" @click="close">Huỷ</button>
+                <button type="submit" class="primary-btn">Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>

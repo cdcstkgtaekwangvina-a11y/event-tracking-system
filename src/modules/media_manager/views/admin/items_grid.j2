@@ -1,117 +1,576 @@
-{# Grid view items #}
-{% if items %}
-    {% for item in items %}
-    <article class="media-item media-grid-item"
-             data-id="{{ item.id }}"
-             data-type="{{ item.type }}"
-             data-url="{{ item.url if item.type == 'file' else '' }}"
-             data-name="{{ item.name }}"
-             data-folder-id="{{ item.folder_id if item.type == 'file' else item.parent_id }}"
-             role="listitem">
-        <div class="media-thumbnail">
-            {% if item.type == 'file' %}
-                {% set file_type = item.file_type|lower %}
-                {% if file_type.startswith('image/') %}
-                    <img src="{{ item.url }}" alt="{{ item.name }}" loading="lazy">
-                {% elif file_type.startswith('video/') %}
-                    <video src="{{ item.url }}" muted preload="metadata" poster="">
-                        <span class="material-symbols-outlined video-icon">videocam</span>
-                    </video>
-                {% elif file_type.startswith('audio/') %}
-                    <div class="audio-placeholder">
-                        <span class="material-symbols-outlined">audiotrack</span>
+{% if data and data|length > 0 %}
+{# ====== LIST VIEW ====== #}
+<div class="media-list" x-show="viewMode === 'list'" x-cloak id="media-list-view" data-page="list"
+    @view-mode-changed.window="$el.scrollTop = 0">
+    <table class="media-table">
+        {% if not cursor_request.cursor %}
+        <thead>
+            <tr>
+                <th class="col-name">Tên ↕</th>
+                <th class="col-size">Kích thước</th>
+                <th class="col-owner">Loại</th>
+                <th class="col-date">Chỉnh sửa lần cuối</th>
+                <th class="col-actions">Hành động</th>
+            </tr>
+        </thead>
+        {% endif %}
+        <tbody>
+            {% for item in data %}
+            <tr class="media-row" data-id="{{ item.id }}" data-type="{{ 'folder' if item.is_folder else 'file' }}"
+                hx-get="{{ url_for('media_manager') }}/items/html?folder_id={{ item.id }}"
+                hx-push-url="?folder_id={{ item.id }}" hx-target="#media-items-container" hx-swap="innerHTML">
+                <td class="col-name">
+                    <div class="media-name-cell">
+                        {% if item.is_folder %}
+                        <span class="material-symbols-outlined media-icon media-icon--folder">folder</span>
+                        {% elif item.media_metadata and item.media_metadata.type == 'image' %}
+                        <span class="material-symbols-outlined media-icon media-icon--image">image</span>
+                        {% elif item.media_metadata and item.media_metadata.type == 'video' %}
+                        <span class="material-symbols-outlined media-icon media-icon--video">videocam</span>
+                        {% elif item.media_metadata and item.media_metadata.format in ['pdf'] %}
+                        <span class="media-icon-badge media-icon-badge--pdf">PDF</span>
+                        {% elif item.media_format in ['xlsx', 'xls'] %}
+                        <span class="media-icon-badge media-icon-badge--xlsx">XLSX</span>
+                        {% elif item.media_format in ['docx', 'doc'] %}
+                        <span class="media-icon-badge media-icon-badge--docx">DOCX</span>
+                        {% elif item.media_format in ['pptx', 'ppt'] %}
+                        <span class="media-icon-badge media-icon-badge--pptx">PPTX</span>
+                        {% else %}
+                        <span class="material-symbols-outlined media-icon media-icon--file">description</span>
+                        {% endif %}
+                        <span class="media-name-text">{{ item.name }}</span>
                     </div>
-                {% elif file_type == 'application/pdf' %}
-                    <div class="pdf-placeholder">
-                        <span class="material-symbols-outlined">picture_as_pdf</span>
+                </td>
+                <td class="col-size">
+                    {% if item.is_folder %}<span class="text-muted">—</span>
+                    {% elif item.media_metadata and item.media_metadata.sizes %}{% set bytes = item.media_metadata.sizes
+                    %}
+                    {% if bytes >= 1073741824 %}{{ "%.1f"|format(bytes / 1073741824) }} GB
+                    {% elif bytes >= 1048576 %}{{ "%.1f"|format(bytes / 1048576) }} MB
+                    {% elif bytes >= 1024 %}{{ "%.1f"|format(bytes / 1024) }} KB
+                    {% else %}{{ bytes }} B{% endif %}
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td class="col-owner">
+                    {% if item.is_folder %}<span class="type-badge type-badge--folder">Thư mục</span>
+                    {% elif item.media_metadata and item.media_metadata.type == 'image' %}<span
+                        class="type-badge type-badge--image">Hình ảnh</span>
+                    {% elif item.media_metadata and item.media_metadata.type == 'video' %}<span
+                        class="type-badge type-badge--video">Video</span>
+                    {% elif item.media_metadata and item.media_metadata.format in ['pdf', 'docx', 'doc', 'xlsx', 'xls',
+                    'pptx', 'ppt'] %}<span class="type-badge type-badge--document">Tài liệu</span>
+                    {% else %}<span class="type-badge type-badge--other">Khác</span>{% endif %}
+                </td>
+                <td class="col-date">
+                    {% if item.updated_at %}{{ item.updated_at[:10] if item.updated_at is string else
+                    item.updated_at.strftime('%Y-%m-%d') }}
+                    {% elif item.created_at %}{{ item.created_at[:10] if item.created_at is string else
+                    item.created_at.strftime('%Y-%m-%d') }}
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td class="col-actions">
+                    <div class="action-buttons">
+                        <button type="button" class="action-btn" title="Sửa"
+                            @click.stop="window.mediaActions?.edit('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                            <span class="material-symbols-outlined">edit</span>
+                        </button>
+                        <button type="button" class="action-btn" title="Sao chép"
+                            @click.stop="window.mediaActions?.copy('{{ item.id }}')">
+                            <span class="material-symbols-outlined">content_copy</span>
+                        </button>
+                        <button type="button" class="action-btn" title="Di chuyển"
+                            @click.stop="window.mediaActions?.move('{{ item.id }}')">
+                            <span class="material-symbols-outlined">drive_file_move</span>
+                        </button>
+                        {% if not item.is_folder and item.url %}
+                        <a href="{{ item.url }}" target="_blank" class="action-btn" title="Tải xuống">
+                            <span class="material-symbols-outlined">download</span>
+                        </a>
+                        {% endif %}
+                        <button type="button" class="action-btn action-btn--danger" title="Xóa"
+                            @click.stop="window.mediaActions?.delete('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
                     </div>
-                {% elif file_type.startswith('application/') and ('word' in file_type or 'document' in file_type) %}
-                    <div class="doc-placeholder">
-                        <span class="material-symbols-outlined">description</span>
-                    </div>
-                {% elif file_type.startswith('application/') and ('sheet' in file_type or 'excel' in file_type) %}
-                    <div class="xls-placeholder">
-                        <span class="material-symbols-outlined">table_chart</span>
-                    </div>
-                {% elif file_type.startswith('application/') and ('presentation' in file_type or 'powerpoint' in file_type) %}
-                    <div class="ppt-placeholder">
-                        <span class="material-symbols-outlined">slideshow</span>
-                    </div>
-                {% elif file_type.startswith('text/') %}
-                    <div class="txt-placeholder">
-                        <span class="material-symbols-outlined">text_snippet</span>
-                    </div>
-                {% elif file_type in ['application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed'] %}
-                    <div class="archive-placeholder">
-                        <span class="material-symbols-outlined">archive</span>
-                    </div>
-                {% else %}
-                    <div class="file-placeholder">
-                        <span class="material-symbols-outlined">insert_drive_file</span>
-                    </div>
-                {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# ====== GRID VIEW ====== #}
+<div class="media-grid" x-show="viewMode === 'grid'" @view-mode-changed.window="$el.scrollTop = 0">
+    {% for item in data %}
+    <div class="media-grid-card" :data-id="{{ item.id }}" :data-type="'{{ 'folder' if item.is_folder else 'file' }}'"
+        @click="viewMode !== 'grid' || (window.mediaActions?.goToFolder?.('{{ item.id }}') ?? false)"
+        hx-get="{{ url_for('media_manager') }}/items/html?folder_id={{ item.id }}"
+        hx-push-url="?folder_id={{ item.id }}" hx-target="#media-items-container" hx-swap="innerHTML">
+        <div class="card-preview">
+            {% if item.is_folder %}
+            <span class="material-symbols-outlined card-icon card-icon--folder">folder</span>
+            {% elif item.media_metadata and item.media_metadata.type == 'image' and item.url %}
+            <img src="{{ item.url }}" alt="{{ item.name }}" class="card-thumbnail" loading="lazy" />
+            {% elif item.media_metadata and item.media_metadata.type == 'video' %}
+            <span class="material-symbols-outlined card-icon card-icon--video">videocam</span>
+            {% elif item.media_format in ['pdf'] %}
+            <span class="media-icon-badge media-icon-badge--pdf card-badge">PDF</span>
+            {% elif item.media_format in ['xlsx', 'xls'] %}
+            <span class="media-icon-badge media-icon-badge--xlsx card-badge">XLSX</span>
+            {% elif item.media_format in ['docx', 'doc'] %}
+            <span class="media-icon-badge media-icon-badge--docx card-badge">DOCX</span>
+            {% elif item.media_format in ['pptx', 'ppt'] %}
+            <span class="media-icon-badge media-icon-badge--pptx card-badge">PPTX</span>
             {% else %}
-                <div class="folder-placeholder">
-                    <span class="material-symbols-outlined">folder</span>
-                </div>
+            <span class="material-symbols-outlined card-icon card-icon--file">description</span>
             {% endif %}
         </div>
-
-        <div class="media-overlay">
-            {% if item.type == 'file' %}
-            <button type="button" class="overlay-btn preview-btn" aria-label="Xem trước: {{ item.name }}" title="Xem trước">
-                <span class="material-symbols-outlined">visibility</span>
-            </button>
-            <button type="button" class="overlay-btn download-btn" aria-label="Tải xuống: {{ item.name }}" title="Tải xuống" data-url="{{ item.url }}">
-                <span class="material-symbols-outlined">download</span>
-            </button>
-            {% endif %}
-            <button type="button" class="overlay-btn rename-btn" aria-label="Đổi tên: {{ item.name }}" title="Đổi tên">
-                <span class="material-symbols-outlined">edit</span>
-            </button>
-            {% if item.type == 'folder' %}
-            <button type="button" class="overlay-btn open-folder-btn" aria-label="Mở thư mục: {{ item.name }}" title="Mở thư mục">
-                <span class="material-symbols-outlined">open_in_new</span>
-            </button>
-            {% endif %}
-            <button type="button" class="overlay-btn delete-btn" aria-label="Xóa: {{ item.name }}" title="Xóa">
-                <span class="material-symbols-outlined">delete</span>
-            </button>
+        <div class="card-info">
+            <span class="card-name" title="{{ item.name }}">{{ item.name }}</span>
+            <span class="card-meta">
+                {% if item.is_folder %}Thư mục
+                {% elif item.media_metadata and item.media_metadata.sizes %}{% set bytes = item.media_metadata.sizes %}
+                {% if bytes >= 1073741824 %}{{ "%.1f"|format(bytes / 1073741824) }} GB
+                {% elif bytes >= 1048576 %}{{ "%.1f"|format(bytes / 1048576) }} MB
+                {% elif bytes >= 1024 %}{{ "%.1f"|format(bytes / 1024) }} KB
+                {% else %}{{ bytes }} B{% endif %}
+                {% else %}—{% endif %}
+            </span>
         </div>
-
-        <div class="media-info">
-            <h4 class="media-name" title="{{ item.name }}">{{ item.name }}</h4>
-            <p class="media-meta">
-                {% if item.type == 'file' %}
-                    {{ item.file_type }} • {{ item.sizes|filesizeformat if item.sizes else 'N/A' }} • {{ item.updated_at|datetimeformat('%d/%m/%Y %H:%M') if item.updated_at else '' }}
-                {% else %}
-                    Thư mục • {{ item.updated_at|datetimeformat('%d/%m/%Y %H:%M') if item.updated_at else '' }}
-                {% endif %}
-            </p>
-        </div>
-        <input type="checkbox" class="media-select" aria-label="Chọn {{ item.name }}">
-    </article>
+    </div>
     {% endfor %}
-{% else %}
-    {# Empty state will be handled by JS #}
+</div>
+
+{# ====== CURSOR PAGINATION: Load More ====== #}
+{% if has_more and next_cursor %}
+<div id="media-load-more" class="media-load-more"
+    hx-get="{{ url_for('media_manager') }}/items/html?cursor={{ next_cursor }}&limit=20{% if folder_id %}&folder_id={{ folder_id }}{% endif %}{% if type_filter %}&type_filter={{ type_filter }}{% endif %}"
+    hx-trigger="revealed" hx-swap="outerHTML">
+    <div class="load-more-spinner">
+        <div class="spinner-sm"></div>
+        <span>Đang tải thêm...</span>
+    </div>
+</div>
 {% endif %}
 
-{# Load more trigger for infinite scroll #}
-{% if has_more and next_cursor %}
-<div class="load-more-trigger"
-     data-next-cursor="{{ next_cursor }}"
-     data-folder-id="{{ folder_id if folder_id is not none else 'root' }}"
-     data-is-desc="{{ 'true' if is_desc else 'false' }}"
-     hx-get="/api/media/items/html"
-     hx-trigger="intersect once"
-     hx-target="#media-grid"
-     hx-swap="beforeend"
-     hx-include="[name='folder_id'], [name='is_desc']"
-     style="display: none;">
-</div>
 {% else %}
-<div class="end-of-list" data-folder-id="{{ folder_id if folder_id is not none else 'root' }}">
-    <span class="material-symbols-outlined">check_circle</span>
-    Đã tải hết
+{# ====== EMPTY STATE ====== #}
+<div class="media-empty">
+    <span class="material-symbols-outlined media-empty-icon">folder_off</span>
+    <h3>Chưa có file nào</h3>
+    <p>Tải lên file hoặc tạo thư mục mới để bắt đầu.</p>
 </div>
 {% endif %}
+
+
+<style>
+    /* ===== LIST VIEW ===== */
+    .media-list {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .media-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .media-table thead {
+        border-bottom: 2px solid var(--border);
+    }
+
+    .media-table th {
+        text-align: left;
+        padding: 12px 16px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 13px;
+        white-space: nowrap;
+        user-select: none;
+    }
+
+    .media-table td {
+        padding: 10px 16px;
+        color: var(--foreground);
+        vertical-align: middle;
+    }
+
+    .media-row {
+        border-bottom: 1px solid var(--border);
+        transition: background-color 0.12s ease;
+        cursor: pointer;
+    }
+
+    .media-row:hover {
+        background-color: var(--sidebar-bg);
+    }
+
+    .media-row:last-child {
+        border-bottom: none;
+    }
+
+    /* Column widths */
+    .col-name {
+        width: 40%;
+        min-width: 200px;
+    }
+
+    .col-size {
+        width: 12%;
+        min-width: 90px;
+    }
+
+    .col-owner {
+        width: 14%;
+        min-width: 100px;
+    }
+
+    .col-date {
+        width: 18%;
+        min-width: 120px;
+    }
+
+    .col-actions {
+        width: 16%;
+        min-width: 80px;
+        text-align: right;
+    }
+
+    .media-table th.col-actions {
+        text-align: right;
+    }
+
+    /* Name cell */
+    .media-name-cell {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .media-name-text {
+        font-weight: 500;
+        color: var(--foreground);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 280px;
+    }
+
+    /* Icon styles */
+    .media-icon {
+        font-size: 22px;
+        flex-shrink: 0;
+    }
+
+    .media-icon--folder {
+        color: #5b9aef;
+    }
+
+    .media-icon--image {
+        color: #8b5cf6;
+    }
+
+    .media-icon--video {
+        color: #ef4444;
+    }
+
+    .media-icon--file {
+        color: var(--text-secondary);
+    }
+
+    /* Badge icons for document types */
+    .media-icon-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 24px;
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        flex-shrink: 0;
+    }
+
+    .media-icon-badge--pdf {
+        background: #fde8e8;
+        color: #dc2626;
+    }
+
+    .media-icon-badge--xlsx {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .media-icon-badge--docx {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .media-icon-badge--pptx {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    /* Type badges */
+    .type-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .type-badge--folder {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .type-badge--image {
+        background: #ede9fe;
+        color: #7c3aed;
+    }
+
+    .type-badge--video {
+        background: #fde8e8;
+        color: #dc2626;
+    }
+
+    .type-badge--document {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .type-badge--other {
+        background: var(--border);
+        color: var(--text-secondary);
+    }
+
+    .text-muted {
+        color: var(--text-secondary);
+    }
+
+    .col-date {
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+
+    /* Action buttons */
+    .action-buttons {
+        display: flex;
+        gap: 4px;
+        justify-content: flex-end;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+
+    .media-row:hover .action-buttons {
+        opacity: 1;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-decoration: none;
+    }
+
+    .action-btn .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    .action-btn:hover {
+        background: var(--border);
+        color: var(--foreground);
+    }
+
+    .action-btn--danger:hover {
+        background: #fde8e8;
+        color: #dc2626;
+    }
+
+    /* ===== GRID VIEW ===== */
+    .media-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 16px;
+    }
+
+    .media-grid-card {
+        display: flex;
+        flex-direction: column;
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: var(--background);
+    }
+
+    .media-grid-card:hover {
+        border-color: var(--text-secondary);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+        transform: translateY(-2px);
+    }
+
+    .card-preview {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 110px;
+        background: var(--sidebar-bg);
+        position: relative;
+    }
+
+    .card-thumbnail {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .card-icon {
+        font-size: 42px;
+    }
+
+    .card-icon--folder {
+        color: #5b9aef;
+    }
+
+    .card-icon--video {
+        color: #ef4444;
+    }
+
+    .card-icon--file {
+        color: var(--text-secondary);
+    }
+
+    .card-badge {
+        width: 52px;
+        height: 34px;
+        font-size: 13px;
+        border-radius: 8px;
+    }
+
+    .card-info {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px;
+        gap: 2px;
+    }
+
+    .card-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--foreground);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .card-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+
+    /* ===== LOAD MORE / INFINITE SCROLL ===== */
+    .load-more-sentinel {
+        padding: 20px 0;
+    }
+
+    .load-more-spinner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+
+    .spinner-sm {
+        width: 18px;
+        height: 18px;
+        border: 2.5px solid var(--border);
+        border-top-color: var(--foreground);
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .media-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        text-align: center;
+        color: var(--text-secondary);
+    }
+
+    .media-empty-icon {
+        font-size: 56px;
+        margin-bottom: 12px;
+        opacity: 0.4;
+    }
+
+    .media-empty h3 {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--foreground);
+        margin-bottom: 4px;
+    }
+
+    .media-empty p {
+        font-size: 14px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .media-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .card-preview {
+            height: 90px;
+        }
+
+        .col-owner,
+        .col-actions {
+            display: none;
+        }
+
+    }
+</style>
+
+<script>
+    if (window.Alpine) {
+        const header = document.querySelector('.media-header');
+        if (header) {
+            const data = Alpine.$data(header);
+            const newFolderId = {{ folder_id if folder_id else 'null' }};
+            if (data.folder_id !== newFolderId) {
+                data.folder_id = newFolderId;
+                if (data.folder_id) {
+                    data.getCurrentMedia();
+                } else {
+                    data.current_media = null;
+                }
+            }
+        }
+    }
+</script>

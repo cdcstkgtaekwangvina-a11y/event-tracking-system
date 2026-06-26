@@ -2,13 +2,54 @@
 "templates/layouts/admin_blank.j2"%}
 {% block admin_title %}Quản lý Media{% endblock %}
 {% block admin_body %}
-{% include "modules/media_manager/views/admin/header.j2" %}
-<div class="media-body"></div>
+<div
+    x-data="{ viewMode: localStorage.getItem('mediaViewMode') || 'grid', init() { this.$watch('viewMode', val => localStorage.setItem('mediaViewMode', val)) } }">
+    {% include "modules/media_manager/views/admin/header.j2" %}
+    <div class="media-body" id="media-items-container"
+        hx-get="{{ url_for('media_manager') }}/items/html?{{ request.query_params }}" hx-trigger="load"
+        hx-swap="innerHTML">
+        <div class="media-loading">
+            <div class="spinner-sm"></div>
+            <span>Đang tải dữ liệu...</span>
+        </div>
+    </div>
+</div>
 
 <style>
     .media-body {
-        width: 100%;
         background-color: var(--background);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px;
+        margin-right: 10px;
+        margin-left: 10px;
+        min-height: 320px;
+        overflow: hidden;
+    }
+
+    .media-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 60px 20px;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+
+    .spinner-sm {
+        width: 18px;
+        height: 18px;
+        border: 2.5px solid var(--border);
+        border-top-color: var(--foreground);
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
     }
 </style>
 {% endblock %}

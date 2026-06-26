@@ -1,400 +1,333 @@
-from database.models.app_db import SessionDep
-from database.models.files import Files
-from database.models.folders import Folders
-from sqlmodel import select, or_
-from sqlalchemy import desc, asc
-from typing import cast, Any, List
+from typing import Optional, Any, cast
+from fastapi import UploadFile
+from database.models.app_db import SessionDep, SessionFactoryDep
+from database.models.media import Medias
+from sqlmodel import and_
 from src.shared.base import BaseCrud, BaseResponse
-from src.shared.schemas.pagination_schemas import (
-    PaginationRequest,
-    PaginationResponse,
-)
 from src.shared.services.vercel_blob import VercelBlobDep
-from src.modules.media_manager.media_schemas import (
-    FileUpdate,
-    FolderCreate,
-    FolderUpdate,
-    FileCreate,
-    FolderCursorNode,
-    FileCursorNode,
-    FolderTreeNode,
-)
+from .media_select import ValidateNameSelect, MediaSelect
 from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
     CursorPaginationResponse,
 )
-from datetime import datetime, timezone
+from src.modules.setting.setting_services import AppSettingServicesDep
+from .media_schemas import CreateMediaSchema, MediaMetaData, PrefixNode
+from .media_constants import MediaType
+from uuid import uuid8
+from src.shared.services.redis_services import RedisDep
+from src.shared.constants.cache_tags import CacheTags
 
 
 class MediaServices:
-    def __init__(self, session: SessionDep, vercel_blob: VercelBlobDep):
+    def __init__(
+        self,
+        session: SessionDep,
+        session_factory: SessionFactoryDep,
+        vercel_blob: VercelBlobDep,
+        app_setting: AppSettingServicesDep,
+        redis: RedisDep,
+    ):
         self.session = session
-        self.file_crud = BaseCrud(session, Files)
-        self.folder_crud = BaseCrud(session, Folders)
+        self.crud = BaseCrud(session, Medias)
         self.vercel_blob = vercel_blob
+        self.session_factory = session_factory
+        self.app_setting = app_setting
+        self.redis = redis
 
     # Validation helpers
 
-    async def _validate_file_unique_name(
-        self, name: str, folder_id: int | None, exclude_id: int | None = None
+    def get_file_metadata(self, file: UploadFile) -> Optional[MediaMetaData]:
+        if not file.content_type:
+            return None
+
+        file_type, file_extension = file.content_type.split("/")
+        result = MediaMetaData(sizes=file.size or 0, format=file_extension)
+
+        match file_type:
+            case MediaType.IMAGE:
+                result.type = MediaType.IMAGE
+            case MediaType.VIDEO:
+                result.type = MediaType.VIDEO
+
+            case _:
+                content_subtypes = [
+                    # 1. Tài liệu Microsoft Office (Hiện đại)
+                    "vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "vnd.openxmlformats-officedocument.presentationml.presentation",
+                    # 2. Tài liệu Microsoft Office (Cũ)
+                    "msword",
+                    "vnd.ms-excel",
+                    "vnd.ms-powerpoint",
+                    "vnd.visio",
+                    # 3. Văn bản & Tài liệu phổ biến
+                    "pdf",
+                    "plain",
+                    "rtf",
+                    "csv",
+                    # 4. Web & Mã nguồn
+                    "html",
+                    "xml",
+                    "markdown",
+                    "json",
+                ]
+
+                if file_extension in content_subtypes:
+                    result.type = MediaType.DOCUMENT
+                else:
+                    result.type = MediaType.OTHER
+        return result
+
+    async def _existing_media(self, id: int, is_soft_delete: bool = True):
+        async with self.session_factory() as session:
+            crud = BaseCrud(session=session, model=Medias)
+            return (
+                await crud.select(ValidateNameSelect)
+                .where(Medias.id == id)
+                .find_one(soft_delete=is_soft_delete)
+            )
+
+    async def _validate_unique_name(
+        self,
+        name: str,
+        parent_id: int | None,
+        is_folder: bool,
     ) -> bool:
-        stmt = select(Files).where(Files.name == name, Files.folder_id == folder_id)
-        if exclude_id is not None:
-            stmt = stmt.where(Files.id != exclude_id)
-        result = await self.session.exec(stmt)
-        return result.first() is not None
 
-    async def _validate_folder_unique_name(
-        self, name: str, parent_id: int | None, exclude_id: int | None = None
-    ) -> bool:
-        stmt = select(Folders).where(
-            Folders.name == name, Folders.parent_id == parent_id
-        )
-        if exclude_id is not None:
-            stmt = stmt.where(Folders.id != exclude_id)
-        result = await self.session.exec(stmt)
-        return result.first() is not None
-
-    # Files
-
-    async def create_file(self, data: FileCreate) -> BaseResponse[Files]:
-        if await self._validate_file_unique_name(
-            data.file.filename or "", data.folder_id
-        ):
-            return BaseResponse.fail(
-                message="Tên file đã tồn tại trong thư mục này",
-                status_code=400,
-            )
-
-        upload_result = await self.vercel_blob.put_async(
-            file=data.file, folder="media/"
-        )
-
-        db_obj = Files(
-            name=data.file.filename or "",
-            url=upload_result.url,
-            type=data.file.content_type or "",
-            sizes=data.file.size,
-            folder_id=data.folder_id,
-        )
-        self.session.add(db_obj)
-        await self.session.commit()
-        await self.session.refresh(db_obj)
-        return BaseResponse.created(db_obj, message="Tạo file thành công")
-
-    async def update_file(self, file_id: int, data: FileUpdate) -> BaseResponse[Files]:
-        db_obj = await self.file_crud.find_by_id(file_id)
-        if db_obj is None:
-            return BaseResponse.not_found(message="Không tìm thấy file")
-
-        update_dict = data.model_dump(exclude_unset=True)
-
-        new_name = update_dict.get("name", db_obj.name)
-        new_folder_id = update_dict.get("folder_id", db_obj.folder_id)
-        if new_name != db_obj.name or new_folder_id != db_obj.folder_id:
-            if await self._validate_file_unique_name(
-                new_name, new_folder_id, exclude_id=file_id
-            ):
-                return BaseResponse.fail(
-                    message="Tên file đã tồn tại trong thư mục này",
-                    status_code=400,
+        async with self.session_factory() as session:
+            crud = BaseCrud(session=session, model=Medias)
+            return not (
+                await crud.select(ValidateNameSelect)
+                .where(
+                    and_(
+                        Medias.name == name,
+                        Medias.parent_id == parent_id,
+                        Medias.is_folder == is_folder,
+                    )
                 )
-
-        old_url = db_obj.url
-        if data.file is not None:
-            upload_result = await self.vercel_blob.put_async(
-                file=data.file, folder="media/"
-            )
-            db_obj.url = upload_result.url
-            db_obj.type = data.file.content_type or db_obj.type
-            db_obj.sizes = data.file.size or db_obj.sizes
-
-            if old_url:
-                await self.vercel_blob.delete_async(old_url)
-
-        for key, value in update_dict.items():
-            if key == "file":
-                continue
-            setattr(db_obj, key, value)
-
-        self.session.add(db_obj)
-        await self.session.commit()
-        await self.session.refresh(db_obj)
-        return BaseResponse.ok(db_obj, message="Cập nhật file thành công")
-
-    async def delete_file(self, file_id: int) -> BaseResponse[None]:
-        db_obj = await self.file_crud.find_by_id(file_id)
-        if db_obj is None:
-            return BaseResponse.not_found(message="Không tìm thấy file")
-
-        file_url = db_obj.url
-        if file_url:
-            await self.vercel_blob.delete_async(file_url)
-
-        await self.session.delete(db_obj)
-        await self.session.commit()
-        return BaseResponse.ok(message="Xóa file thành công")
-
-    async def read_one_file(self, file_id: int) -> BaseResponse[Files]:
-        db_obj = await self.file_crud.find_by_id(file_id)
-        if db_obj is None:
-            return BaseResponse.not_found(message="Không tìm thấy file")
-        return BaseResponse.ok(db_obj, message="Lấy chi tiết file thành công")
-
-    async def pagination_files(
-        self, pagination: PaginationRequest
-    ) -> BaseResponse[PaginationResponse]:
-        result = await self.file_crud.pagination_async(pagination)
-        return BaseResponse.ok(result, message="Lấy danh sách file thành công")
-
-    # Folders
-
-    async def create_folder(self, data: FolderCreate) -> BaseResponse[Folders]:
-        if await self._validate_folder_unique_name(data.name, data.parent_id):
-            return BaseResponse.fail(
-                message="Tên thư mục đã tồn tại trong thư mục cha này",
-                status_code=400,
+                .any_async()
             )
 
-        db_obj = Folders(**data.model_dump())
-        self.session.add(db_obj)
-        await self.session.commit()
-        await self.session.refresh(db_obj)
-        return BaseResponse.created(db_obj, message="Tạo thư mục thành công")
+    async def list_items_by_folder_cursor_raw(
+        self,
+        parent_id: int | None,
+        payload: CursorPaginationRequest,
+        is_soft_delete: bool = True,
+        type_filter: str | None = None,
+    ) -> CursorPaginationResponse | None:
 
-    async def update_folder(
-        self, folder_id: int, data: FolderUpdate
-    ) -> BaseResponse[Folders]:
-        db_obj = await self.folder_crud.find_by_id(folder_id)
-        if db_obj is None:
-            return BaseResponse.not_found(message="Không tìm thấy thư mục")
+        cache_key = (
+            self.redis.get_cursor_key(CacheTags.MEDIA, payload)
+            + f":parent-{parent_id}:soft_delete-{is_soft_delete}"
+            + f":type-{type_filter}"
+        )
 
-        update_dict = data.model_dump(exclude_unset=True)
+        async def get_cursor() -> CursorPaginationResponse:
+            query_builder = self.crud.select(MediaSelect)
 
-        new_name = update_dict.get("name", db_obj.name)
-        new_parent_id = update_dict.get("parent_id", db_obj.parent_id)
-        if new_name != db_obj.name or new_parent_id != db_obj.parent_id:
-            if await self._validate_folder_unique_name(
-                new_name, new_parent_id, exclude_id=folder_id
-            ):
-                return BaseResponse.fail(
-                    message="Tên thư mục đã tồn tại trong thư mục cha này",
-                    status_code=400,
-                )
+            if parent_id:
+                query_builder = query_builder.where(Medias.parent_id == parent_id)
+            else:
+                query_builder = query_builder.where(Medias.parent_id == None)
 
-        for key, value in update_dict.items():
-            setattr(db_obj, key, value)
-        self.session.add(db_obj)
-        await self.session.commit()
-        await self.session.refresh(db_obj)
-        return BaseResponse.ok(db_obj, message="Cập nhật thư mục thành công")
+            if type_filter:
+                if type_filter == "folder":
+                    query_builder = query_builder.where(Medias.is_folder)
+                elif type_filter in {"image", "video", "document", "other"}:
+                    query_builder = query_builder.where(
+                        and_(
+                            Medias.is_folder == False,
+                            cast(Any, Medias.media_metadata)["type"].astext
+                            == type_filter,
+                        )
+                    )
 
-    async def delete_folder(self, folder_id: int) -> BaseResponse[None]:
-        db_obj = await self.folder_crud.find_by_id(folder_id)
-        if db_obj is None:
-            return BaseResponse.not_found(message="Không tìm thấy thư mục")
-        await self.session.delete(db_obj)
-        await self.session.commit()
-        return BaseResponse.ok(message="Xóa thư mục thành công")
+            return await query_builder.cursor_pagination_async(
+                payload,
+                cursor_field=MediaSelect.nameof(lambda x: x.updated_at),
+                search_fields=[MediaSelect.nameof(lambda m: m.name)],
+                soft_delete=is_soft_delete,
+            )
 
-    async def read_one_folder(self, folder_id: int) -> BaseResponse[Folders]:
-        db_obj = await self.folder_crud.find_by_id(folder_id)
-        if db_obj is None:
-            return BaseResponse.not_found(message="Không tìm thấy thư mục")
-        return BaseResponse.ok(db_obj, message="Lấy chi tiết thư mục thành công")
-
-    async def pagination_folders(
-        self, pagination: PaginationRequest
-    ) -> BaseResponse[PaginationResponse]:
-        result = await self.folder_crud.pagination_async(pagination)
-        return BaseResponse.ok(result, message="Lấy danh sách thư mục thành công")
-
-    # Cursor pagination: hiển thị file + folder gọn như file manager
+        return await self.redis.get_or_set_async(
+            key=cache_key,
+            async_func=get_cursor,
+            tags=[CacheTags.MEDIA],
+            model_class=CursorPaginationResponse,
+        )
 
     async def list_items_by_folder_cursor(
-        self, folder_id: int | None, payload: CursorPaginationRequest
+        self,
+        parent_id: int | None,
+        payload: CursorPaginationRequest,
+        is_soft_delete: bool = True,
+        type_filter: str | None = None,
     ) -> BaseResponse[CursorPaginationResponse]:
-        cursor_time: datetime | None = None
-        cursor_id: int | None = None
-        if payload.cursor:
-            try:
-                parts = payload.cursor.split("_")
-                cursor_time = datetime.fromisoformat(parts[0])
-                cursor_id = int(parts[1]) if len(parts) > 1 else None
-            except Exception:
-                cursor_time = None
-                cursor_id = None
+        if parent_id:
+            exiting_media = await self._existing_media(parent_id)
+            if not exiting_media or not exiting_media.is_folder:
+                return BaseResponse.not_found(message="Không tìm thấy thư mục")
 
-        file_stmt = cast(Any, select(Files)).where(
-            Files.deleted_at == None, Files.folder_id == folder_id
+        result = await self.list_items_by_folder_cursor_raw(
+            parent_id, payload, is_soft_delete, type_filter
         )
-        folder_stmt = cast(Any, select(Folders)).where(
-            Folders.deleted_at == None, Folders.parent_id == folder_id
-        )
-
-        stmt_f: Any = file_stmt
-        stmt_d: Any = folder_stmt
-
-        updated_at_file = cast(Any, Files.updated_at)
-        updated_at_folder = cast(Any, Folders.updated_at)
-        id_file = cast(Any, Files.id)
-        id_folder = cast(Any, Folders.id)
-
-        if payload.is_desc:
-            stmt_f = stmt_f.order_by(desc(updated_at_file))
-            stmt_d = stmt_d.order_by(desc(updated_at_folder))
-        else:
-            stmt_f = stmt_f.order_by(asc(updated_at_file))
-            stmt_d = stmt_d.order_by(asc(updated_at_folder))
-
-        if cursor_time is not None and cursor_id is not None:
-            if payload.is_desc:
-                stmt_f = stmt_f.where(
-                    or_(
-                        updated_at_file < cursor_time,
-                        updated_at_file == cursor_time,
-                        id_file < cursor_id,
-                    )
-                )
-                stmt_d = stmt_d.where(
-                    or_(
-                        updated_at_folder < cursor_time,
-                        updated_at_folder == cursor_time,
-                        id_folder < cursor_id,
-                    )
-                )
-            else:
-                stmt_f = stmt_f.where(
-                    or_(
-                        updated_at_file > cursor_time,
-                        updated_at_file == cursor_time,
-                        id_file > cursor_id,
-                    )
-                )
-                stmt_d = stmt_d.where(
-                    or_(
-                        updated_at_folder > cursor_time,
-                        updated_at_folder == cursor_time,
-                        id_folder > cursor_id,
-                    )
-                )
-
-        stmt_f = stmt_f.limit(payload.limit)
-        stmt_d = stmt_d.limit(payload.limit)
-
-        files = (await self.session.exec(stmt_f)).all()
-        folders = (await self.session.exec(stmt_d)).all()
-
-        file_items = [
-            FileCursorNode(
-                id=r.id,
-                name=r.name,
-                url=r.url,
-                file_type=r.type,
-                sizes=r.sizes,
-                folder_id=r.folder_id,
-                updated_at=r.updated_at,
-            )
-            for r in files
-        ]
-        folder_items = [
-            FolderCursorNode(
-                id=r.id,
-                name=r.name,
-                parent_id=r.parent_id,
-                updated_at=r.updated_at,
-            )
-            for r in folders
-        ]
-
-        merged = file_items + folder_items
-        merged.sort(
-            key=lambda x: (x.updated_at or datetime.min, x.id),
-            reverse=payload.is_desc,
-        )
-        merged = merged[: payload.limit]
-
-        next_cursor: str | None = None
-        has_more = False
-        if merged:
-            last = merged[-1]
-            updated_at = last.updated_at or datetime.min.replace(tzinfo=timezone.utc)
-            if updated_at.tzinfo is None:
-                updated_at = updated_at.replace(tzinfo=timezone.utc)
-            next_cursor = f"{updated_at.isoformat()}_{last.id}"
-            has_more = len(files) >= payload.limit or len(folders) >= payload.limit
-
         return BaseResponse.ok(
-            CursorPaginationResponse(
-                data=merged,
-                next_cursor=next_cursor,
-                has_more=has_more,
-            ),
-            message="Lấy danh sách theo cursor thành công",
+            data=result or CursorPaginationResponse(data=[], next_cursor=None)
         )
 
-    # Folder tree for sidebar navigation
-    async def get_folder_tree(
-        self, parent_id: int | None = None
-    ) -> BaseResponse[List[FolderTreeNode]]:
-        # Get all folders (non-deleted)
-        stmt = cast(Any, select(Folders)).where(Folders.deleted_at == None)
-        folders = (await self.session.exec(stmt)).all()
+    async def get_one_media_raw(
+        self, id: int, is_soft_delete: bool = True
+    ) -> Optional[Medias]:
+        return await self.redis.get_or_set_async(
+            key=f"{CacheTags.MEDIA}:{id}",
+            async_func=lambda: self.crud.select(MediaSelect).find_by_id(
+                id=id, soft_delete=is_soft_delete
+            ),
+            tags=[CacheTags.MEDIA],
+            model_class=Medias,
+        )
 
-        # Build tree structure
-        folder_map: dict[int, FolderTreeNode] = {}
-        for f in folders:
-            folder_map[f.id] = FolderTreeNode(
-                id=f.id,
-                name=f.name,
-                parent_id=f.parent_id,
-                children=[],
-                item_count=0,
+    async def get_one_media(
+        self, id: int, is_soft_delete: bool = True
+    ) -> BaseResponse[MediaSelect]:
+        media = await self.get_one_media_raw(id, is_soft_delete)
+        if not media:
+            return BaseResponse.not_found(message="Không tìm thấy media")
+        return BaseResponse.ok(data=MediaSelect(**media.model_dump()))
+
+    async def create_media(self, payload: CreateMediaSchema) -> BaseResponse[Medias]:
+        # ----------------------------------------------------------------
+        # 1. Kiểm tra thư mục cha (nếu có)
+        # ----------------------------------------------------------------
+        prefix: list[dict[str, Any]] | None = None
+        if payload.folder_id is not None:
+            existing_folder = await self.get_one_media_raw(payload.folder_id)
+            if not existing_folder or not existing_folder.is_folder:
+                return BaseResponse.not_found(message="Không tìm thấy thư mục")
+
+            parent_prefix = existing_folder.prefix or []
+            prefix = list(parent_prefix)
+            prefix.append(
+                PrefixNode(
+                    id=existing_folder.id, name=existing_folder.name
+                ).model_dump()
             )
 
-        # Count items in each folder
-        for f in folders:
-            # Count files in this folder
-            file_stmt = cast(Any, select(Files)).where(
-                Files.deleted_at == None, Files.folder_id == f.id
+        extracted_metadata = None
+
+        # ----------------------------------------------------------------
+        # 2. Xử lý trích xuất & kiểm tra File trước (Chưa upload)
+        # ----------------------------------------------------------------
+        if not payload.is_folder:
+            from src.modules.setting.setting_constants import AppConfigKey
+            from src.modules.setting.setting_schemas import FileConfigSchema
+
+            if not payload.file:
+                return BaseResponse.fail("File không được để trống", status_code=400)
+
+            # Kiểm tra dung lượng file
+            size_setting = await self.app_setting.get_setting_value(
+                AppConfigKey.file_config, model_cls=FileConfigSchema
             )
-            file_count = len((await self.session.exec(file_stmt)).all())
+            if (
+                size_setting
+                and payload.file.size
+                and payload.file.size > size_setting.max_size_file
+            ):
+                return BaseResponse.fail(
+                    "Kích thước file quá lớn", status_code=400, data=size_setting
+                )
 
-            # Count subfolders (direct children)
-            subfolder_count = sum(1 for fol in folders if fol.parent_id == f.id)
+            # Đọc thông tin metadata từ file gửi lên (Con trỏ file dịch chuyển về cuối)
+            media_metadata = self.get_file_metadata(payload.file)
+            if not media_metadata:
+                return BaseResponse.fail(
+                    "Không thể xác định thông tin file", status_code=400
+                )
 
-            if f.id in folder_map:
-                folder_map[f.id].item_count = file_count + subfolder_count
+            extracted_metadata = media_metadata.model_dump()
 
-        # Build tree
-        root_nodes: List[FolderTreeNode] = []
-        for f in folders:
-            node = folder_map[f.id]
-            if f.parent_id is None or f.parent_id == parent_id:
-                if parent_id is None or f.parent_id == parent_id:
-                    root_nodes.append(node)
-            else:
-                if f.parent_id in folder_map:
-                    folder_map[f.parent_id].children.append(node)
+        # ----------------------------------------------------------------
+        # 3. Kiểm tra trùng tên trong Database (Đảm bảo an toàn trước khi upload)
+        # ----------------------------------------------------------------
+        valid_name = await self._validate_unique_name(
+            name=payload.name, parent_id=payload.folder_id, is_folder=payload.is_folder
+        )
 
-        # Sort children by name
-        def sort_tree(nodes: List[FolderTreeNode]):
-            for n in nodes:
-                if n.children:
-                    n.children.sort(key=lambda x: x.name)
-                    sort_tree(n.children)
+        if not valid_name:
+            return BaseResponse.fail("Tên đã tồn tại", status_code=400)
 
-        if parent_id is None:
-            # Return full tree from root
-            roots = [n for n in root_nodes if n.parent_id is None]
-            roots.sort(key=lambda x: x.name)
-            sort_tree(roots)
-            return BaseResponse.ok(roots, message="Lấy cây thư mục thành công")
-        else:
-            # Return children of specific parent
-            if parent_id in folder_map:
-                children = folder_map[parent_id].children
-                children.sort(key=lambda x: x.name)
-                sort_tree(children)
-                return BaseResponse.ok(children, message="Lấy thư mục con thành công")
-            return BaseResponse.ok([], message="Lấy thư mục con thành công")
+        # ----------------------------------------------------------------
+        # 4. Chuẩn bị dữ liệu Model & Map chuẩn cột database (folder_id -> parent_id)
+        # ----------------------------------------------------------------
+        dump_data = payload.model_dump(exclude={"file", "folder_id"})
+        new_media = Medias(
+            **dump_data,
+            parent_id=payload.folder_id,
+            media_metadata=extracted_metadata,
+            prefix=prefix,
+        )
+
+        # ----------------------------------------------------------------
+        # 5. Tiến hành Upload lên Cloud (Chỉ chạy khi mọi validate đã PASS)
+        # ----------------------------------------------------------------
+        if not payload.is_folder and payload.file:
+            # QUAN TRỌNG: Đưa con trỏ file về lại vị trí đầu tiên để Vercel đọc trọn vẹn dữ liệu
+            await payload.file.seek(0)
+
+            # Đổi tên file sang chuỗi UUID tránh trùng lặp trên Storage
+            unique_filename = f"{uuid8()}_{payload.name}"
+            upload_vercel = await self.vercel_blob.put_async(
+                file=payload.file, override_name=unique_filename
+            )
+
+            if not upload_vercel or not upload_vercel.url:
+                return BaseResponse.error("Upload file lên Cloud thất bại")
+
+            # Gán URL nhận được từ Cloud vào Model
+            new_media.url = upload_vercel.url
+
+        # ----------------------------------------------------------------
+        # 6. Ghi dữ liệu cuối cùng vào Database
+        # ----------------------------------------------------------------
+        new_media = await self.crud.create(new_media)
+        await self.redis.invalidate_tags_async(CacheTags.MEDIA)
+
+        return BaseResponse.ok(data=new_media)
+
+    async def delete_media(
+        self, id: int, is_soft_delete: bool = True
+    ) -> BaseResponse[bool]:
+
+        # 1. Tìm kiếm file/folder cần xóa
+        existing_media = (
+            await self.crud.select(Medias)
+            .where(Medias.id == id)
+            .find_one(soft_delete=is_soft_delete)
+        )
+
+        if not existing_media:
+            return BaseResponse.not_found("Không tìm thấy folder hoặc file")
+
+        # Lưu lại URL trước khi bản ghi bị xóa cứng trong DB
+        file_url_to_delete = existing_media.url if not is_soft_delete else None
+
+        # 2. Thực hiện transaction cô đọng CHỈ dành cho Database
+        try:
+            async with self.crud.transaction():
+                # Nếu là Folder, bạn nên tự viết thêm logic xóa/ẩn các file con bên trong tại đây nhé!
+
+                success = await self.crud.delete(
+                    data=existing_media, soft_delete=is_soft_delete, autocommit=False
+                )
+                if not success:
+                    raise ValueError("Không thể xóa bản ghi trong Database")
+
+        except Exception as e:
+            # Nếu DB lỗi, Context manager tự rollback, ta trả về lỗi cho Client luôn
+            return BaseResponse.error(f"Xóa thất bại: {str(e)}")
+
+        if file_url_to_delete:
+            await self.vercel_blob.delete_async(file_url_to_delete)
+
+        return BaseResponse.no_content()

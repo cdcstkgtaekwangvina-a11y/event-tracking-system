@@ -4,7 +4,29 @@
     darkModeText: 'Chế độ tối', 
     expandedStyle: 'box-shadow: none; border-radius: 10px; width: 90%; display: flex; align-items: center; gap: 5px; border: 0px;',
     customStyle: null,
+    currentPath: window.location.pathname,
     openDropdown: false,
+    isActivePage(pageId, currentPath){
+        const adminPages = {{ ADMIN_PAGES_DICT}}
+        const currentPage = adminPages.find(x => x.id === pageId)
+        const cleanPath = currentPath.split('?')[0];
+        if (!cleanPath.startsWith('/admin')) return false;
+
+        const targetPage = adminPages.find((x) => x.id === pageId);
+        if (!targetPage) return false;
+
+        if (pageId === 'dashboard') {
+            if (cleanPath === '/admin' || cleanPath === '/admin/') return true;
+            
+            const isKnownPath = adminPages
+            .filter(p => p.id !== 'dashboard')
+            .some(p => cleanPath.startsWith(p.path));
+            
+            return !isKnownPath; 
+        }
+        return cleanPath.startsWith(targetPage.path);
+        
+    },
     async log_out(){
         const approved = await notify.modal.confirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?',{confirmText: 'Đăng xuất', cancelText: 'Ở lại', confirmClass: 'nc-modal__btn--danger', icon: 'error'});
         if (approved) {
@@ -22,6 +44,15 @@
     init() {
     this.customStyle = this.isSidebar ? this.expandedStyle : 'box-shadow: none; border: 0; border-radius: 25%;';
     this.updateMainMargin();
+    document.addEventListener('htmx:after:history:push', () => { 
+            this.currentPath = window.location.pathname; 
+        });
+        document.addEventListener('htmx:after:history:replace', () => { 
+            this.currentPath = window.location.pathname; 
+        });
+        window.addEventListener('popstate', () => { 
+            this.currentPath = window.location.pathname; 
+        });
     },
     updateMainMargin() {
         const main = document.getElementById('admin-main-content');
@@ -66,7 +97,7 @@
         <div class="sidebar-body">
             {% for page in ADMIN_PAGES %}
             <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
-                hx-push-url="true">
+                hx-push-url="true" :data-active="isActivePage('{{ page.id }}', currentPath)">
 
                 <span class="material-symbols-outlined">
                     {{ page.icon }}
@@ -81,7 +112,9 @@
         </div>
 
         <div class="sidebar-footer">
+            {% with toggle_bg = 'var(--sidebar-bg)'%}
             {% include "templates/headers/toggle_theme.j2" %}
+            {% endwith%}
             <div class="dropdown-container">
                 <div class="dropdown border" x-show="openDropdown" x-transition.opacity.duration.300ms
                     @click.outside="openDropdown = false">
@@ -123,7 +156,7 @@
         left: 0;
         top: 0;
         bottom: 0;
-        background-color: var(--background);
+        background-color: var(--sidebar-bg);
         border-right: 1px solid var(--border);
         display: flex;
         flex-direction: column;
@@ -215,6 +248,11 @@
         background-color: var(--border);
     }
 
+    .sidebar-body-item[data-active="true"] {
+        background-color: var(--foreground);
+        color: var(--background);
+    }
+
     .icon-wrapper {
         width: 24px;
         height: 24px;
@@ -231,6 +269,7 @@
         bottom: 0;
         box-sizing: border-box;
         border-top: solid 1px var(--border);
+        background-color: var(--sidebar-bg);
         width: 100%;
         padding: 10px 0;
         display: flex;

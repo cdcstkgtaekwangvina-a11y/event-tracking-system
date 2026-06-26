@@ -18,6 +18,12 @@ engine = create_async_engine(
     pool_pre_ping=True,
 )
 
+async_session_factory = async_sessionmaker(
+    bind=engine,
+    expire_on_commit=False,
+    class_=AsyncSession,
+)
+
 
 async def init_db():
     async with engine.begin() as conn:
@@ -25,13 +31,16 @@ async def init_db():
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async_session_factory = async_sessionmaker(
-        bind=engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
+
     async with async_session_factory() as session:
         yield session
 
 
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    return async_session_factory
+
+
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SessionFactoryDep = Annotated[
+    async_sessionmaker[AsyncSession], Depends(get_session_factory)
+]
