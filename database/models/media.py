@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 class BaseMedia(SQLModel):
     name: str = Field(index=True, max_length=800, nullable=False)
     url: Optional[str] = Field(default=None, nullable=True)
-    prefix: list[dict[str, Any]] | None = Field(default=[], sa_type=JSONB)
+    prefix: str = Field(default="", index=True)
     media_metadata: Optional[dict[str, Any]] = Field(default=None, sa_type=JSONB)
     parent_id: Optional[int] = Field(default=None, index=True, foreign_key="medias.id")
     is_folder: bool = Field(default=False, nullable=False)

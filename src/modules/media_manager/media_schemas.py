@@ -1,7 +1,20 @@
 from fastapi import UploadFile, Form
 from src.shared.base.base_schema import BaseSchema
-from typing import Optional
+from typing import Optional, Any
 from pydantic import Field, model_validator
+from datetime import datetime
+
+
+class MediaSchema(BaseSchema):
+    id: int
+    name: str
+    url: str | None
+    prefix: list[dict[str, Any]] | None = None
+    media_metadata: dict[str, Any] | None
+    parent_id: int | None
+    is_folder: bool
+    created_at: datetime
+    updated_at: datetime | None
 
 
 class CreateMediaSchema(BaseSchema):
@@ -12,7 +25,7 @@ class CreateMediaSchema(BaseSchema):
         description="ID của thư mục cha (parent_id), để trống nếu nằm ở thư mục gốc",
     )
     is_folder: bool = Field(
-        default=False, description="True nếu là thư mục, False nếu là file"
+        default=True, description="True nếu là thư mục, False nếu là file"
     )
     file: Optional[UploadFile] = Field(
         default=None,
@@ -50,6 +63,17 @@ class CreateMediaSchema(BaseSchema):
         Vì FastAPI không thể parse trực tiếp JSON chứa đối tượng UploadFile.
         """
         return cls(name=name, folder_id=folder_id, is_folder=is_folder, file=file)
+
+
+class UpdateMedia(BaseSchema):
+    name: Optional[str] = Field(max_length=800, default=None)
+    folder_id: Optional[int] = Field(gt=0, default=None)
+
+    @model_validator(mode="after")
+    def validate_folder_and_name(self) -> "UpdateMedia":
+        if not self.name and not self.folder_id:
+            raise ValueError("Không có dữ liệu để update")
+        return self
 
 
 class MediaMetaData(BaseSchema):

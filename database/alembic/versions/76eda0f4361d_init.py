@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 9d50cd85f6a1
+Revision ID: 76eda0f4361d
 Revises: 
-Create Date: 2026-06-22 22:13:11.582264
+Create Date: 2026-06-26 17:13:12.351356
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlmodel
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '9d50cd85f6a1'
+revision: str = '76eda0f4361d'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -41,7 +41,7 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=800), nullable=False),
     sa.Column('url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('prefix', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('prefix', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('media_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('parent_id', sa.Integer(), nullable=True),
     sa.Column('is_folder', sa.Boolean(), nullable=False),
@@ -52,6 +52,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_medias_name'), 'medias', ['name'], unique=False)
     op.create_index(op.f('ix_medias_parent_id'), 'medias', ['parent_id'], unique=False)
+    op.create_index(op.f('ix_medias_prefix'), 'medias', ['prefix'], unique=False)
     op.create_table('settings',
     sa.Column('id', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
     sa.Column('value', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -117,6 +118,7 @@ def downgrade() -> None:
     op.drop_table('users')
     op.drop_table('events')
     op.drop_table('settings')
+    op.drop_index(op.f('ix_medias_prefix'), table_name='medias')
     op.drop_index(op.f('ix_medias_parent_id'), table_name='medias')
     op.drop_index(op.f('ix_medias_name'), table_name='medias')
     op.drop_table('medias')

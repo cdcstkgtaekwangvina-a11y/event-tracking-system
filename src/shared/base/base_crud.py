@@ -14,6 +14,7 @@ from typing import (
     List,
     TYPE_CHECKING,
     Callable,
+    Union,
 )
 from sqlalchemy import func, exists, or_, desc, asc, String, and_
 from fastapi import HTTPException
@@ -74,6 +75,19 @@ class BaseCrud(Generic[T]):
         from database.models.base_model import PrimaryModel
 
         return isinstance(model, type) and issubclass(model, PrimaryModel)
+
+    @overload
+    def map_dto_class(self, data: T, dto_class: None) -> T: ...
+
+    @overload
+    def map_dto_class(self, data: T, dto_class: Type[BaseModel]) -> BaseModel: ...
+
+    def map_dto_class(
+        self, data: T, dto_class: Optional[Type[BaseModel]]
+    ) -> Union[T, BaseModel]:
+        if dto_class:
+            return dto_class.model_validate(data, from_attributes=True)
+        return data
 
     # Start Query builder
     @overload
@@ -197,6 +211,7 @@ class BaseCrud(Generic[T]):
         self,
         statement: SelectOfScalar[Any] | Select[Any] | None = None,
         soft_delete: bool = True,
+        dto_class: Optional[Type[BaseModel]] = None,
     ) -> Optional[T]:
 
         if statement is not None:

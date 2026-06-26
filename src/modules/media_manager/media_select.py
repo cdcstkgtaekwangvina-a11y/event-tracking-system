@@ -10,11 +10,16 @@ class ValidateNameSelect(BaseSchema):
     is_folder: bool
 
 
+class PrefixSelect(BaseSchema):
+    id: int
+    name: str
+
+
 class MediaSelect(BaseSchema):
     id: int
     name: str
     url: str | None
-    prefix: list[dict[str, Any]] | None
+    prefix: str | None
     media_metadata: dict[str, Any] | None
     parent_id: int | None
     is_folder: bool

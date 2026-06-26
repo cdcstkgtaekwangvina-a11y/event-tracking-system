@@ -6,13 +6,13 @@ from database.models.media import Medias
 from sqlmodel import and_, col
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.services.vercel_blob import VercelBlobDep
-from .media_select import ValidateNameSelect, MediaSelect
+from .media_select import ValidateNameSelect, MediaSelect, PrefixSelect
 from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
     CursorPaginationResponse,
 )
 from src.modules.setting.setting_services import AppSettingServicesDep
-from .media_schemas import CreateMediaSchema, MediaMetaData, PrefixNode
+from .media_schemas import CreateMediaSchema, MediaMetaData, MediaSchema
 from .media_constants import MediaType
 from uuid import uuid8
 from src.shared.services.redis_services import RedisDep
@@ -109,6 +109,30 @@ class MediaServices:
                 .any_async()
             )
 
+    async def get_breadcrumbs(self, prefix_str: str) -> list[dict[str, Any]]:
+        if not prefix_str:
+            return []
+
+        # 1. Biến chuỗi "1/2/5/" thành list [1, 2, 5]
+        folder_ids = [int(x) for x in prefix_str.split("/") if x]
+
+        folders_data = (
+            await self.crud.select(PrefixSelect)
+            .where(col(Medias.id).in_(folder_ids))
+            .find_many(soft_delete=False)
+        )
+
+        # 3. Sắp xếp lại đúng thứ tự của chuỗi prefix ban đầu
+        folder_map = {f.id: f.name for f in folders_data}
+
+        breadcrumbs = [
+            {"id": f_id, "name": folder_map.get(f_id, "Unknown")}
+            for f_id in folder_ids
+            if f_id in folder_map
+        ]
+
+        return breadcrumbs
+
     async def list_items_by_folder_cursor_raw(
         self,
         parent_id: int | None,
@@ -178,41 +202,51 @@ class MediaServices:
 
     async def get_one_media_raw(
         self, id: int, is_soft_delete: bool = True
-    ) -> Optional[Medias]:
+    ) -> Optional[MediaSchema]:
+
+        async def get_media_async():
+            media = await self.crud.select(MediaSelect).find_by_id(
+                id=id, soft_delete=is_soft_delete
+            )
+            if not media:
+                return None
+            result = MediaSelect.model_validate(media, from_attributes=True)
+            prefix = await self.get_breadcrumbs(media.prefix)
+
+            return MediaSchema(**result.model_dump(exclude={"prefix"}), prefix=prefix)
+
         return await self.redis.get_or_set_async(
             key=f"{CacheTags.MEDIA}:{id}",
-            async_func=lambda: self.crud.select(MediaSelect).find_by_id(
-                id=id, soft_delete=is_soft_delete
-            ),
+            async_func=get_media_async,
             tags=[CacheTags.MEDIA],
-            model_class=Medias,
+            model_class=MediaSchema,
         )
 
     async def get_one_media(
         self, id: int, is_soft_delete: bool = True
-    ) -> BaseResponse[MediaSelect]:
+    ) -> BaseResponse[MediaSchema]:
         media = await self.get_one_media_raw(id, is_soft_delete)
         if not media:
             return BaseResponse.not_found(message="Không tìm thấy media")
-        return BaseResponse.ok(data=MediaSelect(**media.model_dump()))
+        return BaseResponse.ok(data=media)
 
     async def create_media(self, payload: CreateMediaSchema) -> BaseResponse[Medias]:
         # ----------------------------------------------------------------
         # 1. Kiểm tra thư mục cha (nếu có)
         # ----------------------------------------------------------------
-        prefix: list[dict[str, Any]] | None = None
+        prefix: str = ""
         if payload.folder_id is not None:
             existing_folder = await self.get_one_media_raw(payload.folder_id)
             if not existing_folder or not existing_folder.is_folder:
                 return BaseResponse.not_found(message="Không tìm thấy thư mục")
 
-            parent_prefix = existing_folder.prefix or []
-            prefix = list(parent_prefix)
-            prefix.append(
-                PrefixNode(
-                    id=existing_folder.id, name=existing_folder.name
-                ).model_dump()
-            )
+            if existing_folder.prefix is None or len(existing_folder.prefix) == 0:
+                prefix = f"{existing_folder.id}/"
+            else:
+                prefix = (
+                    "/".join([f"{f['id']}" for f in existing_folder.prefix])
+                    + f"/{existing_folder.id}/"
+                )
 
         extracted_metadata = None
 

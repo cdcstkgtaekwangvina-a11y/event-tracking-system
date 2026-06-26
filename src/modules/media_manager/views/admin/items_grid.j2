@@ -17,8 +17,7 @@
         <tbody>
             {% for item in data %}
             <tr class="media-row" data-id="{{ item.id }}" data-type="{{ 'folder' if item.is_folder else 'file' }}"
-                hx-get="{{ url_for('media_manager') }}/items/html?folder_id={{ item.id }}"
-                hx-push-url="?folder_id={{ item.id }}" hx-target="#media-items-container" hx-swap="innerHTML">
+                {% if item.is_folder %}@click="window.mediaActions?.goToFolder?.('{{ item.id }}')"{% endif %}>
                 <td class="col-name">
                     <div class="media-name-cell">
                         {% if item.is_folder %}
@@ -103,9 +102,7 @@
 <div class="media-grid" x-show="viewMode === 'grid'" @view-mode-changed.window="$el.scrollTop = 0">
     {% for item in data %}
     <div class="media-grid-card" :data-id="{{ item.id }}" :data-type="'{{ 'folder' if item.is_folder else 'file' }}'"
-        @click="viewMode !== 'grid' || (window.mediaActions?.goToFolder?.('{{ item.id }}') ?? false)"
-        hx-get="{{ url_for('media_manager') }}/items/html?folder_id={{ item.id }}"
-        hx-push-url="?folder_id={{ item.id }}" hx-target="#media-items-container" hx-swap="innerHTML">
+        {% if item.is_folder %}@click="window.mediaActions?.goToFolder?.('{{ item.id }}')"{% endif %}>
         <div class="card-preview">
             {% if item.is_folder %}
             <span class="material-symbols-outlined card-icon card-icon--folder">folder</span>
