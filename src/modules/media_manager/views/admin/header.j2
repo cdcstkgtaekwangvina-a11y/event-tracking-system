@@ -203,6 +203,18 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- View toggle -->
+                <div class="mhb-view-toggle">
+                    <button class="mhb-view-btn" :class="{ 'active': viewMode === 'grid' }"
+                        @click="$dispatch('view-mode-changed', {mode: 'grid'})" title="Chế độ lưới">
+                        <span class="material-symbols-outlined">grid_view</span>
+                    </button>
+                    <button class="mhb-view-btn" :class="{ 'active': viewMode === 'list' }"
+                        @click="$dispatch('view-mode-changed', {mode: 'list'})" title="Chế độ danh sách">
+                        <span class="material-symbols-outlined">view_list</span>
+                    </button>
+                </div>
             </div>
         </div>
 </div>
@@ -292,7 +304,6 @@
                 display: flex;
                 flex-direction: column;
                 gap: 0;
-                margin-right: 10px;
             }
 
             .media-header-top-area {

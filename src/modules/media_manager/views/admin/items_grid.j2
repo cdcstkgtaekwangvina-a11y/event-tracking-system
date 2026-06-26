@@ -166,8 +166,12 @@
 <style>
     /* ===== LIST VIEW ===== */
     .media-list {
+        grid-column: 1 / -1;
         width: 100%;
-        overflow-x: auto;
+        background: var(--background);
+        border-radius: 12px;
+        border: 1.5px solid var(--border);
+        overflow: hidden;
     }
 
     .media-table {
@@ -400,9 +404,7 @@
 
     /* ===== GRID VIEW ===== */
     .media-grid {
-        display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 16px;
+        display: contents;
     }
 
     .media-grid-card {
@@ -482,8 +484,12 @@
     }
 
     /* ===== LOAD MORE / INFINITE SCROLL ===== */
-    .load-more-sentinel {
-        padding: 20px 0;
+    .media-load-more {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+        margin-top: 10px;
     }
 
     .load-more-spinner {
@@ -512,13 +518,17 @@
 
     /* ===== EMPTY STATE ===== */
     .media-empty {
+        grid-column: 1 / -1;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         padding: 60px 20px;
-        text-align: center;
         color: var(--text-secondary);
+        text-align: center;
+        border: 1.5px dashed var(--border);
+        border-radius: 12px;
+        background: var(--sidebar-bg);
     }
 
     .media-empty-icon {

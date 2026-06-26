@@ -3,7 +3,8 @@
 {% block admin_title %}Quản lý Media{% endblock %}
 {% block admin_body %}
 <div
-    x-data="{ viewMode: localStorage.getItem('mediaViewMode') || 'grid', init() { this.$watch('viewMode', val => localStorage.setItem('mediaViewMode', val)) } }">
+    x-data="{ viewMode: localStorage.getItem('mediaViewMode') || 'grid', init() { this.$watch('viewMode', val => localStorage.setItem('mediaViewMode', val)) } }"
+    @view-mode-changed.window="viewMode = $event.detail.mode">
     {% include "modules/media_manager/views/admin/header.j2" %}
     <div class="media-body" id="media-items-container"
         hx-get="{{ url_for('media_manager') }}/items/html?{{ request.query_params }}" hx-trigger="load"
@@ -20,11 +21,17 @@
         background-color: var(--background);
         border: 1px solid var(--border);
         border-radius: 10px;
-        padding: 10px;
+        padding: 16px;
         margin-right: 10px;
         margin-left: 10px;
         min-height: 320px;
-        overflow: hidden;
+        overflow-y: auto;
+        
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        grid-auto-rows: max-content;
+        gap: 16px;
+        align-content: start;
     }
 
     .media-loading {
@@ -35,6 +42,7 @@
         padding: 60px 20px;
         color: var(--text-secondary);
         font-size: 14px;
+        grid-column: 1 / -1;
     }
 
     .spinner-sm {
