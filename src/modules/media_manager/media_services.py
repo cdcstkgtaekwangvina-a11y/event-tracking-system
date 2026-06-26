@@ -1,8 +1,9 @@
+import asyncio
 from typing import Optional, Any, cast
 from fastapi import UploadFile
 from database.models.app_db import SessionDep, SessionFactoryDep
 from database.models.media import Medias
-from sqlmodel import and_
+from sqlmodel import and_, col
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.services.vercel_blob import VercelBlobDep
 from .media_select import ValidateNameSelect, MediaSelect
@@ -295,39 +296,68 @@ class MediaServices:
 
         return BaseResponse.ok(data=new_media)
 
+    async def bulk_delete_media(
+        self, ids: list[int], is_soft_delete: bool = True
+    ) -> BaseResponse[bool]:
+
+        # 1. Mặc định dùng luôn list ids truyền vào cho việc xóa
+        media_ids: list[int] = ids
+        media_urls: list[str] = []
+
+        # Chỉ khi HARD DELETE mới cần đi tìm dữ liệu cũ để lấy URL xóa file vật lý
+        if not is_soft_delete:
+            exiting_medias = (
+                await self.crud.select(MediaSelect)
+                .where(col(Medias.id).in_(ids))
+                .find_many(soft_delete=is_soft_delete)
+            )
+            if not exiting_medias:
+                return BaseResponse.not_found("Không tìm thấy folder hoặc file")
+
+            media_ids = [media.id for media in exiting_medias if media.id is not None]
+            media_urls = [media.url for media in exiting_medias if media.url]
+
+        # 2. Thực thi Transaction an toàn
+        db_success = False
+        try:
+            async with self.crud.transaction():
+                # Chuẩn bị tác vụ DB (chưa await)
+                delete_media_task = self.crud.delete(
+                    condition=lambda m: col(m.id).in_(media_ids),
+                    soft_delete=is_soft_delete,
+                    autocommit=False,
+                )
+
+                if media_urls:
+                    # Chuẩn bị tác vụ Vercel SDK
+                    delete_vercel_task = self.vercel_blob.delete_async(media_urls)
+
+                    # Chạy song song
+                    db_success, vercel_success = await asyncio.gather(
+                        delete_media_task, delete_vercel_task
+                    )
+
+                    # Nếu 1 trong 2 tác vụ thất bại, chủ động raise lỗi để kích hoạt ROLLBACK tự động
+                    if not db_success or not vercel_success:
+                        raise Exception(
+                            "Xóa dữ liệu database hoặc xóa file trên Vercel thất bại"
+                        )
+                else:
+                    # Nếu chỉ xóa mềm (hoặc không có url file), chỉ cần chạy tác vụ DB
+                    db_success = await delete_media_task
+                    if not db_success:
+                        # Trả về luôn từ trong block này là an toàn (không đổi dữ liệu gì nên commit vô hại)
+                        return BaseResponse.not_found("Không tìm thấy folder hoặc file")
+
+        except Exception as e:
+            return BaseResponse.error(f"Quá trình xóa thất bại: {str(e)}")
+
+        await self.redis.invalidate_tags_async(CacheTags.MEDIA)
+
+        return BaseResponse.no_content()
+
     async def delete_media(
         self, id: int, is_soft_delete: bool = True
     ) -> BaseResponse[bool]:
 
-        # 1. Tìm kiếm file/folder cần xóa
-        existing_media = (
-            await self.crud.select(Medias)
-            .where(Medias.id == id)
-            .find_one(soft_delete=is_soft_delete)
-        )
-
-        if not existing_media:
-            return BaseResponse.not_found("Không tìm thấy folder hoặc file")
-
-        # Lưu lại URL trước khi bản ghi bị xóa cứng trong DB
-        file_url_to_delete = existing_media.url if not is_soft_delete else None
-
-        # 2. Thực hiện transaction cô đọng CHỈ dành cho Database
-        try:
-            async with self.crud.transaction():
-                # Nếu là Folder, bạn nên tự viết thêm logic xóa/ẩn các file con bên trong tại đây nhé!
-
-                success = await self.crud.delete(
-                    data=existing_media, soft_delete=is_soft_delete, autocommit=False
-                )
-                if not success:
-                    raise ValueError("Không thể xóa bản ghi trong Database")
-
-        except Exception as e:
-            # Nếu DB lỗi, Context manager tự rollback, ta trả về lỗi cho Client luôn
-            return BaseResponse.error(f"Xóa thất bại: {str(e)}")
-
-        if file_url_to_delete:
-            await self.vercel_blob.delete_async(file_url_to_delete)
-
-        return BaseResponse.no_content()
+        return await self.bulk_delete_media(ids=[id], is_soft_delete=is_soft_delete)

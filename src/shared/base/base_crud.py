@@ -1,6 +1,6 @@
 from src.shared.helpers.time_extensions import get_now_vn
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel, select, update, delete
 from sqlmodel.sql.expression import SelectOfScalar, Select
 from typing import (
     TypeVar,
@@ -15,7 +15,7 @@ from typing import (
     TYPE_CHECKING,
     Callable,
 )
-from sqlalchemy import func, exists, or_, desc, asc, String, update, and_
+from sqlalchemy import func, exists, or_, desc, asc, String, and_
 from fastapi import HTTPException
 from src.shared.schemas.pagination_schemas import (
     PaginationRequest,
@@ -277,32 +277,33 @@ class BaseCrud(Generic[T]):
     async def delete(
         self,
         id: Any = None,
-        data: Any = None,
+        condition: Callable[[Any], Any] | None = None,
         soft_delete: bool = True,
         autocommit: bool = True,
     ) -> bool:
-        db_obj: Any = None
 
-        if data is not None:
-            db_obj = data
-        elif id is not None:
-            db_obj = await self.find_by_id(id, soft_delete=soft_delete)
+        if id is not None and self.is_has_primary_key(self.model):
+            where_clause = self.model.id == id
+        elif condition is not None:
+            where_clause = condition(self.model)
         else:
-            db_obj = await self.find_one(soft_delete=soft_delete)
-
-        if db_obj is None:
             return False
-        if soft_delete:
-            db_obj.deleted_at = get_now_vn()
-            self.session.add(db_obj)
-            if autocommit:
-                await self.session.commit()
-            return True
+
+        if soft_delete and self.is_has_soft_delete(self.model):
+            statement = (
+                update(self.model).where(where_clause).values(deleted_at=get_now_vn())
+            )
         else:
-            await self.session.delete(db_obj)
-            if autocommit:
-                await self.session.commit()
-            return True
+            statement = delete(self.model).where(where_clause)
+
+        # 3. Thực thi câu lệnh
+        result = await self.session.exec(statement)
+
+        if autocommit:
+            await self.session.commit()
+
+        # Trả về True nếu có ít nhất một dòng dữ liệu bị ảnh hưởng
+        return result.rowcount > 0
 
     async def any_async(
         self,
@@ -534,16 +535,21 @@ class BaseCrud(Generic[T]):
                 try:
                     cursor_time_str = parts[0]
                     # Khôi phục dấu + bị mất do URL decode (VD: 2026-06-26 03:04:15 00:00 -> +00:00)
-                    if len(cursor_time_str) >= 25 and cursor_time_str.rfind(' ') > 19:
-                        last_space = cursor_time_str.rfind(' ')
-                        cursor_time_str = cursor_time_str[:last_space] + '+' + cursor_time_str[last_space+1:]
-                    
+                    if len(cursor_time_str) >= 25 and cursor_time_str.rfind(" ") > 19:
+                        last_space = cursor_time_str.rfind(" ")
+                        cursor_time_str = (
+                            cursor_time_str[:last_space]
+                            + "+"
+                            + cursor_time_str[last_space + 1 :]
+                        )
+
                     try:
                         from datetime import datetime
+
                         cursor_time = datetime.fromisoformat(cursor_time_str)
                     except Exception:
                         cursor_time = parts[0]  # Fallback
-                    
+
                     cursor_id = int(parts[1])
                 except Exception:
                     pass  # Parse lỗi thì bỏ qua, coi như fetch từ đầu
