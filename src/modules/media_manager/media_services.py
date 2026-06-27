@@ -12,7 +12,7 @@ from src.shared.schemas.pagination_schemas import (
     CursorPaginationResponse,
 )
 from src.modules.setting.setting_services import AppSettingServicesDep
-from .media_schemas import CreateMediaSchema, MediaMetaData, MediaSchema
+from .media_schemas import CreateMediaSchema, MediaMetaData, MediaSchema, UpdateMedia
 from .media_constants import MediaType
 from uuid import uuid8
 from src.shared.services.redis_services import RedisDep
@@ -82,11 +82,7 @@ class MediaServices:
     async def _existing_media(self, id: int, is_soft_delete: bool = True):
         async with self.session_factory() as session:
             crud = BaseCrud(session=session, model=Medias)
-            return (
-                await crud.select(ValidateNameSelect)
-                .where(Medias.id == id)
-                .find_one(soft_delete=is_soft_delete)
-            )
+            return await crud.find_by_id(id=id, soft_delete=is_soft_delete)
 
     async def _validate_unique_name(
         self,
@@ -353,38 +349,34 @@ class MediaServices:
 
         # 2. Thực thi Transaction an toàn
         db_success = False
-        try:
-            async with self.crud.transaction():
-                # Chuẩn bị tác vụ DB (chưa await)
-                delete_media_task = self.crud.delete(
-                    condition=lambda m: col(m.id).in_(media_ids),
-                    soft_delete=is_soft_delete,
-                    autocommit=False,
+        async with self.crud.transaction():
+            # Chuẩn bị tác vụ DB (chưa await)
+            delete_media_task = self.crud.delete(
+                condition=lambda m: col(m.id).in_(media_ids),
+                soft_delete=is_soft_delete,
+                autocommit=False,
+            )
+
+            if media_urls:
+                # Chuẩn bị tác vụ Vercel SDK
+                delete_vercel_task = self.vercel_blob.delete_async(media_urls)
+
+                # Chạy song song
+                db_success, vercel_success = await asyncio.gather(
+                    delete_media_task, delete_vercel_task
                 )
 
-                if media_urls:
-                    # Chuẩn bị tác vụ Vercel SDK
-                    delete_vercel_task = self.vercel_blob.delete_async(media_urls)
-
-                    # Chạy song song
-                    db_success, vercel_success = await asyncio.gather(
-                        delete_media_task, delete_vercel_task
+                # Nếu 1 trong 2 tác vụ thất bại, chủ động raise lỗi để kích hoạt ROLLBACK tự động
+                if not db_success or not vercel_success:
+                    return BaseResponse.error(
+                        "Xóa dữ liệu database hoặc xóa file trên Vercel thất bại"
                     )
-
-                    # Nếu 1 trong 2 tác vụ thất bại, chủ động raise lỗi để kích hoạt ROLLBACK tự động
-                    if not db_success or not vercel_success:
-                        raise Exception(
-                            "Xóa dữ liệu database hoặc xóa file trên Vercel thất bại"
-                        )
-                else:
-                    # Nếu chỉ xóa mềm (hoặc không có url file), chỉ cần chạy tác vụ DB
-                    db_success = await delete_media_task
-                    if not db_success:
-                        # Trả về luôn từ trong block này là an toàn (không đổi dữ liệu gì nên commit vô hại)
-                        return BaseResponse.not_found("Không tìm thấy folder hoặc file")
-
-        except Exception as e:
-            return BaseResponse.error(f"Quá trình xóa thất bại: {str(e)}")
+            else:
+                # Nếu chỉ xóa mềm (hoặc không có url file), chỉ cần chạy tác vụ DB
+                db_success = await delete_media_task
+                if not db_success:
+                    # Trả về luôn từ trong block này là an toàn (không đổi dữ liệu gì nên commit vô hại)
+                    return BaseResponse.not_found("Không tìm thấy folder hoặc file")
 
         await self.redis.invalidate_tags_async(CacheTags.MEDIA)
 
@@ -395,3 +387,99 @@ class MediaServices:
     ) -> BaseResponse[bool]:
 
         return await self.bulk_delete_media(ids=[id], is_soft_delete=is_soft_delete)
+
+    async def update_media(self, id: int, payload: UpdateMedia) -> BaseResponse[Medias]:
+        # 1. Kiểm tra sự tồn tại của file/folder hiện tại
+        existing_media = await self._existing_media(id, is_soft_delete=False)
+        if not existing_media:
+            return BaseResponse.not_found("Không tìm thấy folder hoặc file")
+
+        if existing_media.deleted_at is not None:
+            return BaseResponse.fail(
+                f"Vui lòng khôi phục {'thư mục' if existing_media.is_folder else 'file'} trước khi cập nhật"
+            )
+
+        # 2. Kiểm tra trùng tên trùng đường dẫn
+        valid_name = await self._validate_unique_name(
+            name=payload.name or existing_media.name,
+            parent_id=payload.folder_id,
+            is_folder=existing_media.is_folder,
+        )
+
+        if not valid_name:
+            return BaseResponse.fail("Tên đã tồn tại")
+
+        # Lưu lại chuỗi nhận diện gốc của các con cháu TRƯỚC KHI THAY ĐỔI
+        old_child_prefix_base = f"{existing_media.prefix}{existing_media.id}/"
+        new_child_prefix_base = old_child_prefix_base
+
+        # Khởi tạo một dict chứa các trường cần update cho bản ghi hiện tại
+        update_data = {}
+
+        # Thêm name vào dict nếu có thay đổi
+        if payload.name:
+            update_data["name"] = payload.name
+
+        # Xử lý logic di chuyển thư mục cha nếu có truyền folder_id
+        if payload.folder_id and existing_media.parent_id != payload.folder_id:
+            if payload.folder_id == existing_media.id:
+                return BaseResponse.fail("Không thể di chuyển thư mục vào chính nó")
+
+            parent_media = await self._existing_media(
+                payload.folder_id, is_soft_delete=False
+            )
+
+            if not parent_media or not parent_media.is_folder:
+                return BaseResponse.not_found("Thư mục đích không tồn tại")
+
+            if parent_media.prefix.startswith(old_child_prefix_base):
+                return BaseResponse.fail(
+                    "Không thể di chuyển thư mục vào thư mục con của nó"
+                )
+
+            # Đưa các thông tin thay đổi cấu trúc cây vào dict update
+            update_data["parent_id"] = payload.folder_id
+            new_prefix = f"{parent_media.prefix}{parent_media.id}/"
+            update_data["prefix"] = new_prefix
+
+            # Cập nhật lại chuỗi nhận diện mới cho đám con cháu
+            new_child_prefix_base = f"{new_prefix}{existing_media.id}/"
+
+        # ======================================================================
+        # 3. GỌI HÀM UPDATE CỦA BASECRUD (self.crud.update)
+        # Truyền autocommit=False để giữ chung Transaction với câu lệnh Bulk Update phía dưới
+        # ======================================================================
+        updated_media = await self.crud.update(
+            id=id,
+            data=update_data,
+            soft_delete=False,  # Đã check thủ công ở đầu hàm nên truyền False để tối ưu câu lệnh WHERE
+            autocommit=False,
+        )
+
+        # Nếu payload trống hoặc không có gì thay đổi, hàm update của BaseCRUD trả về None
+        # Lúc này ta lấy luôn existing_media để làm dữ liệu trả về kết quả
+        if updated_media is None:
+            updated_media = existing_media
+
+        # 4. Nếu là folder và có sự thay đổi đường dẫn (prefix), tiến hành bulk update cho đám con cháu
+        if existing_media.is_folder and old_child_prefix_base != new_child_prefix_base:
+            from sqlmodel import func, update as sqlmodel_update
+
+            stmt = (
+                sqlmodel_update(Medias)
+                .where(col(Medias.prefix).like(f"{old_child_prefix_base}%"))
+                .values(
+                    prefix=func.replace(
+                        Medias.prefix,
+                        old_child_prefix_base,
+                        new_child_prefix_base,
+                    )
+                )
+            )
+            await self.session.exec(stmt)
+
+        # 5. Kết thúc toàn bộ tiến trình -> Commit dữ liệu của cả cha lẫn con xuống DB
+        await self.session.commit()
+        await self.session.refresh(updated_media)
+        await self.redis.invalidate_tags_async(CacheTags.MEDIA)
+        return BaseResponse.ok(updated_media)

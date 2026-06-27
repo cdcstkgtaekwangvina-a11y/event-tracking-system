@@ -5,9 +5,7 @@ from src.shared.helpers.cbv import clean_cbv
 from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
 )
-from .media_schemas import (
-    CreateMediaSchema,
-)
+from .media_schemas import CreateMediaSchema, UpdateMedia
 from .media_services import MediaServices
 
 TAG_NAME = "media"
@@ -33,6 +31,10 @@ class MediaController:
     @router.get_api("{id}")
     async def get_media(self, id: int):
         return await self.service.get_one_media(id)
+
+    @router.patch_api("{id}")
+    async def update_media(self, id: int, payload: UpdateMedia):
+        return await self.service.update_media(id, payload)
 
     @router.post_api()
     async def create_media(
