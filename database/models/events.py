@@ -20,6 +20,7 @@ class BaseEvents(SQLModel):
     )
     url_image: str | None = Field(default=None)
     url_map: str | None = Field(default=None, nullable=True)
+    location: str | None = Field(default=None, max_length=500, nullable=True)
 
 
 class Events(

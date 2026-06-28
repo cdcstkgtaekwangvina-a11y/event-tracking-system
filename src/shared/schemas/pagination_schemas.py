@@ -9,7 +9,8 @@ class FilterRequest(BaseSchema):
 
 
 class PaginationRequest(BaseSchema):
-    page: int = Field(default=1, gt=1)
+    # page: int = Field(default=1, gt=1)
+    page: int = Field(default=1, ge=1)
     limit: int = Field(default=10, gt=0, le=100)
     sort_field: Optional[str] = None
     is_desc: bool = False

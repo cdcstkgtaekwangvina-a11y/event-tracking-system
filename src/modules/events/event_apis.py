@@ -6,6 +6,7 @@ from src.shared.helpers.cbv import clean_cbv
 from src.shared.schemas.pagination_schemas import PaginationRequest
 from src.shared.base.base_request import BaseRequest
 from fastapi.responses import HTMLResponse
+from datetime import datetime, timezone
 
 TAG_NAME = "events"
 router = BaseRouter(controller=TAG_NAME, tags=[TAG_NAME])
@@ -47,6 +48,33 @@ class EventController:
                 "total": total,
                 "total_pages": total_pages,
                 "search": q.search or "",
+                "now": datetime.now(timezone.utc),
+            },
+        )
+
+    @router.get_api("admin-cards-html", response_class=HTMLResponse)
+    async def get_events_admin_cards_html(
+        self,
+        req: BaseRequest,
+        q: PaginationRequest = Depends(),
+    ):
+        pagination_result = await self.service.get_events_raw(pagination=q)
+        limit = pagination_result.limit
+        total = pagination_result.total
+        total_pages = (total + limit - 1) // limit if limit > 0 else 1
+
+        templates = req.app.state.templates
+        return templates.TemplateResponse(
+            req,
+            name=f"{base_path}admin_event_cards.j2",
+            context={
+                "events": pagination_result.data or [],
+                "page": pagination_result.page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages,
+                "search": q.search or "",
+                "now": datetime.now(timezone.utc),
             },
         )
 

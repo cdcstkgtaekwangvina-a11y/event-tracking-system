@@ -72,6 +72,9 @@ class RedisServices:
         if not saved_tags:
             return True
 
+        if isinstance(saved_tags, list):
+            return False
+
         tag_names = list(saved_tags.keys())
 
         async with self.client.pipeline(transaction=False) as pipe:
