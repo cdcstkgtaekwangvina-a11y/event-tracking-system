@@ -8,6 +8,11 @@ import redis.asyncio as redis
 from dotenv import load_dotenv
 from fastapi import Depends
 from pydantic import BaseModel
+from src.shared.constants.cache_tags import CacheTags
+from src.shared.schemas.pagination_schemas import (
+    CursorPaginationRequest,
+    PaginationRequest,
+)
 
 load_dotenv()
 
@@ -66,6 +71,9 @@ class RedisServices:
         """
         if not saved_tags:
             return True
+
+        if isinstance(saved_tags, list):
+            return False
 
         tag_names = list(saved_tags.keys())
 
@@ -261,6 +269,12 @@ class RedisServices:
             for tag in tags:
                 pipe.incr(f"{self.tag_version_prefix}{tag}")
             await pipe.execute()
+
+    def get_cursor_key(self, prefix: CacheTags, req: CursorPaginationRequest) -> str:
+        return f"{prefix}:cursor:{req.search}:{req.filters}:{req.limit}:{req.cursor}:{req.sort_field}:{req.is_desc}:cursor_desc-{req.is_cursor_desc}"
+
+    def get_pagination_key(self, prefix: CacheTags, req: PaginationRequest) -> str:
+        return f"pagination:{req.page}:{req.limit}:{req.sort_field}:{req.is_desc}:{req.filters}:{req.search}"
 
 
 RedisDep = Annotated[RedisServices, Depends()]

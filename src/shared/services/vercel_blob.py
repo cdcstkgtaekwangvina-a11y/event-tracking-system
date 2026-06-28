@@ -23,9 +23,12 @@ class VercelBlobServices:
         return self._client
 
     async def put_async(
-        self, file: UploadFile, folder: Optional[str] = None
+        self,
+        file: UploadFile,
+        override_name: str | None = None,
+        folder: Optional[str] = None,
     ) -> PutBlobResult:
-        path: str = file.filename or ""
+        path: str = override_name or file.filename or ""
         if folder:
             path = folder + path
         return await self.client.put(

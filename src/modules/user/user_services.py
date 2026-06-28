@@ -1,7 +1,6 @@
 from __future__ import annotations
 from uuid import UUID
 from database.models.app_db import SessionDep
-from database.models.files import Files
 from src.shared.base import BaseCrud, BaseResponse
 from sqlmodel import or_
 from pwdlib import PasswordHash
@@ -11,6 +10,7 @@ from typing import TYPE_CHECKING, Optional
 from src.shared.services.redis_services import RedisDep
 from .user_schemas import UserSchema
 from src.shared.constants.cache_tags import CacheTags
+from database.models.media import Medias
 
 if TYPE_CHECKING:
     from database.models.users import Users
@@ -34,7 +34,7 @@ class UserServices:
                 self.crud.select(
                     UserSchema, logic_column=[UserSchema.nameof(lambda x: x.file_id)]
                 )
-                .join(Files, isouter=True)
+                .join(Medias, isouter=True)
                 .group_by(Users.id)
                 .find_by_id(id)
             ),

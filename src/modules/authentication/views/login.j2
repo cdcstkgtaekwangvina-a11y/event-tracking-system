@@ -100,7 +100,7 @@
     <div class="buttons">
         <div class="home-btn">
             <a href="{{ url_for('home')}}" style="text-decoration: none;">
-                {% include "static/public/icons/home.svg"%}
+                <span class="material-symbols-outlined">home</span>
             </a>
         </div>
         {% with toggle_style = "display: flex; align-items: center;" %}
@@ -110,7 +110,7 @@
     <div class="login-form" x-data="{isHide : true, isDisable : true}">
         <div class="login-info">
             <div class="login-logo">
-                {% include "static/public/icons/login.svg"%}
+                <span class="material-symbols-outlined">login</span>
             </div>
             <h2>Hệ thống Event tracking system</h2>
             <p>Đăng nhập để tiếp tục</p>
@@ -134,7 +134,7 @@
                         @input="isDisable = checkInput()" />
                 </div>
                 <button class="toggle-password" @click="isHide = !isHide" type="button">
-                    {% include "static/public/icons/visibility.svg"%}
+                    <span class="material-symbols-outlined">visibility</span>
                 </button>
             </div>
         </div>

@@ -1,0 +1,642 @@
+<div class="media-header" x-data="{
+        current_media: null,
+        folder_id: new URLSearchParams(window.location.search).get('folder_id'),
+        viewMode: localStorage.getItem('mediaViewMode') || 'grid',
+        async getCurrentMedia(){
+            if (this.folder_id === '' || this.folder_id === null || this.folder_id === undefined ) return;
+            while (!window.fetchHelper) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            const media = await window.fetchHelper.get('media/' + this.folder_id);
+            if(media.status_code === 200){
+                this.current_media = media.data;
+            }
+        },
+        log(){
+            console.log('Folder id', this.folder_id)
+            console.log(this.current_media);
+            return;
+        },
+        setViewMode(mode){
+            this.viewMode = mode;
+            localStorage.setItem('mediaViewMode', mode);
+        },
+        getCurrentFolderId(){
+            return this.folder_id;
+        }
+
+        }" @view-mode-changed.window="setViewMode($event.detail.mode)">
+    <div class="media-header-top-area">
+        <div class="media-header-top">
+            <div class="media-title-group">
+                <h2>Quản lý File</h2>
+            </div>
+            <div class="media-header-buttons">
+                <button type="button" class="upload-button"
+                    @click="window.mediaCreateModal?.open({ mode: 'file', folderId: folder_id })">
+                    <span class="material-symbols-outlined">upload</span>
+                    <span x-show="!$store.screen.isMobile">Tải lên</span>
+                </button>
+                <button type="button" class="create-folder-button"
+                    @click="window.mediaCreateModal?.open({ mode: 'folder', folderId: folder_id })">
+                    <span class="material-symbols-outlined">folder</span>
+                    <span x-show="!$store.screen.isMobile">Tạo thư mục</span>
+                </button>
+
+                <a type="button" href="#" class="trash-button"
+                    @click.prevent="window.mediaActions?.showTrash(folder_id)">
+                    <span class="material-symbols-outlined">delete</span>
+                    <span x-show="!$store.screen.isMobile">Thùng rác</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="media-header-middle" x-init="await getCurrentMedia()">
+            <div class="address-bar" id="media-address-bar">
+                <a href="#" @click.prevent="window.mediaActions?.goHome()" class="address-bar-item">
+                    <span class="material-symbols-outlined" style="color: var(--text-secondary);">home</span>
+                    <span class="address-bar-item-text">Tất cả file</span>
+                </a>
+                <template x-for="p in (current_media && current_media.prefix) ? current_media.prefix : []" :key="p.id">
+                    <div class="address-bar-segment">
+                        <span class="material-symbols-outlined address-bar-chevron">chevron_right</span>
+                        <a href="#" @click.prevent="window.mediaActions?.goToFolder(p.id)" class="address-bar-item">
+                            <span class="address-bar-item-text" x-text="p.name"></span>
+                        </a>
+                    </div>
+                </template>
+
+                <template x-if="current_media">
+                    <div class="address-bar-segment">
+                        <span class="material-symbols-outlined address-bar-chevron">chevron_right</span>
+                        <a href="#" @click.prevent="window.mediaActions?.goToFolder(current_media.id)" class="address-bar-item">
+                            <span class="address-bar-item-text" x-text="current_media.name"></span>
+                        </a>
+                    </div>
+                </template>
+            </div>
+        </div>
+        <div class="media-header-bottom" x-data="{
+            filterOpen: false,
+            sortOpen: false,
+            trashOpen: false,
+            filterValue: new URLSearchParams(window.location.search).get('type_filter') || 'all',
+            sortValue: new URLSearchParams(window.location.search).get('sort_field') || 'updated_at',
+            sortDir: new URLSearchParams(window.location.search).get('is_desc') === 'false' ? 'asc' : 'desc',
+            init() {
+                const searchParam = new URLSearchParams(window.location.search).get('search');
+                if (searchParam && this.$refs.searchInput) {
+                    this.$refs.searchInput.value = searchParam;
+                }
+
+                this.$watch('filterValue', value => {
+                    this.reload()
+                })
+                this.$watch('sortValue', () => {
+                    this.reload()
+                })
+                this.$watch('sortDir', () => {
+                    this.reload()
+                })
+            },
+            reload(extraParams = {}) {
+                const container = document.getElementById('media-items-container')
+                if (!container) return
+                const params = new URLSearchParams(window.location.search)
+
+                if (this.filterValue && this.filterValue !== 'all') {
+                    params.set('type_filter', this.filterValue)
+                } else {
+                    params.delete('type_filter')
+                }
+
+                if (this.$refs.searchInput && this.$refs.searchInput.value) {
+                    params.set('search', this.$refs.searchInput.value)
+                } else {
+                    params.delete('search')
+                }
+
+                if (this.sortValue) {
+                    params.set('sort_field', this.sortValue)
+                    params.set('is_desc', this.sortDir === 'desc' ? 'true' : 'false')
+                }
+
+                if (extraParams.includeDeleted) {
+                    params.set('include_deleted', 'true')
+                } else {
+                    params.delete('include_deleted')
+                }
+
+                const pushUrl = `{{ url_for('media_manager') }}?${params.toString()}`
+                window.history.pushState(null, '', pushUrl)
+
+                const url = `{{ url_for('media_manager') }}/items/html?${params.toString()}`
+                container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`
+                htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' })
+            }
+        }">
+            <div class="mhb-search">
+                <span class="material-symbols-outlined mhb-search-icon">search</span>
+                <input type="text" class="mhb-search-input" placeholder="Tìm kiếm file và thư mục..."
+                    x-ref="searchInput" @keyup.enter="$parent.reload()">
+            </div>
+            <div class="mhb-actions">
+                <!-- Filter dropdown -->
+                <div class="mhb-dropdown-wrapper" @click.outside="filterOpen = false">
+                    <button class="mhb-dropdown-btn" @click="filterOpen = !filterOpen"
+                        :class="{ 'active': filterOpen }">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">filter_list</span>
+                        <span class="mhb-dropdown-label" x-text="
+                        filterValue === 'all' ? 'Tất cả' :
+                        filterValue === 'image' ? 'Hình ảnh' :
+                        filterValue === 'video' ? 'Video' :
+                        filterValue === 'document' ? 'Tài liệu' :
+                        filterValue === 'folder' ? 'Thư mục' :
+                        filterValue === 'other' ? 'Khác' : 'Tất cả'
+                    "></span>
+                        <span class="material-symbols-outlined mhb-dropdown-chevron"
+                            :style="filterOpen && 'transform: rotate(180deg)'">expand_more</span>
+                    </button>
+                    <div class="mhb-dropdown-menu" x-show="filterOpen" x-transition.opacity.duration.150ms>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'all' }"
+                            @click="filterValue = 'all'; filterOpen = false">Tất cả</button>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'image' }"
+                            @click="filterValue = 'image'; filterOpen = false">Hình ảnh</button>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'video' }"
+                            @click="filterValue = 'video'; filterOpen = false">Video</button>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'document' }"
+                            @click="filterValue = 'document'; filterOpen = false">Tài liệu</button>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'folder' }"
+                            @click="filterValue = 'folder'; filterOpen = false">Thư mục</button>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'other' }"
+                            @click="filterValue = 'other'; filterOpen = false">Khác</button>
+                    </div>
+                </div>
+
+                <!-- Sort dropdown -->
+                <div class="mhb-dropdown-wrapper" @click.outside="sortOpen = false">
+                    <button class="mhb-dropdown-btn" @click="sortOpen = !sortOpen" :class="{ 'active': sortOpen }">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">swap_vert</span>
+                        <span class="mhb-dropdown-label" x-text="
+                        sortValue === 'name' ? 'Tên' :
+                        sortValue === 'created_at' ? 'Ngày tạo' :
+                        sortValue === 'media_metadata.sizes' ? 'Kích thước' :
+                        sortValue === 'updated_at' ? 'Ngày sửa đổi' : 'Tên'
+                    "></span>
+                        <span x-text="sortDir === 'desc' ? '↓' : '↑'" style="font-size: 13px;"></span>
+                        <span class="material-symbols-outlined mhb-dropdown-chevron"
+                            :style="sortOpen && 'transform: rotate(180deg)'">expand_more</span>
+                    </button>
+                    <div class="mhb-dropdown-menu" x-show="sortOpen" x-transition.opacity.duration.150ms>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'name' }"
+                            @click="sortValue = 'name'; sortOpen = false">Tên</button>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'created_at' }"
+                            @click="sortValue = 'created_at'; sortOpen = false">Ngày tạo</button>
+                        <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'updated_at' }"
+                            @click="sortValue = 'updated_at'; sortOpen = false">Ngày sửa đổi</button>
+                        <div class="mhb-dropdown-divider"></div>
+                        <button class="mhb-dropdown-item"
+                            @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'; sortOpen = false">
+                            <span class="material-symbols-outlined" style="font-size: 16px;"
+                                x-text="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'"></span>
+                            <span x-text="sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- View toggle -->
+                <div class="mhb-view-toggle">
+                    <button class="mhb-view-btn" :class="{ 'active': viewMode === 'grid' }"
+                        @click="$dispatch('view-mode-changed', {mode: 'grid'})" title="Chế độ lưới">
+                        <span class="material-symbols-outlined">grid_view</span>
+                    </button>
+                    <button class="mhb-view-btn" :class="{ 'active': viewMode === 'list' }"
+                        @click="$dispatch('view-mode-changed', {mode: 'list'})" title="Chế độ danh sách">
+                        <span class="material-symbols-outlined">view_list</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+</div>
+
+        <script>
+            document.addEventListener('alpine:init', () => {
+                window.mediaActions = {
+                    goToFolder(id) {
+                        const container = document.getElementById('media-items-container');
+                        if (!container) return;
+                        const url = `{{ url_for('media_manager') }}/items/html?folder_id=${id}`;
+                        container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
+                        htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                        window.history.pushState(null, '', `?folder_id=${id}`);
+                    },
+                    goHome() {
+                        const container = document.getElementById('media-items-container');
+                        if (!container) return;
+                        const url = `{{ url_for('media_manager') }}/items/html`;
+                        container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
+                        htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                        window.history.pushState(null, '', `{{ url_for('media_manager') }}`);
+                    },
+                    showTrash(folderId) {
+                        const container = document.getElementById('media-items-container');
+                        if (!container) return;
+                        const params = new URLSearchParams();
+                        params.set('include_deleted', 'true');
+                        if (folderId) params.set('folder_id', folderId);
+                        const url = `{{ url_for('media_manager') }}/items/html?${params.toString()}`;
+
+                        const parentXData = document.querySelector('.media-header-bottom')?.__x;
+                        if (parentXData) {
+                            parentXData.filterValue = 'all';
+                            parentXData.reload({ includeDeleted: true });
+                        } else {
+                            container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
+                            htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                        }
+                        window.history.pushState(null, '', `?folder_id=${folderId || ''}&include_deleted=true`);
+                    },
+                    async delete(id, type) {
+                        if (!confirm(`Bạn có chắc muốn xoá ${type === 'folder' ? 'thư mục' : 'file'} này không?`)) return;
+
+                        try {
+                            const response = await fetch(`{{ url_for('media_manager') }}/delete`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: new URLSearchParams({ id, is_soft_delete: true })
+                            });
+
+                            if (!response.ok) {
+                                const json = await response.json().catch(() => ({}));
+                                alert(json?.message || 'Xoá thất bại');
+                                return;
+                            }
+
+                            const container = document.getElementById('media-items-container');
+                            if (!container) return;
+                            const params = new URLSearchParams(window.location.search);
+                            const url = `{{ url_for('media_manager') }}/items/html?${params.toString()}`;
+                            container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
+                            htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                        } catch (error) {
+                            console.error(error);
+                            alert('Có lỗi xảy ra khi xóa');
+                        }
+                    }
+                };
+
+                // Emit view mode changes so header and items_grid can sync
+                document.addEventListener('view-mode-changed', (e) => {
+                    const detail = e.detail || {};
+                    window.dispatchEvent(new CustomEvent('view-mode-changed', { detail }));
+                });
+            });
+
+        </script>
+
+        <style>
+            .media-header-buttons {
+                display: flex;
+                gap: 10px;
+            }
+
+            .media-header {
+                display: flex;
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .media-header-top-area {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 10px 0 10px;
+                gap: 12px;
+                min-width: 0;
+            }
+
+            .media-header-top {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+                gap: 16px;
+                min-width: 0;
+            }
+
+            .media-title-group {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                min-width: 0;
+            }
+
+            .media-title-group h2 {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                min-width: 0;
+            }
+
+            .media-header-middle {
+                background-color: var(--sidebar-bg);
+                border-radius: 10px;
+                padding: 10px 15px;
+                margin: 15px 10px 10px 10px;
+                border: 1px solid var(--border);
+            }
+
+            .media-header-bottom {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 5px 10px 15px 10px;
+                margin: 0 10px;
+                min-width: 0;
+                background: transparent;
+                border: none;
+            }
+
+            .upload-button {
+                border-radius: 10px;
+                padding: 8px 15px;
+                background-color: var(--foreground);
+                color: var(--background);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                border: 0;
+                outline: 0;
+            }
+
+            .upload-button:hover {
+                background-color: var(--text-secondary);
+            }
+
+            .create-folder-button {
+                border-radius: 10px;
+                padding: 8px 15px;
+                background-color: var(--border);
+                color: var(--foreground);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                outline: 0;
+                border: 0;
+            }
+
+            .create-folder-button:hover {
+                background-color: var(--text-secondary);
+            }
+
+            .trash-button {
+                border-radius: 10px;
+                padding: 8px 15px;
+                background-color: var(--border);
+                color: red;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                outline: 0;
+                border: 0;
+                text-decoration: none;
+            }
+
+            .trash-button:hover {
+                background-color: var(--text-secondary);
+            }
+
+            /* ===== ADDRESS BAR ===== */
+            .address-bar {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                min-width: 0;
+                padding-bottom: 2px;
+            }
+
+            .address-bar::-webkit-scrollbar {
+                height: 6px;
+            }
+
+            .address-bar::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 999px;
+            }
+
+            .address-bar-item {
+                text-decoration: none;
+                color: var(--foreground);
+                font-weight: bold;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                line-height: 1;
+                white-space: nowrap;
+            }
+
+            .address-bar-item-text:hover {
+                text-decoration: underline;
+                text-underline-offset: 3px;
+            }
+
+            .address-bar-segment {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .address-bar-chevron {
+                font-size: 16px;
+                color: var(--text-secondary);
+            }
+
+            /* ===== MEDIA HEADER BOTTOM ===== */
+            .media-header-bottom {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 8px 0;
+            }
+
+            /* Search */
+            .mhb-search {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background-color: var(--sidebar-bg);
+                border: 1.5px solid var(--border);
+                border-radius: 8px;
+                padding: 10px 12px;
+                transition: border-color 0.2s ease;
+            }
+
+            .mhb-search:focus-within {
+                border-color: var(--foreground);
+            }
+
+            .mhb-search-icon {
+                font-size: 20px;
+                color: var(--text-secondary);
+                flex-shrink: 0;
+            }
+
+            .mhb-search-input {
+                flex: 1;
+                border: none;
+                outline: none;
+                background: transparent;
+                color: var(--foreground);
+                font-size: 14px;
+            }
+
+            .mhb-search-input::placeholder {
+                color: var(--text-secondary);
+            }
+
+            /* Actions group */
+            .mhb-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-shrink: 0;
+            }
+
+            /* Dropdown common */
+            .mhb-dropdown-wrapper {
+                position: relative;
+            }
+
+            .mhb-dropdown-btn {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 10px 12px;
+                border: 1.5px solid var(--border);
+                border-radius: 8px;
+                background: var(--sidebar-bg);
+                color: var(--foreground);
+                cursor: pointer;
+                font-size: 13px;
+                white-space: nowrap;
+                transition: all 0.15s ease;
+            }
+
+            .mhb-dropdown-btn:hover,
+            .mhb-dropdown-btn.active {
+                border-color: var(--foreground);
+            }
+
+            .mhb-dropdown-label {
+                font-weight: 500;
+            }
+
+            .mhb-dropdown-chevron {
+                font-size: 18px !important;
+                transition: transform 0.2s ease;
+            }
+
+            .mhb-dropdown-menu {
+                position: absolute;
+                top: calc(100% + 6px);
+                right: 0;
+                min-width: 150px;
+                background: var(--background);
+                border: 1.5px solid var(--border);
+                border-radius: 10px;
+                padding: 4px;
+                z-index: 100;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            }
+
+            .mhb-dropdown-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                padding: 8px 12px;
+                border: none;
+                border-radius: 6px;
+                background: transparent;
+                color: var(--foreground);
+                font-size: 13px;
+                cursor: pointer;
+                text-align: left;
+                transition: background-color 0.12s ease;
+            }
+
+            .mhb-dropdown-item:hover {
+                background-color: var(--border);
+            }
+
+            .mhb-dropdown-item.selected {
+                font-weight: 600;
+                background-color: var(--border);
+            }
+
+            .mhb-dropdown-divider {
+                height: 1px;
+                background-color: var(--border);
+                margin: 4px 0;
+            }
+
+            /* View toggle */
+            .mhb-view-toggle {
+                display: flex;
+                gap: 4px;
+                padding: 5px;
+                background-color: var(--sidebar-bg);
+                border: 1.5px solid var(--border);
+                border-radius: 10px;
+            }
+
+            .mhb-view-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 4px 6px;
+                border: 1.5px solid transparent;
+                border-radius: 7px;
+                background: transparent;
+                color: var(--text-secondary);
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+
+            .mhb-view-btn .material-symbols-outlined {
+                font-size: 20px;
+            }
+
+            .mhb-view-btn:hover {
+                color: var(--foreground);
+                background-color: var(--border);
+            }
+
+            .mhb-view-btn.active {
+                color: var(--foreground);
+                background-color: var(--background);
+                border-color: var(--border);
+                box-shadow: 0 1px 3px var(--border);
+            }
+
+            /* Responsive */
+            @media (max-width: 640px) {
+                .media-header-bottom {
+                    flex-wrap: wrap;
+                }
+
+                .mhb-search {
+                    width: 100%;
+                    flex: unset;
+                }
+            }
+        </style>

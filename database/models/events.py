@@ -5,7 +5,7 @@ from sqlalchemy import DateTime
 from typing import cast, Any, Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from database.models.files import Files
+    from database.models.media import Medias
     from database.models.events_employees import EventsEmployees
 
 
@@ -20,6 +20,7 @@ class BaseEvents(SQLModel):
     )
     url_image: str | None = Field(default=None)
     url_map: str | None = Field(default=None, nullable=True)
+    location: str | None = Field(default=None, max_length=500, nullable=True)
 
 
 class Events(
@@ -32,8 +33,8 @@ class Events(
 ):
     __tablename__: str = "events"
     id: int | None = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="files.id")
+    media_id: Optional[int] = Field(default=None, foreign_key="medias.id")
     employee_links: Optional[List[EventsEmployees]] = Relationship(
         back_populates="event"
     )
-    file: Optional["Files"] = Relationship(back_populates="events")
+    media: Optional["Medias"] = Relationship(back_populates="events")

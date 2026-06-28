@@ -1,8 +1,8 @@
-"""init db
+"""init
 
-Revision ID: dba04f81bede
+Revision ID: 76eda0f4361d
 Revises: 
-Create Date: 2026-05-16 16:47:31.498252
+Create Date: 2026-06-26 17:13:12.351356
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlmodel
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'dba04f81bede'
+revision: str = '76eda0f4361d'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -28,55 +28,50 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=False),
+    sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=True),
     sa.Column('position', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=True),
     sa.Column('gender', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=True),
     sa.Column('department', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('starting_date', sa.Date(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('folders',
+    op.create_table('medias',
     sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=False),
+    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=800), nullable=False),
+    sa.Column('url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('prefix', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('media_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('parent_id', sa.Integer(), nullable=True),
+    sa.Column('is_folder', sa.Boolean(), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['parent_id'], ['folders.id'], ),
+    sa.ForeignKeyConstraint(['parent_id'], ['medias.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('name', 'parent_id', name='uq_folder_name_parent')
+    sa.UniqueConstraint('name', 'parent_id', name='uq_media_name_parent')
     )
+    op.create_index(op.f('ix_medias_name'), 'medias', ['name'], unique=False)
+    op.create_index(op.f('ix_medias_parent_id'), 'medias', ['parent_id'], unique=False)
+    op.create_index(op.f('ix_medias_prefix'), 'medias', ['prefix'], unique=False)
     op.create_table('settings',
     sa.Column('id', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
     sa.Column('value', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('files',
-    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
-    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
-    sa.Column('sizes', sa.BigInteger(), nullable=True),
-    sa.Column('folder_id', sa.Integer(), nullable=True),
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['folder_id'], ['folders.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('name', 'folder_id', name='uq_file_name_folder')
-    )
-    op.create_index(op.f('ix_files_folder_id'), 'files', ['folder_id'], unique=False)
     op.create_table('events',
     sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=False),
+    sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('start_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('end_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('url_image', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('url_map', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('file_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['file_id'], ['files.id'], ),
+    sa.Column('media_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['media_id'], ['medias.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('users',
@@ -89,12 +84,13 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('password', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=True),
+    sa.Column('password', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('otp_code', sqlmodel.sql.sqltypes.AutoString(length=10), nullable=True),
+    sa.Column('token_version', sa.Integer(), nullable=False),
     sa.Column('expired_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('google_sub', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=True),
-    sa.Column('file_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['file_id'], ['files.id'], ),
+    sa.Column('media_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['media_id'], ['medias.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email'),
     sa.UniqueConstraint('username')
@@ -104,6 +100,7 @@ def upgrade() -> None:
     sa.Column('status', sqlmodel.sql.sqltypes.AutoString(length=50), nullable=False),
     sa.Column('join_at', sa.DateTime(), nullable=True),
     sa.Column('check_in_at', sa.DateTime(), nullable=True),
+    sa.Column('send_at', sa.DateTime(), nullable=True),
     sa.Column('event_id', sa.Integer(), nullable=False),
     sa.Column('employee_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['employee_id'], ['employees.id'], ),
@@ -120,9 +117,10 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_users_google_sub'), table_name='users')
     op.drop_table('users')
     op.drop_table('events')
-    op.drop_index(op.f('ix_files_folder_id'), table_name='files')
-    op.drop_table('files')
     op.drop_table('settings')
-    op.drop_table('folders')
+    op.drop_index(op.f('ix_medias_prefix'), table_name='medias')
+    op.drop_index(op.f('ix_medias_parent_id'), table_name='medias')
+    op.drop_index(op.f('ix_medias_name'), table_name='medias')
+    op.drop_table('medias')
     op.drop_table('employees')
     # ### end Alembic commands ###

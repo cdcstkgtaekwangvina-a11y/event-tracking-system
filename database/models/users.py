@@ -7,7 +7,7 @@ from typing import cast, Any, Optional, TYPE_CHECKING
 from src.modules.user.role_constants import ROLE
 
 if TYPE_CHECKING:
-    from database.models.files import Files
+    from database.models.media import Medias
 
 
 class BaseUsers(SQLModel):
@@ -27,7 +27,7 @@ class Users(
     table=True,
 ):
     __tablename__: str = "users"
-    id: UUID = Field(default=uuid8(), primary_key=True)
+    id: UUID = Field(default_factory=uuid8, primary_key=True)
     password: str | None = Field(default=None, nullable=True)
     otp_code: str | None = Field(default=None, max_length=10, nullable=True)
     token_version: int = Field(default=0, nullable=False)
@@ -37,5 +37,5 @@ class Users(
     google_sub: str | None = Field(
         default=None, max_length=500, nullable=True, unique=True, index=True
     )
-    file_id: int | None = Field(default=None, foreign_key="files.id")
-    file: Optional["Files"] = Relationship(back_populates="users")
+    media_id: Optional[int] = Field(default=None, foreign_key="medias.id")
+    media: Optional["Medias"] = Relationship(back_populates="users")

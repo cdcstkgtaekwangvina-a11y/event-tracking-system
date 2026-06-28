@@ -30,7 +30,7 @@
                 <img class="avatar-img" src="{{ auth.user.file_url if auth.user.file_url else auth.user.avatar_url }}"
                     alt="{{ auth.user.name }}">
                 {% else %}
-                {% include "static/public/icons/avatar.svg" %}
+                <span class="material-symbols-outlined">account_circle</span>
                 {% endif %}
                 <span x-show="$store.screen.isMobile === false" style="font-weight: bold;">
                     {{ auth.user.name if auth.user.name else auth.user.email }}
@@ -40,23 +40,23 @@
                 @click.outside="openDropdown = false">
                 <a href="{{ url_for('me') }}" class="dropdown-button"
                     style="text-decoration: none; color: var(--foreground);">
-                    {% include "static/public/icons/account.svg"%}
+                    <span class="material-symbols-outlined">account_circle</span>
                     <span>Tài khoản</span></a>
                 {% if auth.user.role and auth.user.role == 'ADMIN' or auth.user.role == 'SUPPER_ADMIN' %}
                 <a href="{{ url_for('admin_dashboard') }}" class="dropdown-button"
                     style="text-decoration: none; color: var(--foreground);">
-                    {% include "static/public/icons/manage.svg"%}
+                    <span class="material-symbols-outlined">manage_accounts</span>
                     <span>Quản lý</span></a>
                 {% endif %}
                 <button class="dropdown-button logout" @click="await log_out()">
-                    {% include "static/public/icons/logout.svg" %}
+                    <span class="material-symbols-outlined">logout</span>
                     <span>Đăng xuất</span></button>
             </div>
         </div>
         {% else%}
         <a class="login-btn" href="{{ url_for('login_view') }}?redirect={{ request.url|string|urlencode }}"
             style="text-decoration: none;">
-            {% include "static/public/icons/login.svg"%}
+            <span class="material-symbols-outlined">login</span>
             <span x-show="$store.screen.isMobile === false" style="font-weight: bold;">Đăng nhập</span>
         </a>
         {% endif %}
@@ -165,6 +165,7 @@
         outline: 0;
         border: 0;
         width: 100%;
+        gap: 5px;
     }
 
     .dropdown-button:hover {
