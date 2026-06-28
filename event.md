@@ -68,7 +68,7 @@ sequenceDiagram
 5. Ở Frontend, sau khi nhận kết quả thành công:
    - Hiển thị Toast thông báo thành công.
    - Đóng Modal và xóa dữ liệu form cũ.
-   - Phát sự kiện toàn cục: `window.dispatchEvent(new CustomEvent('refresh-events'))`.
+   - Phát sự kiện lên body: `document.body.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }))`.
 6. HTMX nhận biết tín hiệu `refresh-events` và tự động gửi request lấy lại danh sách mới để hiển thị lên màn hình.
 
 ### D. Luồng Xem chi tiết & Cập nhật sự kiện (Update)
@@ -229,14 +229,14 @@ async saveEvent() {
     if (response.ok) {
         notify.toast.success('Cập nhật thành công');
         this.modalOpen = false;
-        window.dispatchEvent(new CustomEvent('refresh-events'));
+        document.body.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }));
     }
 }
 ```
 * `const url = ...`, `const method = ...`: Nếu `isEdit` là `true`, thiết lập gửi request đến đường dẫn `/api/events/{id}` bằng phương thức `PUT`.
 * `.toISOString()`: Chuyển đổi định dạng giờ địa phương ngược về giờ chuẩn UTC (dạng ISO 8601) để lưu vào cơ sở dữ liệu.
 * `fetch(...)`: Thực hiện request Ajax gửi dữ liệu JSON lên server.
-* `window.dispatchEvent(...)`: Sau khi nhận tín hiệu thành công từ server, phát sự kiện `refresh-events` lên toàn bộ trang để HTMX tự động gọi lại API lấy danh sách sự kiện mới.
+* `document.body.dispatchEvent(...)`: Sau khi nhận tín hiệu thành công từ server, phát sự kiện `refresh-events` lên phần tử body (có chế độ sủi bọt bubbles: true) để HTMX tự động bắt lấy và gọi lại API lấy danh sách sự kiện mới.
 
 #### Bước 3: Backend xử lý và cập nhật cơ sở dữ liệu
 Tại file [event_apis.py](file:///f:/Project_KienPhung/event-tracking-system/src/modules/events/event_apis.py):
@@ -304,7 +304,7 @@ async deleteEvent() {
     if (response.ok) {
         notify.toast.success('Xóa sự kiện thành công');
         this.modalOpen = false;
-        window.dispatchEvent(new CustomEvent('refresh-events'));
+        document.body.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }));
     }
 }
 ```
@@ -329,4 +329,80 @@ async def delete_event(self, event_id: int) -> BaseResponse:
     return BaseResponse.ok(message="Xóa sự kiện thành công")
 ```
 * `delete()`: Thực hiện câu lệnh SQL `DELETE FROM events WHERE id = event_id` thông qua SQLAlchemy để xóa bỏ bản ghi sự kiện ra khỏi Database.
+
+---
+
+## 6. Hướng dẫn quy trình tìm và gỡ lỗi (Debugging Guide - Step-by-Step)
+
+Dưới đây là quy trình từng bước (Step-by-step) đã được áp dụng để phát hiện và xử lý lỗi không hiển thị danh sách và lỗi tìm kiếm (Search), bạn có thể tự mình áp dụng quy trình này để xử lý các lỗi phát sinh sau này:
+
+### Bước 1: Kiểm tra phản hồi thực tế của API (API Response Check)
+Khi giao diện (Frontend) hiển thị không đúng hoặc trống trơn, bước đầu tiên là phải kiểm tra xem **Backend trả về dữ liệu gì**.
+
+* **Cách thực hiện**:
+  * Mở **Developer Tools** trên trình duyệt (F12) -> Chuyển sang tab **Network** -> Thực hiện thao tác (gõ tìm kiếm/reload) -> Click vào request API tương ứng để xem phần **Response** (Phản hồi).
+  * Hoặc chạy lệnh `curl` trực tiếp trong terminal để kiểm tra nhanh:
+    ```powershell
+    curl.exe -i "http://localhost:8000/api/events/admin-cards-html?search=Team"
+    ```
+* **Cách phân tích kết quả**:
+  * **Nếu lỗi HTTP 422 (Unprocessable Entity)**: Đây là lỗi định dạng dữ liệu truyền lên. Hãy đọc kỹ phần JSON lỗi trả về để xem trường nào bị sai ràng buộc (Ví dụ lỗi: `"Input should be greater than 1"` của tham số `page` do khai báo `gt=1` nhầm trong schema).
+  * **Nếu trả về HTTP 200 nhưng dữ liệu trống/sai lệch**: Đây là lỗi logic xử lý ở Backend hoặc truy vấn Database. Hãy chuyển sang **Bước 2**.
+
+---
+
+### Bước 2: Kiểm tra câu lệnh SQL thực tế được thực thi (SQL Logging Check)
+Khi logic Backend bị sai hoặc trả về sai dữ liệu, hãy xem câu lệnh SQL mà thư viện ORM (SQLAlchemy/SQLModel) dịch ra để gửi xuống cơ sở dữ liệu.
+
+* **Cách thực hiện**:
+  * Nhìn vào cửa sổ Terminal đang chạy ứng dụng (`src.main`). SQLAlchemy đã được cấu hình in (log) câu lệnh SQL thời gian thực khi có request.
+  * Hãy tìm khối lệnh có dạng `SELECT ... FROM events ...` được in ra khi bạn thực hiện tìm kiếm hoặc tải trang.
+* **Cách phân tích kết quả**:
+  * Hãy soi kỹ điều kiện `WHERE` trong câu lệnh SQL.
+  * *Ví dụ thực tế*: Khi gõ tìm kiếm từ khóa `"Team"`, SQL log in ra:
+    ```sql
+    WHERE events.deleted_at IS NULL GROUP BY events.id ...
+    ```
+    Nhận xét: Hoàn toàn không có điều kiện `WHERE events.name ILIKE '%Team%'`. Điều này chứng tỏ **Backend đã bỏ qua từ khóa tìm kiếm** hoặc code tạo điều kiện `WHERE` trong Python đã bị chạy sai luồng nhánh `if/else`. Hãy chuyển sang **Bước 3**.
+
+---
+
+### Bước 3: Viết mã thử nghiệm độc lập (Scratch Script Testing)
+Khi nghi ngờ một hàm logic phức tạp hoặc nghi ngờ cơ chế tự động của thư viện (như cách kiểm tra kiểu cột `isinstance(column.type, String)`), cách nhanh nhất là viết một file kiểm thử nhỏ để chạy độc lập.
+
+* **Cách thực hiện**:
+  * Tạo một file Python tạm thời (ví dụ: `src/test_search.py`) chỉ chứa đoạn mã cần kiểm tra:
+    ```python
+    from database.models.events import Events
+    from sqlalchemy import String
+    
+    for column in Events.__table__.columns:
+        print(f"Cột: {column.name}, Kiểu: {column.type}, Trùng khớp String: {isinstance(column.type, String)}")
+    ```
+  * Chạy file này bằng trình thông dịch của dự án để đảm bảo môi trường đồng nhất:
+    ```powershell
+    .\envs\python.exe -m src.test_search
+    ```
+* **Cách phân tích kết quả**:
+  * Kết quả chạy script in ra: `Cột: name, Kiểu: VARCHAR(300), Trùng khớp String: False`.
+  * Từ đây, chúng ta phát hiện ngay thủ phạm: SQLModel sử dụng lớp kiểu dữ liệu tự định nghĩa tên là `AutoString`. Lớp này không thừa kế từ `String` của SQLAlchemy nên hàm `isinstance` trả về `False` và bỏ qua cột này khi tìm kiếm.
+  * Sau khi kiểm tra xong, hãy xóa file test để giữ sạch cây mã nguồn:
+    ```powershell
+    Remove-Item src/test_search.py
+    ```
+
+---
+
+### Bước 4: Sử dụng VS Code Debugger để khoanh vùng lỗi trực quan
+Nếu các bước trên chưa làm rõ được lỗi, hãy sử dụng tính năng Debug của VS Code để theo dõi sự thay đổi của biến số qua từng dòng code.
+
+* **Cách thực hiện**:
+  1. Tắt server ở terminal thường (Ctrl + C).
+  2. Click vào lề trái số dòng code để đặt dấu chấm đỏ (Breakpoint) tại điểm nghi ngờ (ví dụ: dòng nhận tham số ở `event_apis.py` hoặc dòng bắt đầu lọc trong `base_crud.py`).
+  3. Nhấn phím **`F5`** để khởi chạy chế độ Debug.
+  4. Thực hiện thao tác trên giao diện trình duyệt để trigger đoạn code chạy qua điểm dừng.
+* **Cách phân tích**:
+  * Chương trình sẽ dừng lại tại dòng có chấm đỏ.
+  * Bạn rê chuột lên các biến trong VS Code hoặc xem bảng **Variables** ở bên trái để theo dõi giá trị hiện tại của biến, từ đó phát hiện nhánh `if/else` nào đang bị rẽ sai hướng.
+
 

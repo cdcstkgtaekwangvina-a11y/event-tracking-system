@@ -400,7 +400,7 @@ class BaseCrud(Generic[T]):
                     table = getattr(self.model, "__table__", None)
                     if table is not None:
                         for column in table.columns:
-                            if isinstance(column.type, String):
+                            if isinstance(column.type, String) or column.type.__class__.__name__ == 'AutoString':
                                 search_conditions.append(
                                     column.ilike(f"%{pagination.search}%")
                                 )
@@ -505,7 +505,7 @@ class BaseCrud(Generic[T]):
                     table = getattr(self.model, "__table__", None)
                     if table is not None:
                         for column in table.columns:
-                            if isinstance(column.type, String):
+                            if isinstance(column.type, String) or column.type.__class__.__name__ == 'AutoString':
                                 search_conditions.append(
                                     column.ilike(f"%{cursor_request.search}%")
                                 )

@@ -62,7 +62,7 @@ class EventServices:
         return BaseResponse.ok(db_obj, message="Cập nhật sự kiện thành công")
 
     async def delete_event(self, event_id: int) -> BaseResponse:
-        deleted = await self.crud.select(Events).where(Events.id == event_id).delete()
+        deleted = await self.crud.delete(event_id)
         if not deleted:
             return BaseResponse.not_found(message="Không tìm thấy sự kiện")
         return BaseResponse.ok(message="Xóa sự kiện thành công")

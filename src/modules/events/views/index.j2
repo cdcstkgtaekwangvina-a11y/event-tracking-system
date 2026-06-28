@@ -3,6 +3,14 @@
 {% block admin_title %}Quản lý sự kiện{% endblock %}
 
 {% block admin_body %}
+{# 
+=== ĐOẠN CODE CŨ (Bản gốc chứa TipTap Editor placeholder, comment lại để giữ tham khảo) ===
+<div class="event-header">
+    <h1>Quản lý sự kiện</h1>
+</div>
+{% include "templates/components/editor/editor.j2" %}
+=======================================================================================
+#}
 <div class="admin-events-container" x-data="adminEventsApp()" @open-edit-modal.window="openEditModal($event.detail)">
     
     <!-- Header Section -->
@@ -212,8 +220,11 @@
                         notify.toast.success(this.isEdit ? 'Cập nhật thành công' : 'Tạo sự kiện thành công');
                         this.modalOpen = false;
                         this.resetForm();
-                        // Dispatch event to trigger HTMX reload
-                        window.dispatchEvent(new CustomEvent('refresh-events'));
+                        
+                        // CODE CŨ: window.dispatchEvent(new CustomEvent('refresh-events'));
+                        // -> Không sử dụng vì phát sự kiện trực tiếp trên window sẽ không "sủi bọt" (bubble) xuống body được.
+                        // CODE MỚI: Phát sự kiện trực tiếp trên document.body kèm { bubbles: true } để hx-trigger="refresh-events from:body" có thể bắt được.
+                        document.body.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }));
                     } else {
                         notify.toast.error('Có lỗi xảy ra', resData.message || resData.detail || 'Vui lòng kiểm tra lại dữ liệu');
                     }
@@ -247,7 +258,11 @@
                         notify.toast.success('Xóa sự kiện thành công');
                         this.modalOpen = false;
                         this.resetForm();
-                        window.dispatchEvent(new CustomEvent('refresh-events'));
+                        
+                        // CODE CŨ: window.dispatchEvent(new CustomEvent('refresh-events'));
+                        // -> Không sử dụng vì phát sự kiện trực tiếp trên window sẽ không "sủi bọt" (bubble) xuống body được.
+                        // CODE MỚI: Phát sự kiện trực tiếp trên document.body kèm { bubbles: true } để hx-trigger="refresh-events from:body" có thể bắt được.
+                        document.body.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }));
                     } else {
                         notify.toast.error('Xóa thất bại', resData.message || resData.detail || 'Không thể xóa sự kiện');
                     }
