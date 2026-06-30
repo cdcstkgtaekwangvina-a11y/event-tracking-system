@@ -39,17 +39,24 @@ export const fetchHelper = {
   },
   async post(path = "", payload = {}, options = { requireAuth: false }) {
     try {
+      const isFormData = payload instanceof FormData;
+      const headers = {
+        ...options.headers,
+        ...(options.requireAuth
+          ? { Authorization: `Bearer ${getToken("access_token")}` }
+          : {}),
+      };
+      // Only set Content-Type if not FormData (fetch sets it automatically with boundary)
+      if (!isFormData && !headers["Content-Type"]) {
+        headers["Content-Type"] = contentType.json;
+      }
+
       const res = await fetch(`${this.baseUrl}/${path}`, {
         method: "POST",
-        headers: {
-          ...(options.headers || { "Content-Type": contentType.json }),
-          ...(options.requireAuth
-            ? { Authorization: `Bearer ${getToken("access_token")}` }
-            : {}),
-        },
-        body: JSON.stringify(payload),
+        headers: headers,
+        body: isFormData ? payload : JSON.stringify(payload),
       });
-      return  await returnValue(res);
+      return await returnValue(res);
     } catch (error) {
       console.error("Error fetching data:", error);
       return null;
@@ -77,7 +84,7 @@ export const fetchHelper = {
   async patch(path = "", payload = {}, options = { requireAuth: false }) {
     try {
       const res = await fetch(`${this.baseUrl}/${path}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
           ...(options.requireAuth

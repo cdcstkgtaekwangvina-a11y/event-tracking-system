@@ -6,6 +6,8 @@
         {% if not cursor_request.cursor %}
         <thead>
             <tr>
+                <th class="col-select"><input type="checkbox" id="select-all-list"
+                        @change="window.mediaActions?.toggleSelectAll($event, 'list')"></th>
                 <th class="col-name">Tên ↕</th>
                 <th class="col-size">Kích thước</th>
                 <th class="col-owner">Loại</th>
@@ -17,7 +19,22 @@
         <tbody>
             {% for item in data %}
             <tr class="media-row" data-id="{{ item.id }}" data-type="{{ 'folder' if item.is_folder else 'file' }}"
-                {% if item.is_folder %}@click="window.mediaActions?.goToFolder?.('{{ item.id }}')"{% endif %}>
+                :class="{ 'selected': $store.mediaSelection.isSelected({{ item.id }}) }" draggable="true"
+                @dragstart="event.dataTransfer.setData('text/plain', '{{ item.id }}'); event.dataTransfer.effectAllowed = 'move';"
+                {% if item.is_folder %} @dragover.prevent="event.currentTarget.classList.add('drag-over')"
+                @dragleave="event.currentTarget.classList.remove('drag-over')" @drop="
+                    event.preventDefault();
+                    event.currentTarget.classList.remove('drag-over');
+                    const draggedId = event.dataTransfer.getData('text/plain');
+                    if (draggedId && draggedId !== '{{ item.id }}') {
+                        window.mediaActions?.moveToFolder(draggedId, '{{ item.id }}');
+                    }
+                " @click="window.mediaActions?.goToFolder?.('{{ item.id }}')" {% endif %}>
+                <td class="col-select">
+                    <input type="checkbox" class="row-checkbox"
+                        :checked="$store.mediaSelection.isSelected({{ item.id }})"
+                        @change="window.mediaActions?.toggleSelectItem($event, {{ item.id }})" @click.stop>
+                </td>
                 <td class="col-name">
                     <div class="media-name-cell">
                         {% if item.is_folder %}
@@ -61,33 +78,52 @@
                     {% else %}<span class="type-badge type-badge--other">Khác</span>{% endif %}
                 </td>
                 <td class="col-date">
-                    {% if item.updated_at %}{{ item.updated_at[:10] if item.updated_at is string else
-                    item.updated_at.strftime('%Y-%m-%d') }}
-                    {% elif item.created_at %}{{ item.created_at[:10] if item.created_at is string else
-                    item.created_at.strftime('%Y-%m-%d') }}
-                    {% else %}<span class="text-muted">—</span>{% endif %}
+                    {% if item.updated_at %}
+                    {% if item.updated_at is string %}
+                    {# Trường hợp là CHUỖI: Cắt từng phần Day, Month, Year và Time rồi ghép lại #}
+                    {{ item.updated_at[8:10] }}-{{ item.updated_at[5:7] }}-{{ item.updated_at[0:4] }} {{
+                    item.updated_at[11:19] }}
+                    {% else %}
+                    {# Trường hợp là DATETIME: Dùng định dạng %d-%m-%Y %H:%M:%S #}
+                    {{ item.updated_at.strftime('%d-%m-%Y %H:%M:%S') }}
+                    {% endif %}
+                    {% elif item.created_at %}
+                    {% if item.created_at is string %}
+                    {{ item.created_at[8:10] }}-{{ item.created_at[5:7] }}-{{ item.created_at[0:4] }} {{
+                    item.created_at[11:19] }}
+                    {% else %}
+                    {{ item.created_at.strftime('%d-%m-%Y %H:%M:%S') }}
+                    {% endif %}
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
                 </td>
                 <td class="col-actions">
                     <div class="action-buttons">
+                        {% if not deleted_media %}
                         <button type="button" class="action-btn" title="Sửa"
                             @click.stop="window.mediaActions?.edit('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
                             <span class="material-symbols-outlined">edit</span>
-                        </button>
-                        <button type="button" class="action-btn" title="Sao chép"
-                            @click.stop="window.mediaActions?.copy('{{ item.id }}')">
-                            <span class="material-symbols-outlined">content_copy</span>
                         </button>
                         <button type="button" class="action-btn" title="Di chuyển"
                             @click.stop="window.mediaActions?.move('{{ item.id }}')">
                             <span class="material-symbols-outlined">drive_file_move</span>
                         </button>
+                        {% endif %}
                         {% if not item.is_folder and item.url %}
                         <a href="{{ item.url }}" target="_blank" class="action-btn" title="Tải xuống">
                             <span class="material-symbols-outlined">download</span>
                         </a>
                         {% endif %}
-                        <button type="button" class="action-btn action-btn--danger" title="Xóa"
-                            @click.stop="window.mediaActions?.delete('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                        {% if deleted_media %}
+                        <button type="button" class="action-btn action-btn--primary" title="Khôi phục"
+                            @click.stop="window.mediaActions?.restore('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                            <span class="material-symbols-outlined">restore</span>
+                        </button>
+                        {% endif %}
+                        <button type="button" class="action-btn action-btn--danger"
+                            title="{% if deleted_media %}Xóa vĩnh viễn{% else %}Xóa{% endif %}"
+                            @click.stop="window.mediaActions?.deleteItem('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
                             <span class="material-symbols-outlined">delete</span>
                         </button>
                     </div>
@@ -102,8 +138,21 @@
 <div class="media-grid" x-show="viewMode === 'grid'" @view-mode-changed.window="$el.scrollTop = 0">
     {% for item in data %}
     <div class="media-grid-card" :data-id="{{ item.id }}" :data-type="'{{ 'folder' if item.is_folder else 'file' }}'"
-        {% if item.is_folder %}@click="window.mediaActions?.goToFolder?.('{{ item.id }}')"{% endif %}>
+        :class="{ 'selected': $store.mediaSelection.isSelected({{ item.id }}) }" {% if not deleted_media
+        %}draggable="true"
+        @dragstart="event.dataTransfer.setData('text/plain', '{{ item.id }}'); event.dataTransfer.effectAllowed = 'move';"
+        {% if item.is_folder %} @dragover.prevent="event.currentTarget.classList.add('drag-over')"
+        @dragleave="event.currentTarget.classList.remove('drag-over')" @drop="
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+            const draggedId = event.dataTransfer.getData('text/plain');
+            if (draggedId && draggedId !== '{{ item.id }}') {
+                window.mediaActions?.moveToFolder(draggedId, '{{ item.id }}');
+            }
+        " @click="window.mediaActions?.goToFolder?.('{{ item.id }}')" {% endif %} {% endif %}>
         <div class="card-preview">
+            <input type="checkbox" class="grid-checkbox" :checked="$store.mediaSelection.isSelected({{ item.id }})"
+                @change="window.mediaActions?.toggleSelectItem($event, {{ item.id }})" @click.stop>
             {% if item.is_folder %}
             <span class="material-symbols-outlined card-icon card-icon--folder">folder</span>
             {% elif item.media_metadata and item.media_metadata.type == 'image' and item.url %}
@@ -141,7 +190,7 @@
 {# ====== CURSOR PAGINATION: Load More ====== #}
 {% if has_more and next_cursor %}
 <div id="media-load-more" class="media-load-more"
-    hx-get="{{ url_for('media_manager') }}/items/html?cursor={{ next_cursor }}&limit=20{% if folder_id %}&folder_id={{ folder_id }}{% endif %}{% if type_filter %}&type_filter={{ type_filter }}{% endif %}"
+    hx-get="{{ url_for('media_manager') }}/items/html?cursor={{ next_cursor }}&limit=20{% if folder_id %}&folder_id={{ folder_id }}{% endif %}{% if type_filter %}&type_filter={{ type_filter }}{% endif %}{% if deleted_media %}&deleted_media=true{% endif %}"
     hx-trigger="revealed" hx-swap="outerHTML">
     <div class="load-more-spinner">
         <div class="spinner-sm"></div>
@@ -152,7 +201,7 @@
 
 {% else %}
 {# ====== EMPTY STATE ====== #}
-<div class="media-empty">
+<div class="media-empty" x-init="hasData = false">
     <span class="material-symbols-outlined media-empty-icon">folder_off</span>
     <h3>Chưa có file nào</h3>
     <p>Tải lên file hoặc tạo thư mục mới để bắt đầu.</p>
@@ -161,6 +210,13 @@
 
 
 <style>
+    /* ===== DRAG AND DROP ===== */
+    .drag-over {
+        background-color: var(--primary-light, rgba(0, 120, 215, 0.1)) !important;
+        outline: 2px dashed var(--primary, #0078d7) !important;
+        outline-offset: -2px;
+    }
+
     /* ===== LIST VIEW ===== */
     .media-list {
         grid-column: 1 / -1;
@@ -171,13 +227,14 @@
         overflow: hidden;
     }
 
-    .media-list ~ .media-list {
-        margin-top: -16px; /* Offset the grid gap */
+    .media-list~.media-list {
+        margin-top: -16px;
+        /* Offset the grid gap */
         border-top: none;
         border-top-left-radius: 0;
         border-top-right-radius: 0;
     }
-    
+
     .media-list:has(~ .media-list) {
         border-bottom-left-radius: 0;
         border-bottom-right-radius: 0;
@@ -412,6 +469,43 @@
         color: #dc2626;
     }
 
+    /* ===== SELECTION ===== */
+    .col-select {
+        width: 40px;
+        min-width: 40px;
+        text-align: center;
+    }
+
+    .row-checkbox,
+    .grid-checkbox {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--primary);
+        cursor: pointer;
+    }
+
+    .media-row.selected,
+    .media-grid-card.selected {
+        background-color: rgba(0, 120, 215, 0.08);
+        border-color: var(--primary);
+    }
+
+    .media-grid-card .card-preview {
+        position: relative;
+    }
+
+    .grid-checkbox {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        width: 20px;
+        height: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
     /* ===== GRID VIEW ===== */
     .media-grid {
         display: contents;
@@ -582,8 +676,8 @@
         const header = document.querySelector('.media-header');
         if (header) {
             const data = Alpine.$data(header);
-            const newFolderId = {{ folder_id if folder_id else 'null' }};
-            if (data.folder_id !== newFolderId) {
+            const newFolderId = "{{ folder_id if folder_id else 'null' }}";
+            if (newFolderId != 'null' && data.folder_id !== newFolderId) {
                 data.folder_id = newFolderId;
                 if (data.folder_id) {
                     data.getCurrentMedia();
@@ -591,6 +685,7 @@
                     data.current_media = null;
                 }
             }
-        }
+        };
+
     }
 </script>

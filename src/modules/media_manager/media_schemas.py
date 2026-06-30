@@ -67,19 +67,26 @@ class CreateMediaSchema(BaseSchema):
 
 class UpdateMedia(BaseSchema):
     name: Optional[str] = Field(max_length=800, default=None)
-    folder_id: Optional[int] = Field(gt=0, default=None)
+    folder_id: Optional[int] = Field(ge=-1, default=None)
 
     @model_validator(mode="after")
     def validate_folder_and_name(self) -> "UpdateMedia":
-        if not self.name and not self.folder_id:
+        if self.name is None and self.folder_id is None:
             raise ValueError("Không có dữ liệu để update")
         return self
+
+
+class BulkDeleteSchema(BaseSchema):
+    ids: list[int] = Field(..., min_length=1, description="Danh sách ID cần xóa")
+    is_soft_delete: bool = Field(
+        default=True, description="True = xóa mềm, False = xóa vĩnh viễn"
+    )
 
 
 class MediaMetaData(BaseSchema):
     type: Optional[str] = None
     sizes: int = Field(gt=0)
-    format: Optional[str] = Field(max_length=50)
+    format: Optional[str] = Field(max_length=100)
 
 
 class PrefixNode(BaseSchema):

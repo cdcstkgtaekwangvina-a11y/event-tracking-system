@@ -2,12 +2,16 @@
         current_media: null,
         folder_id: new URLSearchParams(window.location.search).get('folder_id'),
         viewMode: localStorage.getItem('mediaViewMode') || 'grid',
-        async getCurrentMedia(){
+        async getCurrentMedia() {
             if (this.folder_id === '' || this.folder_id === null || this.folder_id === undefined ) return;
             while (!window.fetchHelper) {
                 await new Promise(resolve => setTimeout(resolve, 50));
             }
-            const media = await window.fetchHelper.get('media/' + this.folder_id);
+            const media = await window.fetchHelper.get('media/' + this.folder_id + `?deleted_media=${deleted_media}`);
+            if(!Number.isFinite(+this.folder_id)) {
+                // stop if folder_id is not a number-like value
+                return;
+            }
             if(media.status_code === 200){
                 this.current_media = media.data;
             }
@@ -43,40 +47,42 @@
                     <span x-show="!$store.screen.isMobile">Tạo thư mục</span>
                 </button>
 
-                <a type="button" href="#" class="trash-button"
-                    @click.prevent="window.mediaActions?.showTrash(folder_id)">
+                <a type="button" href="#" @click.prevent="window.location.href = '{{ url_for('trash') }}'"
+                    class="trash-button">
                     <span class="material-symbols-outlined">delete</span>
                     <span x-show="!$store.screen.isMobile">Thùng rác</span>
                 </a>
             </div>
         </div>
     </div>
-    <div class="media-header-middle" x-init="await getCurrentMedia()">
-            <div class="address-bar" id="media-address-bar">
-                <a href="#" @click.prevent="window.mediaActions?.goHome()" class="address-bar-item">
-                    <span class="material-symbols-outlined" style="color: var(--text-secondary);">home</span>
-                    <span class="address-bar-item-text">Tất cả file</span>
-                </a>
-                <template x-for="p in (current_media && current_media.prefix) ? current_media.prefix : []" :key="p.id">
-                    <div class="address-bar-segment">
-                        <span class="material-symbols-outlined address-bar-chevron">chevron_right</span>
-                        <a href="#" @click.prevent="window.mediaActions?.goToFolder(p.id)" class="address-bar-item">
-                            <span class="address-bar-item-text" x-text="p.name"></span>
-                        </a>
-                    </div>
-                </template>
+    <div class="media-header-middle" x-init="getCurrentMedia()">
+        <div class="address-bar" id="media-address-bar">
+            <a href="#" @click.prevent="() => {current_media = null; folder_id = ''; window.mediaActions?.goHome(); }"
+                class="address-bar-item">
+                <span class="material-symbols-outlined" style="color: var(--text-secondary);">home</span>
+                <span class="address-bar-item-text">Tất cả file</span>
+            </a>
+            <template x-for="p in (current_media && current_media.prefix) ? current_media.prefix : []" :key="p.id">
+                <div class="address-bar-segment">
+                    <span class="material-symbols-outlined address-bar-chevron">chevron_right</span>
+                    <a href="#" @click.prevent="window.mediaActions?.goToFolder(p.id)" class="address-bar-item">
+                        <span class="address-bar-item-text" x-text="p.name"></span>
+                    </a>
+                </div>
+            </template>
 
-                <template x-if="current_media">
-                    <div class="address-bar-segment">
-                        <span class="material-symbols-outlined address-bar-chevron">chevron_right</span>
-                        <a href="#" @click.prevent="window.mediaActions?.goToFolder(current_media.id)" class="address-bar-item">
-                            <span class="address-bar-item-text" x-text="current_media.name"></span>
-                        </a>
-                    </div>
-                </template>
-            </div>
+            <template x-if="current_media">
+                <div class="address-bar-segment">
+                    <span class="material-symbols-outlined address-bar-chevron">chevron_right</span>
+                    <a href="#" @click.prevent="window.mediaActions?.goToFolder(current_media.id)"
+                        class="address-bar-item">
+                        <span class="address-bar-item-text" x-text="current_media.name"></span>
+                    </a>
+                </div>
+            </template>
         </div>
-        <div class="media-header-bottom" x-data="{
+    </div>
+    <div class="media-header-bottom" x-data="{
             filterOpen: false,
             sortOpen: false,
             trashOpen: false,
@@ -122,9 +128,9 @@
                 }
 
                 if (extraParams.includeDeleted) {
-                    params.set('include_deleted', 'true')
+                    params.set('deleted_media', 'true')
                 } else {
-                    params.delete('include_deleted')
+                    params.delete('deleted_media')
                 }
 
                 const pushUrl = `{{ url_for('media_manager') }}?${params.toString()}`
@@ -135,18 +141,17 @@
                 htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' })
             }
         }">
-            <div class="mhb-search">
-                <span class="material-symbols-outlined mhb-search-icon">search</span>
-                <input type="text" class="mhb-search-input" placeholder="Tìm kiếm file và thư mục..."
-                    x-ref="searchInput" @keyup.enter="$parent.reload()">
-            </div>
-            <div class="mhb-actions">
-                <!-- Filter dropdown -->
-                <div class="mhb-dropdown-wrapper" @click.outside="filterOpen = false">
-                    <button class="mhb-dropdown-btn" @click="filterOpen = !filterOpen"
-                        :class="{ 'active': filterOpen }">
-                        <span class="material-symbols-outlined" style="font-size: 18px;">filter_list</span>
-                        <span class="mhb-dropdown-label" x-text="
+        <div class="mhb-search">
+            <span class="material-symbols-outlined mhb-search-icon">search</span>
+            <input type="text" class="mhb-search-input" placeholder="Tìm kiếm file và thư mục..." x-ref="searchInput"
+                @keyup.enter="$parent.reload()">
+        </div>
+        <div class="mhb-actions">
+            <!-- Filter dropdown -->
+            <div class="mhb-dropdown-wrapper" @click.outside="filterOpen = false">
+                <button class="mhb-dropdown-btn" @click="filterOpen = !filterOpen" :class="{ 'active': filterOpen }">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">filter_list</span>
+                    <span class="mhb-dropdown-label" x-text="
                         filterValue === 'all' ? 'Tất cả' :
                         filterValue === 'image' ? 'Hình ảnh' :
                         filterValue === 'video' ? 'Video' :
@@ -154,489 +159,1137 @@
                         filterValue === 'folder' ? 'Thư mục' :
                         filterValue === 'other' ? 'Khác' : 'Tất cả'
                     "></span>
-                        <span class="material-symbols-outlined mhb-dropdown-chevron"
-                            :style="filterOpen && 'transform: rotate(180deg)'">expand_more</span>
-                    </button>
-                    <div class="mhb-dropdown-menu" x-show="filterOpen" x-transition.opacity.duration.150ms>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'all' }"
-                            @click="filterValue = 'all'; filterOpen = false">Tất cả</button>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'image' }"
-                            @click="filterValue = 'image'; filterOpen = false">Hình ảnh</button>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'video' }"
-                            @click="filterValue = 'video'; filterOpen = false">Video</button>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'document' }"
-                            @click="filterValue = 'document'; filterOpen = false">Tài liệu</button>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'folder' }"
-                            @click="filterValue = 'folder'; filterOpen = false">Thư mục</button>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'other' }"
-                            @click="filterValue = 'other'; filterOpen = false">Khác</button>
-                    </div>
+                    <span class="material-symbols-outlined mhb-dropdown-chevron"
+                        :style="filterOpen && 'transform: rotate(180deg)'">expand_more</span>
+                </button>
+                <div class="mhb-dropdown-menu" x-show="filterOpen" x-transition.opacity.duration.150ms>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'all' }"
+                        @click="filterValue = 'all'; filterOpen = false">Tất cả</button>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'image' }"
+                        @click="filterValue = 'image'; filterOpen = false">Hình ảnh</button>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'video' }"
+                        @click="filterValue = 'video'; filterOpen = false">Video</button>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'document' }"
+                        @click="filterValue = 'document'; filterOpen = false">Tài liệu</button>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'folder' }"
+                        @click="filterValue = 'folder'; filterOpen = false">Thư mục</button>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': filterValue === 'other' }"
+                        @click="filterValue = 'other'; filterOpen = false">Khác</button>
                 </div>
+            </div>
 
-                <!-- Sort dropdown -->
-                <div class="mhb-dropdown-wrapper" @click.outside="sortOpen = false">
-                    <button class="mhb-dropdown-btn" @click="sortOpen = !sortOpen" :class="{ 'active': sortOpen }">
-                        <span class="material-symbols-outlined" style="font-size: 18px;">swap_vert</span>
-                        <span class="mhb-dropdown-label" x-text="
+            <!-- Sort dropdown -->
+            <div class="mhb-dropdown-wrapper" @click.outside="sortOpen = false">
+                <button class="mhb-dropdown-btn" @click="sortOpen = !sortOpen" :class="{ 'active': sortOpen }">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">swap_vert</span>
+                    <span class="mhb-dropdown-label" x-text="
                         sortValue === 'name' ? 'Tên' :
                         sortValue === 'created_at' ? 'Ngày tạo' :
                         sortValue === 'media_metadata.sizes' ? 'Kích thước' :
                         sortValue === 'updated_at' ? 'Ngày sửa đổi' : 'Tên'
                     "></span>
-                        <span x-text="sortDir === 'desc' ? '↓' : '↑'" style="font-size: 13px;"></span>
-                        <span class="material-symbols-outlined mhb-dropdown-chevron"
-                            :style="sortOpen && 'transform: rotate(180deg)'">expand_more</span>
-                    </button>
-                    <div class="mhb-dropdown-menu" x-show="sortOpen" x-transition.opacity.duration.150ms>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'name' }"
-                            @click="sortValue = 'name'; sortOpen = false">Tên</button>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'created_at' }"
-                            @click="sortValue = 'created_at'; sortOpen = false">Ngày tạo</button>
-                        <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'updated_at' }"
-                            @click="sortValue = 'updated_at'; sortOpen = false">Ngày sửa đổi</button>
-                        <div class="mhb-dropdown-divider"></div>
-                        <button class="mhb-dropdown-item"
-                            @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'; sortOpen = false">
-                            <span class="material-symbols-outlined" style="font-size: 16px;"
-                                x-text="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'"></span>
-                            <span x-text="sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'"></span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- View toggle -->
-                <div class="mhb-view-toggle">
-                    <button class="mhb-view-btn" :class="{ 'active': viewMode === 'grid' }"
-                        @click="$dispatch('view-mode-changed', {mode: 'grid'})" title="Chế độ lưới">
-                        <span class="material-symbols-outlined">grid_view</span>
-                    </button>
-                    <button class="mhb-view-btn" :class="{ 'active': viewMode === 'list' }"
-                        @click="$dispatch('view-mode-changed', {mode: 'list'})" title="Chế độ danh sách">
-                        <span class="material-symbols-outlined">view_list</span>
+                    <span x-text="sortDir === 'desc' ? '↓' : '↑'" style="font-size: 13px;"></span>
+                    <span class="material-symbols-outlined mhb-dropdown-chevron"
+                        :style="sortOpen && 'transform: rotate(180deg)'">expand_more</span>
+                </button>
+                <div class="mhb-dropdown-menu" x-show="sortOpen" x-transition.opacity.duration.150ms>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'name' }"
+                        @click="sortValue = 'name'; sortOpen = false">Tên</button>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'created_at' }"
+                        @click="sortValue = 'created_at'; sortOpen = false">Ngày tạo</button>
+                    <button class="mhb-dropdown-item" :class="{ 'selected': sortValue === 'updated_at' }"
+                        @click="sortValue = 'updated_at'; sortOpen = false">Ngày sửa đổi</button>
+                    <div class="mhb-dropdown-divider"></div>
+                    <button class="mhb-dropdown-item"
+                        @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'; sortOpen = false">
+                        <span class="material-symbols-outlined" style="font-size: 16px;"
+                            x-text="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'"></span>
+                        <span x-text="sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'"></span>
                     </button>
                 </div>
             </div>
+
+            <!-- View toggle -->
+            <div class="mhb-view-toggle">
+                <button class="mhb-view-btn" :class="{ 'active': viewMode === 'grid' }"
+                    @click="$dispatch('view-mode-changed', {mode: 'grid'})" title="Chế độ lưới">
+                    <span class="material-symbols-outlined">grid_view</span>
+                </button>
+                <button class="mhb-view-btn" :class="{ 'active': viewMode === 'list' }"
+                    @click="$dispatch('view-mode-changed', {mode: 'list'})" title="Chế độ danh sách">
+                    <span class="material-symbols-outlined">view_list</span>
+                </button>
+            </div>
         </div>
+    </div>
 </div>
 
-        <script>
-            document.addEventListener('alpine:init', () => {
-                window.mediaActions = {
-                    goToFolder(id) {
-                        const container = document.getElementById('media-items-container');
-                        if (!container) return;
-                        const url = `{{ url_for('media_manager') }}/items/html?folder_id=${id}`;
-                        container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
-                        htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
-                        window.history.pushState(null, '', `?folder_id=${id}`);
-                    },
-                    goHome() {
-                        const container = document.getElementById('media-items-container');
-                        if (!container) return;
-                        const url = `{{ url_for('media_manager') }}/items/html`;
-                        container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
-                        htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
-                        window.history.pushState(null, '', `{{ url_for('media_manager') }}`);
-                    },
-                    showTrash(folderId) {
-                        const container = document.getElementById('media-items-container');
-                        if (!container) return;
-                        const params = new URLSearchParams();
-                        params.set('include_deleted', 'true');
-                        if (folderId) params.set('folder_id', folderId);
-                        const url = `{{ url_for('media_manager') }}/items/html?${params.toString()}`;
+<!-- Bulk Action Toolbar -->
+<div class="bulk-action-toolbar" x-show="$store.mediaSelection.hasSelection()" x-transition.duration.200ms x-cloak>
+    <div class="bulk-action-info">
+        <span class="material-symbols-outlined">check_circle</span>
+        <span x-text="'Đã chọn ' + $store.mediaSelection.getCount() + ' mục'"></span>
+    </div>
+    <div class="bulk-action-buttons">
+        <button type="button" class="bulk-btn bulk-btn--secondary" @click="$store.mediaSelection.clear()">
+            <span class="material-symbols-outlined">close</span>
+            <span>Bỏ chọn</span>
+        </button>
+        <button type="button" class="bulk-btn bulk-btn--danger" @click="window.mediaActions?.bulkDelete()">
+            <span class="material-symbols-outlined">delete</span>
+            <span>Xóa</span>
+        </button>
+    </div>
+</div>
+
+<script>
+    const deleted_media = {{ 'true' if deleted_media else 'false' }};
+    const currentPageUrl = "{{ url_for('trash') if deleted_media else url_for('media_manager') }}";
+    document.addEventListener('alpine:init', () => {
+        window.mediaActions = {
+            goToFolder(id) {
+                const container = document.getElementById('media-items-container');
+                if (!container) return;
+                const url = `{{ url_for('media_manager') }}/items/html?folder_id=${id}&deleted_media=${deleted_media}`;
+                container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
+                htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                window.history.pushState(null, '', `?folder_id=${id}`);
+            },
+            goHome() {
+                const container = document.getElementById('media-items-container');
+                if (!container) return;
+                const url = `{{ url_for('media_manager') }}/items/html?deleted_media=${deleted_media}`;
+                container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
+                htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                window.history.pushState(null, '', currentPageUrl);
+            },
+            showTrash(folderId) {
+                const container = document.getElementById('media-items-container');
+                if (!container) return;
+                const params = new URLSearchParams();
+                params.set('deleted_media', 'true');
+                if (folderId) params.set('folder_id', folderId);
+                const url = `{{ url_for('media_manager') }}/items/html?${params.toString()}`;
+
+                const parentXData = document.querySelector('.media-header-bottom')?.__x;
+                if (parentXData) {
+                    parentXData.filterValue = 'all';
+                    parentXData.reload({ includeDeleted: true });
+                } else {
+                    container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
+                    htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                }
+                window.history.pushState(null, '', `?folder_id=${folderId || ''}&deleted_media=true`);
+            },
+            move(itemId) {
+                window.dispatchEvent(new CustomEvent('open-move-modal', { detail: { itemId: itemId } }));
+            },
+            edit(id, type) {
+                // Find the name element in both list and grid views
+                const row = document.querySelector(`.media-row[data-id="${id}"]`);
+                const card = document.querySelector(`.media-grid-card[data-id="${id}"]`);
+
+                const nameEl = row?.querySelector('.media-name-text') || card?.querySelector('.card-name');
+                if (!nameEl || nameEl.dataset.editing === 'true') return;
+
+                const oldName = nameEl.textContent.trim();
+                nameEl.dataset.editing = 'true';
+
+                // Create inline input
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = oldName;
+                input.className = 'inline-rename-input';
+                input.style.cssText = 'width: 100%; padding: 2px 6px; font-size: inherit; border: 1px solid var(--primary); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary); outline: none;';
+
+                nameEl.textContent = '';
+                nameEl.appendChild(input);
+                input.focus();
+                input.select();
+
+                const save = async () => {
+                    const newName = input.value.trim();
+                    if (!newName || newName === oldName) {
+                        // Revert
+                        nameEl.textContent = oldName;
+                        delete nameEl.dataset.editing;
+                        return;
+                    }
+
+                    try {
+                        const json = await window.fetchHelper.patch(`media/${id}`, { name: newName });
+                        if (json && json.status_code === 200) {
+                            nameEl.textContent = newName;
+                            // Also update the other view's name if exists
+                            const otherEl = row ? card?.querySelector('.card-name') : row?.querySelector('.media-name-text');
+                            if (otherEl) otherEl.textContent = newName;
+                            window.notify.toast.success('Thành công', 'Đã đổi tên');
+                        } else {
+                            nameEl.textContent = oldName;
+                            window.notify.toast.error('Lỗi', json?.message || 'Đổi tên thất bại');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        nameEl.textContent = oldName;
+                        window.notify.toast.error('Lỗi', 'Có lỗi xảy ra');
+                    }
+                    delete nameEl.dataset.editing;
+                };
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                    if (e.key === 'Escape') { input.value = oldName; input.blur(); }
+                });
+                input.addEventListener('blur', save, { once: true });
+            },
+            async deleteItem(id, type) {
+                const approved = await window.notify.modal.confirm(
+                    'Xóa dữ liệu',
+                    `Bạn có chắc muốn xoá ${type === 'folder' ? 'thư mục' : 'file'} này không?`,
+                    { icon: 'danger', confirmText: 'Xóa', cancelText: 'Hủy' }
+                );
+                if (!approved) return;
+
+                const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
+                try {
+                    const json = await window.fetchHelper.delete(`media/${id}?is_soft_delete=true`);
+                    window.notify.toast.dismiss(loadingId);
+
+                    if (!json || json.status_code !== 204) {
+                        window.notify.toast.error('Lỗi', json?.message || 'Xóa thất bại');
+                        return;
+                    }
+
+                    window.notify.toast.success('Thành công', 'Đã chuyển vào thùng rác');
+
+                    const elements = document.querySelectorAll(`.media-row[data-id="${id}"], .media-grid-card[data-id="${id}"]`);
+                    elements.forEach(el => el.remove());
+                } catch (error) {
+                    console.error(error);
+                    window.notify.toast.dismiss(loadingId);
+                    window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi xóa');
+                }
+            },
+            async moveToFolder(itemId, targetFolderId) {
+                const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
+                try {
+                    const json = await window.fetchHelper.patch(`media/${itemId}`, { folder_id: parseInt(targetFolderId) });
+                    window.notify.toast.dismiss(loadingId);
+
+                    if (!json || json.status_code !== 200 || json.success === false) {
+                        window.notify.toast.error('Lỗi', json?.message || 'Di chuyển thất bại');
+                        return;
+                    }
+
+                    window.notify.toast.success('Thành công', 'Đã di chuyển dữ liệu');
+
+                    const elements = document.querySelectorAll(`.media-row[data-id="${itemId}"], .media-grid-card[data-id="${itemId}"]`);
+                    elements.forEach(el => el.remove());
+                } catch (error) {
+                    console.error(error);
+                    window.notify.toast.dismiss(loadingId);
+                    window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi di chuyển');
+                }
+            },
+            // Selection functions
+            toggleSelectItem(event, id) {
+                event.stopPropagation();
+                const store = Alpine.store('mediaSelection');
+                if (store) {
+                    store.toggle(id);
+                }
+            },
+            toggleSelectAll(event, view) {
+                const store = Alpine.store('mediaSelection');
+                if (!store) return;
+
+                const container = document.getElementById(view === 'list' ? 'media-list-view' : 'media-grid-view');
+                if (!container) return;
+
+                const checkboxes = container.querySelectorAll('.row-checkbox, .grid-checkbox');
+                const ids = Array.from(checkboxes).map(cb => {
+                    const row = cb.closest('.media-row, .media-grid-card');
+                    return row ? parseInt(row.dataset.id) : null;
+                }).filter(Boolean);
+
+                if (event.target.checked) {
+                    store.selectAll(ids);
+                } else {
+                    store.clear();
+                }
+            },
+            // Bulk delete
+            async bulkDelete() {
+                const store = Alpine.store('mediaSelection');
+                if (!store || !store.hasSelection()) return;
+
+                const ids = store.getSelectedIds();
+                const count = ids.length;
+
+                // Sử dụng confirm modal trực tiếp thay vì info modal chỉ để hiển thị
+                const approved = await window.notify.modal.confirm(
+                    'Xóa nhiều mục',
+                    `Bạn có chắc muốn xoá ${count} mục này không?`,
+                    {
+                        icon: 'danger',
+                        confirmText: 'Xóa',
+                        cancelText: 'Hủy'
+                    }
+                );
+
+                if (!approved) return;
+
+                const loadingId = window.notify.toast.loading('Đang xử lý', `Đang xóa ${count} mục...`);
+                try {
+                    const json = await window.fetchHelper.delete('media/bulk-delete', {
+                        ids: ids,
+                        is_soft_delete: true
+                    });
+                    window.notify.toast.dismiss(loadingId);
+
+                    if (!json || json.success === false) {
+                        window.notify.toast.error('Lỗi', json?.message || 'Xóa thất bại');
+                        return;
+                    }
+
+                    window.notify.toast.success('Thành công', `Đã chuyển ${count} mục vào thùng rác`);
+
+                    // Remove items from UI directly
+                    ids.forEach(id => {
+                        const elements = document.querySelectorAll(`.media-row[data-id="${id}"], .media-grid-card[data-id="${id}"]`);
+                        elements.forEach(el => el.remove());
+                    });
+
+                    store.clear();
+                } catch (error) {
+                    console.error(error);
+                    window.notify.toast.dismiss(loadingId);
+                    window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi xóa');
+                }
+            }
+        };
+
+        // Emit view mode changes so header and items_grid can sync
+        document.addEventListener('view-mode-changed', (e) => {
+            const detail = e.detail || {};
+            window.dispatchEvent(new CustomEvent('view-mode-changed', { detail }))
+        });
+    });
+
+</script>
+
+<style>
+    .media-header-buttons {
+        display: flex;
+        gap: 10px;
+    }
+
+    .media-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .media-header-top-area {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 10px 0 10px;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .media-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        gap: 16px;
+        min-width: 0;
+    }
+
+    .media-title-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .media-title-group h2 {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
+    .media-header-middle {
+        background-color: var(--sidebar-bg);
+        border-radius: 10px;
+        padding: 10px 15px;
+        margin: 15px 10px 10px 10px;
+        border: 1px solid var(--border);
+    }
+
+    .media-header-bottom {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 10px 15px 10px;
+        margin: 0 10px;
+        min-width: 0;
+        background: transparent;
+        border: none;
+    }
+
+    .upload-button {
+        border-radius: 10px;
+        padding: 8px 15px;
+        background-color: var(--foreground);
+        color: var(--background);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        border: 0;
+        outline: 0;
+    }
+
+    .upload-button:hover {
+        background-color: var(--text-secondary);
+    }
+
+    .create-folder-button {
+        border-radius: 10px;
+        padding: 8px 15px;
+        background-color: var(--border);
+        color: var(--foreground);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        outline: 0;
+        border: 0;
+    }
+
+    .create-folder-button:hover {
+        background-color: var(--text-secondary);
+    }
+
+    .trash-button {
+        border-radius: 10px;
+        padding: 8px 15px;
+        background-color: var(--border);
+        color: red;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        outline: 0;
+        border: 0;
+        text-decoration: none;
+    }
+
+    .trash-button:hover {
+        background-color: var(--text-secondary);
+    }
+
+    /* ===== ADDRESS BAR ===== */
+    .address-bar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        min-width: 0;
+        padding-bottom: 2px;
+    }
+
+    .address-bar::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .address-bar::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 999px;
+    }
+
+    .address-bar-item {
+        text-decoration: none;
+        color: var(--foreground);
+        font-weight: bold;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .address-bar-item-text:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+
+    .address-bar-segment {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .address-bar-chevron {
+        font-size: 16px;
+        color: var(--text-secondary);
+    }
+
+    /* ===== MEDIA HEADER BOTTOM ===== */
+    .media-header-bottom {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 0;
+    }
+
+    /* Search */
+    .mhb-search {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background-color: var(--sidebar-bg);
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        transition: border-color 0.2s ease;
+    }
+
+    .mhb-search:focus-within {
+        border-color: var(--foreground);
+    }
+
+    .mhb-search-icon {
+        font-size: 20px;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+    }
+
+    .mhb-search-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        color: var(--foreground);
+        font-size: 14px;
+    }
+
+    .mhb-search-input::placeholder {
+        color: var(--text-secondary);
+    }
+
+    /* Actions group */
+    .mhb-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    /* Dropdown common */
+    .mhb-dropdown-wrapper {
+        position: relative;
+    }
+
+    .mhb-dropdown-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 12px;
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        background: var(--sidebar-bg);
+        color: var(--foreground);
+        cursor: pointer;
+        font-size: 13px;
+        white-space: nowrap;
+        transition: all 0.15s ease;
+    }
+
+    .mhb-dropdown-btn:hover,
+    .mhb-dropdown-btn.active {
+        border-color: var(--foreground);
+    }
+
+    .mhb-dropdown-label {
+        font-weight: 500;
+    }
+
+    .mhb-dropdown-chevron {
+        font-size: 18px !important;
+        transition: transform 0.2s ease;
+    }
+
+    .mhb-dropdown-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        min-width: 150px;
+        background: var(--background);
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        padding: 4px;
+        z-index: 100;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .mhb-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--foreground);
+        font-size: 13px;
+        cursor: pointer;
+        text-align: left;
+        transition: background-color 0.12s ease;
+    }
+
+    .mhb-dropdown-item:hover {
+        background-color: var(--border);
+    }
+
+    .mhb-dropdown-item.selected {
+        font-weight: 600;
+        background-color: var(--border);
+    }
+
+    .mhb-dropdown-divider {
+        height: 1px;
+        background-color: var(--border);
+        margin: 4px 0;
+    }
+
+    /* View toggle */
+    .mhb-view-toggle {
+        display: flex;
+        gap: 4px;
+        padding: 5px;
+        background-color: var(--sidebar-bg);
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+    }
+
+    .mhb-view-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 6px;
+        border: 1.5px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .mhb-view-btn .material-symbols-outlined {
+        font-size: 20px;
+    }
+
+    .mhb-view-btn:hover {
+        color: var(--foreground);
+        background-color: var(--border);
+    }
+
+    .mhb-view-btn.active {
+        color: var(--foreground);
+        background-color: var(--background);
+        border-color: var(--border);
+        box-shadow: 0 1px 3px var(--border);
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+        .media-header-bottom {
+            flex-wrap: wrap;
+        }
+
+        .mhb-search {
+            width: 100%;
+            flex: unset;
+        }
+    }
+
+    /* ===== BULK ACTION TOOLBAR ===== */
+    .bulk-action-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: var(--primary-light, rgba(0, 120, 215, 0.1));
+        border: 1.5px solid var(--primary);
+        border-radius: 10px;
+        margin: 15px 10px 0 10px;
+        gap: 16px;
+        animation: slideDown 0.2s ease-out;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .bulk-action-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--primary);
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .bulk-action-info .material-symbols-outlined {
+        font-size: 20px;
+    }
+
+    .bulk-action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .bulk-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s ease;
+    }
+
+    .bulk-btn .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    .bulk-btn--secondary {
+        background: transparent;
+        color: var(--foreground);
+        border: 1.5px solid var(--border);
+    }
+
+    .bulk-btn--secondary:hover {
+        background: var(--border);
+    }
+
+    .bulk-btn--danger {
+        background: var(--nc-error);
+        color: #fff;
+    }
+
+    .bulk-btn--danger:hover {
+        opacity: 0.85;
+    }
+</style>
+
+<!-- Modal chọn thư mục đích để di chuyển -->
+<div x-data="folderMoveModal" @open-move-modal.window="openModal($event.detail.itemId)" x-show="isOpen"
+    class="nc-modal-overlay" style="display: none; z-index: 9999;" x-cloak>
+    <div class="nc-modal" @click.stop style="max-width: 450px; width: 100%;">
+        <div class="nc-modal__header"
+            style="display: flex; justify-content: space-between; align-items: center; padding: 16px;">
+            <h3 class="nc-modal__title" style="margin: 0; font-size: 16px;">Chọn thư mục đích</h3>
+            <button class="nc-toast__close"
+                style="margin: 0; width: 28px; height: 28px; font-size: 20px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"
+                @click="closeModal()">&times;</button>
+        </div>
+        <div class="nc-modal__body" style="padding: 10px 16px; min-height: 250px; max-height: 400px; overflow-y: auto;">
+            <div x-show="loading" style="text-align: center; padding: 40px;">
+                <div class="spinner-sm" style="margin: 0 auto;"></div>
+            </div>
+
+            <div x-show="!loading">
+                <!-- Breadcrumb -->
+                <div
+                    style="margin-bottom: 15px; display: flex; gap: 5px; align-items: center; color: var(--primary); cursor: pointer; font-size: 13px; flex-wrap: wrap;">
+                    <span @click="loadFolders(null)">🏠 Gốc</span>
+                    <template x-for="crumb in breadcrumbs" :key="crumb.id">
+                        <span style="display: flex; align-items: center; gap: 5px;">
+                            <span class="material-symbols-outlined"
+                                style="font-size: 14px; color: var(--text-secondary)">chevron_right</span>
+                            <span @click="loadFolders(crumb)" x-text="crumb.name"></span>
+                        </span>
+                    </template>
+                </div>
+
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <template x-for="folder in folders" :key="folder.id">
+                        <li style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: background 0.2s;"
+                            onmouseover="this.style.backgroundColor='var(--border)'"
+                            onmouseout="this.style.backgroundColor='transparent'" @click="loadFolders(folder)">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="material-symbols-outlined media-icon--folder"
+                                    style="font-size: 20px; color: #F8D775">folder</span>
+                                <span x-text="folder.name" style="font-size: 14px;"></span>
+                            </div>
+                            <span class="material-symbols-outlined"
+                                style="font-size: 16px; color: var(--text-secondary)">chevron_right</span>
+                        </li>
+                    </template>
+                    <li x-show="folders.length === 0"
+                        style="text-align: center; color: var(--text-secondary); padding: 40px 20px; font-size: 14px;">
+                        Thư mục trống
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="nc-modal__footer" style="padding: 12px 16px;">
+            <div class="nc-modal__actions nc-modal__actions--end" style="width: 100%; justify-content: space-between;">
+                <button class="nc-modal__btn nc-modal__btn--secondary" @click="closeModal()">Hủy</button>
+                <button class="nc-modal__btn nc-modal__btn--primary" @click="confirmMove(currentParentId)"
+                    x-text="currentParentId ? 'Di chuyển tới đây' : 'Di chuyển ra Gốc'"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('folderMoveModal', () => ({
+            isOpen: false,
+            loading: false,
+            itemId: null,
+            currentParentId: null,
+            folders: [],
+            breadcrumbs: [],
+
+            async openModal(itemId) {
+                this.itemId = itemId;
+                this.isOpen = true;
+                this.breadcrumbs = [];
+                this.currentParentId = null;
+                await this.loadFolders(null);
+            },
+
+            closeModal() {
+                this.isOpen = false;
+            },
+
+            async loadFolders(folder) {
+                this.loading = true;
+                try {
+                    const parentId = folder ? folder.id : null;
+                    this.currentParentId = parentId;
+
+                    const payload = { type_filter: 'folder', size: 100 };
+                    if (parentId) payload.parent_id = parentId;
+
+                    const res = await window.fetchHelper.get(`media`, payload);
+
+                    if (res && res.data) {
+                        this.folders = res.data.data.filter(f => f.id != this.itemId);
+                    } else {
+                        this.folders = [];
+                    }
+
+                    if (!folder) {
+                        this.breadcrumbs = [];
+                    } else {
+                        const index = this.breadcrumbs.findIndex(b => b.id === folder.id);
+                        if (index >= 0) {
+                            this.breadcrumbs = this.breadcrumbs.slice(0, index + 1);
+                        } else {
+                            this.breadcrumbs.push({ id: folder.id, name: folder.name });
+                        }
+                    }
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async confirmMove(targetFolderId) {
+                if (targetFolderId == this.itemId) {
+                    window.notify.toast.error('Lỗi', 'Không thể di chuyển thư mục vào chính nó');
+                    return;
+                }
+                this.closeModal();
+                if (window.mediaActions && window.mediaActions.moveToFolder) {
+                    await window.mediaActions.moveToFolder(this.itemId, targetFolderId || -1);
+                }
+            }
+        }));
+    });
+</script>
+
+<!-- Modal tạo thư mục / tải lên -->
+<div x-data="mediaCreateModal" @open-create-modal.window="openModal($event.detail)" x-show="isOpen"
+    class="nc-modal-overlay" style="display: none; z-index: 9999;" x-cloak>
+    <div class="nc-modal" @click.stop style="max-width: 400px; width: 100%;">
+        <div class="nc-modal__header"
+            style="display: flex; justify-content: space-between; align-items: center; padding: 16px;">
+            <h3 class="nc-modal__title" style="margin: 0; font-size: 16px;"
+                x-text="mode === 'folder' ? 'Tạo thư mục mới' : 'Tải lên File'"></h3>
+            <button class="nc-toast__close"
+                style="margin: 0; width: 28px; height: 28px; font-size: 20px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"
+                @click="closeModal()">&times;</button>
+        </div>
+        <div class="nc-modal__body" style="padding: 16px;">
+            <template x-if="mode === 'folder'">
+                <div>
+                    <label style="display: block; font-size: 13px; margin-bottom: 6px; font-weight: 500;">Tên thư
+                        mục</label>
+                    <input type="text" x-model="folderName" x-ref="folderInput" class="form-control"
+                        style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;"
+                        placeholder="Nhập tên thư mục..." @keydown.enter="submitFolder()">
+                </div>
+            </template>
+            <template x-if="mode === 'file'">
+                <div>
+                    <div style="
+                            margin-top: 8px;
+                            border: 2px dashed var(--border);
+                            border-radius: 12px;
+                            padding: 28px 16px;
+                            text-align: center;
+                            background: var(--bg-secondary);
+                            cursor: pointer;
+                            transition: border-color 0.15s ease, background-color 0.15s ease;
+                        " @click="$refs.fileInput.click()" @dragover.prevent="" @drop.prevent="handleFileDrop($event)">
+                        <span class="material-symbols-outlined"
+                            style="font-size: 32px; color: var(--text-secondary);">cloud_upload</span>
+                        <p style="margin: 10px 0 4px; font-weight: 500; font-size: 14px;">
+                            Kéo thả file hoặc click để chọn
+                        </p>
+                        <p style="margin: 0; font-size: 12px; color: var(--text-secondary);">
+                            Tối đa <span x-text="maxFileSizeLabel"></span> mỗi file
+                        </p>
+                        <input type="file" x-ref="fileInput" class="form-control" style="display: none;"
+                            @change="onFileSelected($event)" />
+                    </div>
+                    <div x-show="fileName"
+                        style="margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 100%;">
+                        <span style="
+                            font-size: 13px;
+                            color: var(--foreground);
+                            word-break: break-all;
+                            overflow-wrap: anywhere;
+                            white-space: normal;
+                            line-height: 1.4;
+                            min-width: 0;
+                            flex: 1 1 auto;
+                            max-width: 100%;
+                        " x-text="fileName"></span>
+                        <button type="button"
+                            style="border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 18px; line-height: 1; flex-shrink: 0;"
+                            @click="clearFile()">&times;</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <div class="nc-modal__footer" style="padding: 12px 16px;">
+            <div class="nc-modal__actions nc-modal__actions--end"
+                style="width: 100%; justify-content: flex-end; gap: 10px;">
+                <button class="nc-modal__btn nc-modal__btn--secondary" @click="closeModal()">Hủy</button>
+                <button class="nc-modal__btn nc-modal__btn--primary" @click="submit()"
+                    x-text="mode === 'folder' ? 'Tạo mới' : 'Tải lên'"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('mediaCreateModal', () => ({
+            isOpen: false,
+            mode: 'folder',
+            folderId: null,
+            folderName: '',
+            fileName: '',
+            fileSizeBytes: null,
+            maxFileSizeMb: 50,
+            maxFileSizeLabel: '50 MB',
+
+            openModal(data) {
+                this.mode = data.mode || 'folder';
+                this.folderId = data.folderId || null;
+                this.folderName = '';
+                this.fileName = '';
+                this.fileSizeBytes = null;
+                this.isOpen = true;
+                if (this.mode === 'folder') {
+                    setTimeout(() => {
+                        this.$refs.folderInput && this.$refs.folderInput.focus();
+                    }, 100);
+                }
+                if (this.mode === 'file') {
+                    this.getMaxUploadSizeLimit();
+                }
+            },
+
+            closeModal() {
+                this.isOpen = false;
+            },
+
+            async getMaxUploadSizeLimit() {
+                try {
+                    const res = await window.fetchHelper.get('setting/max_file_sizes');
+                    if (!res || res.status_code !== 200 || !res.data) {
+                        return;
+                    }
+                    const candidate = res.data?.value.max_size_file;
+                    const raw = typeof candidate === 'object' ? Object.values(candidate)[0] : candidate;
+                    const size = Number(raw);
+                    if (Number.isNaN(size) || size <= 0) return;
+                    this.maxFileSizeMb = size / 1024 / 1024;
+                    this.maxFileSizeLabel = this.formatBytes(size);
+                } catch (error) {
+                    console.error('Không thể lấy cấu hình upload', error);
+                }
+            },
+
+            formatBytes(bytes) {
+                if (!bytes || bytes <= 0) return '50 MB';
+                const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+                return `${(bytes / Math.pow(1024, index)).toFixed(1)} ${units[index]}`;
+            },
+
+            clearFile() {
+                this.fileName = '';
+                this.fileSizeBytes = null;
+                const fileInput = this.$refs.fileInput;
+                if (fileInput) fileInput.value = '';
+            },
+
+            onFileSelected(event) {
+                const file = event.target?.files?.[0];
+                if (file) {
+                    this.fileName = file.name;
+                    this.fileSizeBytes = file.size;
+                }
+            },
+
+            handleFileDrop(event) {
+                const file = event.dataTransfer?.files?.[0];
+                if (file) {
+                    this.fileName = file.name;
+                    this.fileSizeBytes = file.size;
+                }
+            },
+
+            async submit() {
+                if (this.mode === 'folder') {
+                    await this.submitFolder();
+                } else {
+                    await this.submitFile();
+                }
+            },
+
+            async submitFolder() {
+                if (!this.folderName.trim()) {
+                    window.notify.toast.error('Lỗi', 'Vui lòng nhập tên thư mục');
+                    return;
+                }
+
+                const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
+                try {
+                    const formData = new FormData();
+                    formData.append('name', this.folderName.trim());
+                    formData.append('is_folder', 'true');
+                    if (this.folderId && this.folderId !== 'null' && this.folderId !== '') {
+                        formData.append('folder_id', this.folderId);
+                    }
+
+                    const res = await window.fetchHelper.post('media', formData);
+
+                    window.notify.toast.dismiss(loadingId);
+
+                    if (res.status_code === 201) {
+                        window.notify.toast.success('Thành công', 'Đã tạo thư mục');
+                        this.closeModal();
 
                         const parentXData = document.querySelector('.media-header-bottom')?.__x;
                         if (parentXData) {
-                            parentXData.filterValue = 'all';
-                            parentXData.reload({ includeDeleted: true });
+                            parentXData.reload();
                         } else {
-                            container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
-                            htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                            window.location.reload();
                         }
-                        window.history.pushState(null, '', `?folder_id=${folderId || ''}&include_deleted=true`);
-                    },
-                    async delete(id, type) {
-                        if (!confirm(`Bạn có chắc muốn xoá ${type === 'folder' ? 'thư mục' : 'file'} này không?`)) return;
-
-                        try {
-                            const response = await fetch(`{{ url_for('media_manager') }}/delete`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                                body: new URLSearchParams({ id, is_soft_delete: true })
-                            });
-
-                            if (!response.ok) {
-                                const json = await response.json().catch(() => ({}));
-                                alert(json?.message || 'Xoá thất bại');
-                                return;
-                            }
-
-                            const container = document.getElementById('media-items-container');
-                            if (!container) return;
-                            const params = new URLSearchParams(window.location.search);
-                            const url = `{{ url_for('media_manager') }}/items/html?${params.toString()}`;
-                            container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
-                            htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
-                        } catch (error) {
-                            console.error(error);
-                            alert('Có lỗi xảy ra khi xóa');
-                        }
+                    } else {
+                        window.notify.toast.error('Lỗi', res?.message || 'Tên thư mục đã tồn tại hoặc không hợp lệ');
                     }
-                };
+                } catch (err) {
+                    console.error(err);
+                    window.notify.toast.dismiss(loadingId);
+                    window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi tạo thư mục');
+                }
+            },
 
-                // Emit view mode changes so header and items_grid can sync
-                document.addEventListener('view-mode-changed', (e) => {
-                    const detail = e.detail || {};
-                    window.dispatchEvent(new CustomEvent('view-mode-changed', { detail }));
-                });
-            });
-
-        </script>
-
-        <style>
-            .media-header-buttons {
-                display: flex;
-                gap: 10px;
-            }
-
-            .media-header {
-                display: flex;
-                flex-direction: column;
-                gap: 0;
-            }
-
-            .media-header-top-area {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 10px 10px 0 10px;
-                gap: 12px;
-                min-width: 0;
-            }
-
-            .media-header-top {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                width: 100%;
-                gap: 16px;
-                min-width: 0;
-            }
-
-            .media-title-group {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                min-width: 0;
-            }
-
-            .media-title-group h2 {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                min-width: 0;
-            }
-
-            .media-header-middle {
-                background-color: var(--sidebar-bg);
-                border-radius: 10px;
-                padding: 10px 15px;
-                margin: 15px 10px 10px 10px;
-                border: 1px solid var(--border);
-            }
-
-            .media-header-bottom {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 5px 10px 15px 10px;
-                margin: 0 10px;
-                min-width: 0;
-                background: transparent;
-                border: none;
-            }
-
-            .upload-button {
-                border-radius: 10px;
-                padding: 8px 15px;
-                background-color: var(--foreground);
-                color: var(--background);
-                cursor: pointer;
-                transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                border: 0;
-                outline: 0;
-            }
-
-            .upload-button:hover {
-                background-color: var(--text-secondary);
-            }
-
-            .create-folder-button {
-                border-radius: 10px;
-                padding: 8px 15px;
-                background-color: var(--border);
-                color: var(--foreground);
-                cursor: pointer;
-                transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                outline: 0;
-                border: 0;
-            }
-
-            .create-folder-button:hover {
-                background-color: var(--text-secondary);
-            }
-
-            .trash-button {
-                border-radius: 10px;
-                padding: 8px 15px;
-                background-color: var(--border);
-                color: red;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                outline: 0;
-                border: 0;
-                text-decoration: none;
-            }
-
-            .trash-button:hover {
-                background-color: var(--text-secondary);
-            }
-
-            /* ===== ADDRESS BAR ===== */
-            .address-bar {
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                flex-wrap: nowrap;
-                overflow-x: auto;
-                min-width: 0;
-                padding-bottom: 2px;
-            }
-
-            .address-bar::-webkit-scrollbar {
-                height: 6px;
-            }
-
-            .address-bar::-webkit-scrollbar-thumb {
-                background: var(--border);
-                border-radius: 999px;
-            }
-
-            .address-bar-item {
-                text-decoration: none;
-                color: var(--foreground);
-                font-weight: bold;
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-                line-height: 1;
-                white-space: nowrap;
-            }
-
-            .address-bar-item-text:hover {
-                text-decoration: underline;
-                text-underline-offset: 3px;
-            }
-
-            .address-bar-segment {
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-            }
-
-            .address-bar-chevron {
-                font-size: 16px;
-                color: var(--text-secondary);
-            }
-
-            /* ===== MEDIA HEADER BOTTOM ===== */
-            .media-header-bottom {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 8px 0;
-            }
-
-            /* Search */
-            .mhb-search {
-                flex: 1;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                background-color: var(--sidebar-bg);
-                border: 1.5px solid var(--border);
-                border-radius: 8px;
-                padding: 10px 12px;
-                transition: border-color 0.2s ease;
-            }
-
-            .mhb-search:focus-within {
-                border-color: var(--foreground);
-            }
-
-            .mhb-search-icon {
-                font-size: 20px;
-                color: var(--text-secondary);
-                flex-shrink: 0;
-            }
-
-            .mhb-search-input {
-                flex: 1;
-                border: none;
-                outline: none;
-                background: transparent;
-                color: var(--foreground);
-                font-size: 14px;
-            }
-
-            .mhb-search-input::placeholder {
-                color: var(--text-secondary);
-            }
-
-            /* Actions group */
-            .mhb-actions {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                flex-shrink: 0;
-            }
-
-            /* Dropdown common */
-            .mhb-dropdown-wrapper {
-                position: relative;
-            }
-
-            .mhb-dropdown-btn {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                padding: 10px 12px;
-                border: 1.5px solid var(--border);
-                border-radius: 8px;
-                background: var(--sidebar-bg);
-                color: var(--foreground);
-                cursor: pointer;
-                font-size: 13px;
-                white-space: nowrap;
-                transition: all 0.15s ease;
-            }
-
-            .mhb-dropdown-btn:hover,
-            .mhb-dropdown-btn.active {
-                border-color: var(--foreground);
-            }
-
-            .mhb-dropdown-label {
-                font-weight: 500;
-            }
-
-            .mhb-dropdown-chevron {
-                font-size: 18px !important;
-                transition: transform 0.2s ease;
-            }
-
-            .mhb-dropdown-menu {
-                position: absolute;
-                top: calc(100% + 6px);
-                right: 0;
-                min-width: 150px;
-                background: var(--background);
-                border: 1.5px solid var(--border);
-                border-radius: 10px;
-                padding: 4px;
-                z-index: 100;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-            }
-
-            .mhb-dropdown-item {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                width: 100%;
-                padding: 8px 12px;
-                border: none;
-                border-radius: 6px;
-                background: transparent;
-                color: var(--foreground);
-                font-size: 13px;
-                cursor: pointer;
-                text-align: left;
-                transition: background-color 0.12s ease;
-            }
-
-            .mhb-dropdown-item:hover {
-                background-color: var(--border);
-            }
-
-            .mhb-dropdown-item.selected {
-                font-weight: 600;
-                background-color: var(--border);
-            }
-
-            .mhb-dropdown-divider {
-                height: 1px;
-                background-color: var(--border);
-                margin: 4px 0;
-            }
-
-            /* View toggle */
-            .mhb-view-toggle {
-                display: flex;
-                gap: 4px;
-                padding: 5px;
-                background-color: var(--sidebar-bg);
-                border: 1.5px solid var(--border);
-                border-radius: 10px;
-            }
-
-            .mhb-view-btn {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 4px 6px;
-                border: 1.5px solid transparent;
-                border-radius: 7px;
-                background: transparent;
-                color: var(--text-secondary);
-                cursor: pointer;
-                transition: all 0.15s ease;
-            }
-
-            .mhb-view-btn .material-symbols-outlined {
-                font-size: 20px;
-            }
-
-            .mhb-view-btn:hover {
-                color: var(--foreground);
-                background-color: var(--border);
-            }
-
-            .mhb-view-btn.active {
-                color: var(--foreground);
-                background-color: var(--background);
-                border-color: var(--border);
-                box-shadow: 0 1px 3px var(--border);
-            }
-
-            /* Responsive */
-            @media (max-width: 640px) {
-                .media-header-bottom {
-                    flex-wrap: wrap;
+            async submitFile() {
+                const fileInput = this.$refs.fileInput;
+                if (!fileInput || !fileInput.files.length) {
+                    window.notify.toast.error('Lỗi', 'Vui lòng chọn file để tải lên');
+                    return;
+                }
+                const maxBytes = this.maxFileSizeMb * 1024 * 1024;
+                if (this.fileSizeBytes && maxBytes && this.fileSizeBytes > maxBytes) {
+                    window.notify.toast.error('Lỗi', 'File vượt quá giới hạn cho phép');
+                    return;
                 }
 
-                .mhb-search {
-                    width: 100%;
-                    flex: unset;
+                const file = fileInput.files[0];
+                const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
+                try {
+                    const formData = new FormData();
+                    formData.append('name', file.name);
+                    formData.append('is_folder', 'false');
+                    formData.append('file', file);
+                    if (this.folderId && this.folderId !== 'null' && this.folderId !== '') {
+                        formData.append('folder_id', this.folderId);
+                    }
+
+                    const res = await window.fetchHelper.post('media', formData);
+
+                    window.notify.toast.dismiss(loadingId);
+
+                    if (res && res.success !== false && res.status_code !== 400 && res.status_code !== 422) {
+                        window.notify.toast.success('Thành công', 'Đã tải file lên');
+                        this.closeModal();
+
+                        const parentXData = document.querySelector('.media-header-bottom')?.__x;
+                        if (parentXData) {
+                            parentXData.reload();
+                        } else {
+                            window.location.reload();
+                        }
+                    } else {
+                        window.notify.toast.error('Lỗi', res?.message || 'Tải file thất bại');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    window.notify.toast.dismiss(loadingId);
+                    window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi tải file');
                 }
             }
-        </style>
+        }));
+
+        // Expose helper trigger for Alpine
+        window.mediaCreateModal = {
+            open: (data) => window.dispatchEvent(new CustomEvent('open-create-modal', { detail: data }))
+        };
+    });
+</script>

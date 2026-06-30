@@ -32,4 +32,45 @@
 <script src="/static/js/theme.js"></script>
 <script src="/static/js/check_mobile.js"></script>
 
-</html>
+<script>
+  document.addEventListener('alpine:init', () => {
+    if (!Alpine.store('mediaSelection')) {
+      Alpine.store('mediaSelection', {
+        selectedIds: [],
+
+        isSelected(id) {
+          return this.selectedIds.includes(id);
+        },
+
+        getSelectedIds() {
+          return this.selectedIds;
+        },
+
+        getCount() {
+          return this.selectedIds.length;
+        },
+
+        toggle(id) {
+          const index = this.selectedIds.indexOf(id);
+          if (index === -1) {
+            this.selectedIds.push(id);
+          } else {
+            this.selectedIds.splice(index, 1);
+          }
+        },
+
+        clear() {
+          this.selectedIds = [];
+        },
+
+        selectAll(ids) {
+          this.selectedIds = [...ids];
+        },
+
+        hasSelection() {
+          return this.selectedIds.length > 0;
+        },
+      });
+    }
+  });
+</script>
