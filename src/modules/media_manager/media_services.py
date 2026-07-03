@@ -49,7 +49,8 @@ class MediaServices:
                 result.type = MediaType.IMAGE
             case MediaType.VIDEO:
                 result.type = MediaType.VIDEO
-
+            case MediaType.AUDIO:
+                result.type = MediaType.AUDIO
             case _:
                 content_subtypes = [
                     # 1. Tài liệu Microsoft Office (Hiện đại)
@@ -181,7 +182,7 @@ class MediaServices:
             if type_filter:
                 if type_filter == "folder":
                     query_builder = query_builder.where(Medias.is_folder)
-                elif type_filter in {"image", "video", "document", "other"}:
+                elif type_filter in {"image", "video", "audio", "document", "other"}:
                     query_builder = query_builder.where(
                         and_(
                             Medias.is_folder == False,

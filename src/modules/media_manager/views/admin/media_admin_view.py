@@ -39,6 +39,7 @@ class MediaViews:
         req: BaseRequest,
         folder_id: Optional[int] = None,
         deleted_media: bool = False,
+        picker: bool = False,
         cursor_request: CursorPaginationRequest = Depends(),
         type_filter: Optional[str] = None,
     ):
@@ -57,6 +58,8 @@ class MediaViews:
                 "folder_id": folder_id,
                 "cursor_request": cursor_request,
                 "deleted_media": deleted_media,
+                "picker_mode": picker,
+                "query_params": dict(req.query_params),
             },
         )
 

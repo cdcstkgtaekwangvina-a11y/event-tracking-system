@@ -1,4 +1,4 @@
-import { Editor } from 'https://esm.sh/@tiptap/core'
+import { Editor, Node } from 'https://esm.sh/@tiptap/core'
 import StarterKit from 'https://esm.sh/@tiptap/starter-kit?deps=@tiptap/core'
 import { TableKit } from 'https://esm.sh/@tiptap/extension-table?deps=@tiptap/core'
 import Image from 'https://esm.sh/@tiptap/extension-image?deps=@tiptap/core'
@@ -17,6 +17,7 @@ import { Placeholder } from 'https://esm.sh/@tiptap/extensions/placeholder'
 
 export {
   Editor,
+  Node,
   StarterKit,
   Image,
   TableKit,
