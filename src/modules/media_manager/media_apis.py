@@ -35,7 +35,7 @@ class MediaController:
     ):
         return await self.service.create_media(payload)
 
-    @router.post_api("restore")
+    @router.patch_api("restore/{id}")
     async def restore_media(self, id: int):
         return await self.service.restore_media(id)
 

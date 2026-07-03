@@ -2,6 +2,11 @@
         current_media: null,
         folder_id: new URLSearchParams(window.location.search).get('folder_id'),
         viewMode: localStorage.getItem('mediaViewMode') || 'grid',
+        syncFromLocation() {
+            const params = new URLSearchParams(window.location.search);
+            this.folder_id = params.get('folder_id') || '';
+            deleted_media = window.location.pathname === new URL(trashPageUrl, window.location.origin).pathname;
+        },
         async getCurrentMedia() {
             if (this.folder_id === '' || this.folder_id === null || this.folder_id === undefined ) return;
             while (!window.fetchHelper) {
@@ -27,31 +32,36 @@
         },
         getCurrentFolderId(){
             return this.folder_id;
+        },
+        init() {
+            this.syncFromLocation();
+            window.addEventListener('popstate', () => this.syncFromLocation());
         }
 
         }" @view-mode-changed.window="setViewMode($event.detail.mode)">
     <div class="media-header-top-area">
         <div class="media-header-top">
             <div class="media-title-group">
-                <h2>Quản lý File</h2>
+                <h2 x-text="deleted_media ? 'Thùng rác' : 'Quản lý File'"></h2>
             </div>
             <div class="media-header-buttons">
-                <button type="button" class="upload-button"
+                <button type="button" class="upload-button" x-show="!deleted_media"
                     @click="window.mediaCreateModal?.open({ mode: 'file', folderId: folder_id })">
                     <span class="material-symbols-outlined">upload</span>
                     <span x-show="!$store.screen.isMobile">Tải lên</span>
                 </button>
-                <button type="button" class="create-folder-button"
+                <button type="button" class="create-folder-button" x-show="!deleted_media"
                     @click="window.mediaCreateModal?.open({ mode: 'folder', folderId: folder_id })">
                     <span class="material-symbols-outlined">folder</span>
                     <span x-show="!$store.screen.isMobile">Tạo thư mục</span>
                 </button>
 
-                <a type="button" href="#" @click.prevent="window.location.href = '{{ url_for('trash') }}'"
-                    class="trash-button">
+                <button type="button" class="trash-button" x-show="hasData"
+                    @click.prevent="deleted_media ? (hasData ? window.mediaActions?.emptyTrash() : window.mediaActions?.goManager()) : window.mediaActions?.showTrash()">
                     <span class="material-symbols-outlined">delete</span>
-                    <span x-show="!$store.screen.isMobile">Thùng rác</span>
-                </a>
+                    <span x-show="!$store.screen.isMobile"
+                        x-text="deleted_media ? 'Làm trống thùng rác' : 'Thùng rác'"></span>
+                </button>
             </div>
         </div>
     </div>
@@ -127,18 +137,35 @@
                     params.set('is_desc', this.sortDir === 'desc' ? 'true' : 'false')
                 }
 
-                if (extraParams.includeDeleted) {
+                if (Object.prototype.hasOwnProperty.call(extraParams, 'includeDeleted')) {
+                    if (extraParams.includeDeleted) {
+                        params.set('deleted_media', 'true')
+                    } else {
+                        params.delete('deleted_media')
+                    }
+                }
+
+                const isTrashPage = window.location.pathname === new URL(trashPageUrl, window.location.origin).pathname
+                deleted_media = Object.prototype.hasOwnProperty.call(extraParams, 'includeDeleted')
+                    ? !!extraParams.includeDeleted
+                    : isTrashPage
+
+                if (deleted_media) {
                     params.set('deleted_media', 'true')
                 } else {
                     params.delete('deleted_media')
                 }
 
-                const pushUrl = `{{ url_for('media_manager') }}?${params.toString()}`
+                const pushParams = new URLSearchParams(params)
+                pushParams.delete('deleted_media')
+                const pushUrl = `${deleted_media ? trashPageUrl : managerPageUrl}${pushParams.toString() ? `?${pushParams.toString()}` : ''}`
                 window.history.pushState(null, '', pushUrl)
 
-                const url = `{{ url_for('media_manager') }}/items/html?${params.toString()}`
+                const query = params.toString()
+                const url = `{{ url_for('media_manager') }}/items/html${query ? `?${query}` : ''}`
                 container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`
                 htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' })
+                syncHeaderState()
             }
         }">
         <div class="mhb-search">
@@ -226,73 +253,338 @@
 
 <!-- Bulk Action Toolbar -->
 <div class="bulk-action-toolbar" x-show="$store.mediaSelection.hasSelection()" x-transition.duration.200ms x-cloak>
-    <div class="bulk-action-info">
-        <span class="material-symbols-outlined">check_circle</span>
-        <span x-text="'Đã chọn ' + $store.mediaSelection.getCount() + ' mục'"></span>
+    <div class="bulk-action-left">
+        <span class="material-symbols-outlined bulk-check-icon">check_box</span>
+        <span class="bulk-count-text"
+            x-text="'&#272;&#227; ch&#7885;n ' + $store.mediaSelection.getCount() + ' m&#7909;c'"></span>
+        <div class="bulk-action-buttons">
+            <button type="button" class="bulk-btn bulk-btn--danger" @click="window.mediaActions?.bulkDelete()">
+                <span class="material-symbols-outlined" x-text="deleted_media ? 'delete_forever' : 'delete'"></span>
+                <span x-text="deleted_media ? 'Xóa vĩnh viễn' : 'Chuyển vào thùng rác'"></span>
+            </button>
+        </div>
     </div>
-    <div class="bulk-action-buttons">
-        <button type="button" class="bulk-btn bulk-btn--secondary" @click="$store.mediaSelection.clear()">
-            <span class="material-symbols-outlined">close</span>
-            <span>Bỏ chọn</span>
-        </button>
-        <button type="button" class="bulk-btn bulk-btn--danger" @click="window.mediaActions?.bulkDelete()">
-            <span class="material-symbols-outlined">delete</span>
-            <span>Xóa</span>
-        </button>
-    </div>
+    <button type="button" class="bulk-close-btn" @click="$store.mediaSelection.clear()" title="&#272;&#243;ng">
+        <span class="material-symbols-outlined">close</span>
+    </button>
 </div>
 
 <script>
-    const deleted_media = {{ 'true' if deleted_media else 'false' }};
-    const currentPageUrl = "{{ url_for('trash') if deleted_media else url_for('media_manager') }}";
+    const managerPageUrl = "{{ url_for('media_manager') }}";
+    const trashPageUrl = "{{ url_for('trash') }}";
+    let deleted_media = window.location.pathname === new URL(trashPageUrl, window.location.origin).pathname;
+
+    const syncHeaderState = () => {
+        const header = document.querySelector('.media-header');
+        if (!header || !window.Alpine || typeof Alpine.$data !== 'function') return;
+        const data = Alpine.$data(header);
+        if (!data) return;
+        const params = new URLSearchParams(window.location.search);
+        const isTrashPage = window.location.pathname === new URL(trashPageUrl, window.location.origin).pathname;
+        deleted_media = isTrashPage;
+        data.folder_id = params.get('folder_id') || '';
+        data.current_media = null;
+        if (typeof data.getCurrentMedia === 'function') {
+            data.getCurrentMedia();
+        }
+    };
+
     document.addEventListener('alpine:init', () => {
         window.mediaActions = {
-            goToFolder(id) {
+            marqueeState: {
+                active: false,
+                pointerId: null,
+                boundRoot: null,
+                box: null,
+                startX: 0,
+                startY: 0,
+                lastX: 0,
+                lastY: 0,
+                suppressClickUntil: 0,
+            },
+            isMarqueeActive() {
+                return this.marqueeState.active;
+            },
+            shouldSuppressItemClick() {
+                return Date.now() < this.marqueeState.suppressClickUntil;
+            },
+            initMarqueeSelection(root) {
+                if (!root || this.marqueeState.boundRoot === root) return;
+                this.marqueeState.boundRoot = root;
+                this.marqueeState.box = null;
+                this.marqueeState.active = false;
+                this.marqueeState.pointerId = null;
+
+                const getStore = () => Alpine.store('mediaSelection');
+                const isInteractive = (target) => !!target.closest(
+                    'button, a, input, textarea, select, label, [role="button"], .card-more-menu, .action-buttons, .bulk-action-toolbar'
+                );
+
+                const getItems = () => Array.from(root.querySelectorAll('.media-row, .media-grid-card'))
+                    .filter((item) => item.getClientRects().length > 0);
+
+                const ensureBox = () => {
+                    let box = this.marqueeState.box;
+                    if (!box) {
+                        box = document.createElement('div');
+                        box.className = 'media-selection-box';
+                        root.appendChild(box);
+                        this.marqueeState.box = box;
+                    }
+                    return box;
+                };
+
+                const clearBox = () => {
+                    if (this.marqueeState.box) {
+                        this.marqueeState.box.remove();
+                        this.marqueeState.box = null;
+                    }
+                };
+
+                const setSelection = (ids, additive) => {
+                    const store = getStore();
+                    if (!store) return;
+
+                    if (additive) {
+                        const merged = new Set(store.getSelectedIds());
+                        ids.forEach(id => merged.add(id));
+                        store.selectedIds = Array.from(merged);
+                        return;
+                    }
+
+                    store.selectAll(ids);
+                };
+
+                const updateSelection = () => {
+                    if (!this.marqueeState.active) return;
+
+                    const rootRect = root.getBoundingClientRect();
+                    const left = Math.min(this.marqueeState.startX, this.marqueeState.lastX);
+                    const right = Math.max(this.marqueeState.startX, this.marqueeState.lastX);
+                    const top = Math.min(this.marqueeState.startY, this.marqueeState.lastY);
+                    const bottom = Math.max(this.marqueeState.startY, this.marqueeState.lastY);
+
+                    const box = ensureBox();
+                    box.style.left = `${left - rootRect.left}px`;
+                    box.style.top = `${top - rootRect.top}px`;
+                    box.style.width = `${Math.max(0, right - left)}px`;
+                    box.style.height = `${Math.max(0, bottom - top)}px`;
+
+                    const rect = {
+                        left,
+                        right,
+                        top,
+                        bottom,
+                    };
+
+                    const selectedIds = [];
+                    for (const item of getItems()) {
+                        const itemRect = item.getBoundingClientRect();
+                        const intersects = !(
+                            itemRect.right < rect.left ||
+                            itemRect.left > rect.right ||
+                            itemRect.bottom < rect.top ||
+                            itemRect.top > rect.bottom
+                        );
+                        if (intersects) {
+                            selectedIds.push(parseInt(item.dataset.id));
+                        }
+                    }
+
+                    const store = getStore();
+                    if (!store) return;
+
+                    if (this.marqueeState.additive) {
+                        const merged = new Set(this.marqueeState.initialSelectedIds || []);
+                        selectedIds.forEach(id => merged.add(id));
+                        store.selectedIds = Array.from(merged);
+                    } else {
+                        store.selectedIds = selectedIds;
+                    }
+                };
+
+                const endSelection = () => {
+                    const pointerId = this.marqueeState.pointerId;
+                    if (pointerId !== null && root.hasPointerCapture?.(pointerId)) {
+                        root.releasePointerCapture?.(pointerId);
+                    }
+                    if (!this.marqueeState.active) {
+                        this.marqueeState.pointerId = null;
+                        root.style.userSelect = '';
+                        clearBox();
+                        return;
+                    }
+                    this.marqueeState.active = false;
+                    this.marqueeState.pointerId = null;
+                    this.marqueeState.suppressClickUntil = Date.now() + 250;
+                    clearBox();
+                    root.style.userSelect = '';
+                };
+
+                root.addEventListener('pointerdown', (event) => {
+                    if (event.button !== 0) return;
+                    if (deleted_media) return;
+                    if (event.pointerType === 'touch') return;
+                    if (isInteractive(event.target) || event.target.closest('.media-grid-card, .media-row')) return;
+
+                    this.marqueeState.startX = event.clientX;
+                    this.marqueeState.startY = event.clientY;
+                    this.marqueeState.lastX = event.clientX;
+                    this.marqueeState.lastY = event.clientY;
+                    this.marqueeState.pointerId = event.pointerId;
+                    this.marqueeState.active = false;
+                    this.marqueeState.additive = event.ctrlKey || event.metaKey || event.shiftKey;
+                    this.marqueeState.initialSelectedIds = new Set((Alpine.store('mediaSelection')?.getSelectedIds?.() || []));
+
+                    root.setPointerCapture?.(event.pointerId);
+                });
+
+                root.addEventListener('pointermove', (event) => {
+                    if (this.marqueeState.pointerId !== event.pointerId) return;
+                    const dx = Math.abs(event.clientX - this.marqueeState.startX);
+                    const dy = Math.abs(event.clientY - this.marqueeState.startY);
+                    this.marqueeState.lastX = event.clientX;
+                    this.marqueeState.lastY = event.clientY;
+
+                    if (!this.marqueeState.active) {
+                        if (dx < 5 && dy < 5) return;
+                        this.marqueeState.active = true;
+                        root.style.userSelect = 'none';
+                        if (!this.marqueeState.additive) {
+                            const store = getStore();
+                            store?.clear();
+                        }
+                        ensureBox();
+                    }
+
+                    event.preventDefault();
+                    updateSelection();
+                });
+
+                root.addEventListener('pointerup', (event) => {
+                    if (this.marqueeState.pointerId !== event.pointerId) return;
+                    endSelection();
+                });
+
+                root.addEventListener('pointercancel', (event) => {
+                    if (this.marqueeState.pointerId !== event.pointerId) return;
+                    endSelection();
+                });
+            },
+            getHeaderBottomData() {
+                const headerBottom = document.querySelector('.media-header-bottom');
+                if (!headerBottom || !window.Alpine || typeof Alpine.$data !== 'function') {
+                    return null;
+                }
+                return Alpine.$data(headerBottom);
+            },
+            isDeletedView() {
+                return deleted_media === true;
+            },
+            reloadItems(extraParams = {}) {
                 const container = document.getElementById('media-items-container');
-                if (!container) return;
-                const url = `{{ url_for('media_manager') }}/items/html?folder_id=${id}&deleted_media=${deleted_media}`;
+                if (!container) return false;
+
+                const params = new URLSearchParams(window.location.search);
+                if (Object.prototype.hasOwnProperty.call(extraParams, 'includeDeleted')) {
+                    if (extraParams.includeDeleted) {
+                        params.set('deleted_media', 'true');
+                        deleted_media = true;
+                    } else {
+                        params.delete('deleted_media');
+                        deleted_media = false;
+                    }
+                } else {
+                    deleted_media = window.location.pathname === new URL(trashPageUrl, window.location.origin).pathname;
+                    if (deleted_media) {
+                        params.set('deleted_media', 'true');
+                    } else {
+                        params.delete('deleted_media');
+                    }
+                }
+
+                const query = params.toString();
+                const url = `{{ url_for('media_manager') }}/items/html${query ? `?${query}` : ''}`;
+                const selectionStore = Alpine.store('mediaSelection');
+                if (selectionStore) {
+                    selectionStore.clear();
+                }
                 container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
                 htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
-                window.history.pushState(null, '', `?folder_id=${id}`);
+                syncHeaderState();
+                return true;
+            },
+            setHasData(value) {
+                const header = document.querySelector('.media-header');
+                if (!header || !window.Alpine || typeof Alpine.$data !== 'function') return;
+                const data = Alpine.$data(header);
+                if (data) {
+                    data.hasData = !!value;
+                }
+            },
+            goToFolder(id) {
+                const params = new URLSearchParams();
+                params.set('folder_id', id);
+                if (deleted_media) params.set('deleted_media', 'true');
+                window.history.pushState(null, '', `?${params.toString()}`);
+                this.reloadItems();
             },
             goHome() {
-                const container = document.getElementById('media-items-container');
-                if (!container) return;
-                const url = `{{ url_for('media_manager') }}/items/html?deleted_media=${deleted_media}`;
-                container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
-                htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
-                window.history.pushState(null, '', currentPageUrl);
+                const params = new URLSearchParams();
+                if (deleted_media) params.set('deleted_media', 'true');
+                window.history.pushState(null, '', deleted_media ? trashPageUrl : managerPageUrl);
+                this.reloadItems();
             },
             showTrash(folderId) {
-                const container = document.getElementById('media-items-container');
-                if (!container) return;
                 const params = new URLSearchParams();
                 params.set('deleted_media', 'true');
                 if (folderId) params.set('folder_id', folderId);
-                const url = `{{ url_for('media_manager') }}/items/html?${params.toString()}`;
+                deleted_media = true;
 
-                const parentXData = document.querySelector('.media-header-bottom')?.__x;
+                const parentXData = this.getHeaderBottomData();
                 if (parentXData) {
                     parentXData.filterValue = 'all';
                     parentXData.reload({ includeDeleted: true });
                 } else {
-                    container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`;
-                    htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' });
+                    window.history.pushState(null, '', `?${params.toString()}`);
+                    this.reloadItems({ includeDeleted: true });
                 }
-                window.history.pushState(null, '', `?folder_id=${folderId || ''}&deleted_media=true`);
+                syncHeaderState();
+            },
+            goManager() {
+                deleted_media = false;
+                window.history.pushState(null, '', managerPageUrl);
+                this.reloadItems();
             },
             move(itemId) {
                 window.dispatchEvent(new CustomEvent('open-move-modal', { detail: { itemId: itemId } }));
             },
-            edit(id, type) {
+            async edit(id, type) {
                 // Find the name element in both list and grid views
                 const row = document.querySelector(`.media-row[data-id="${id}"]`);
                 const card = document.querySelector(`.media-grid-card[data-id="${id}"]`);
-
                 const nameEl = row?.querySelector('.media-name-text') || card?.querySelector('.card-name');
-                if (!nameEl || nameEl.dataset.editing === 'true') return;
+                if (!nameEl) return;
 
                 const oldName = nameEl.textContent.trim();
+
+                // If in Grid view, show custom rename modal
+                const isGridView = localStorage.getItem('mediaViewMode') === 'grid' || !row;
+                if (isGridView) {
+                    if (window.mediaRenameModal) {
+                        window.mediaRenameModal.open({
+                            itemId: id,
+                            oldName: oldName,
+                            nameEl: nameEl,
+                            rowEl: row,
+                            cardEl: card
+                        });
+                    }
+                    return;
+                }
+
+                // List view: keep inline input
+                if (nameEl.dataset.editing === 'true') return;
                 nameEl.dataset.editing = 'true';
 
                 // Create inline input
@@ -344,15 +636,17 @@
             },
             async deleteItem(id, type) {
                 const approved = await window.notify.modal.confirm(
-                    'Xóa dữ liệu',
-                    `Bạn có chắc muốn xoá ${type === 'folder' ? 'thư mục' : 'file'} này không?`,
-                    { icon: 'danger', confirmText: 'Xóa', cancelText: 'Hủy' }
+                    deleted_media ? 'Xóa vĩnh viễn dữ liệu' : 'Xóa dữ liệu',
+                    deleted_media
+                        ? `Bạn có chắc muốn xoá vĩnh viễn ${type === 'folder' ? 'thư mục' : 'file'} này không?`
+                        : `Bạn có chắc muốn xoá ${type === 'folder' ? 'thư mục' : 'file'} này không?`,
+                    { icon: 'danger', confirmText: deleted_media ? 'Xóa vĩnh viễn' : 'Xóa', cancelText: 'Hủy' }
                 );
                 if (!approved) return;
 
                 const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
                 try {
-                    const json = await window.fetchHelper.delete(`media/${id}?is_soft_delete=true`);
+                    const json = await window.fetchHelper.delete(`media/${id}?is_soft_delete=${!deleted_media}`);
                     window.notify.toast.dismiss(loadingId);
 
                     if (!json || json.status_code !== 204) {
@@ -360,10 +654,8 @@
                         return;
                     }
 
-                    window.notify.toast.success('Thành công', 'Đã chuyển vào thùng rác');
-
-                    const elements = document.querySelectorAll(`.media-row[data-id="${id}"], .media-grid-card[data-id="${id}"]`);
-                    elements.forEach(el => el.remove());
+                    window.notify.toast.success('Thành công', `Đã ${deleted_media ? 'xóa vĩnh viễn' : 'chuyển vào thùng rác'}`);
+                    this.reloadItems();
                 } catch (error) {
                     console.error(error);
                     window.notify.toast.dismiss(loadingId);
@@ -382,9 +674,7 @@
                     }
 
                     window.notify.toast.success('Thành công', 'Đã di chuyển dữ liệu');
-
-                    const elements = document.querySelectorAll(`.media-row[data-id="${itemId}"], .media-grid-card[data-id="${itemId}"]`);
-                    elements.forEach(el => el.remove());
+                    this.reloadItems();
                 } catch (error) {
                     console.error(error);
                     window.notify.toast.dismiss(loadingId);
@@ -428,11 +718,13 @@
 
                 // Sử dụng confirm modal trực tiếp thay vì info modal chỉ để hiển thị
                 const approved = await window.notify.modal.confirm(
-                    'Xóa nhiều mục',
-                    `Bạn có chắc muốn xoá ${count} mục này không?`,
+                    deleted_media ? 'Xóa vĩnh viễn nhiều mục' : 'Xóa nhiều mục',
+                    deleted_media
+                        ? `Bạn có chắc muốn xoá vĩnh viễn ${count} mục này không?`
+                        : `Bạn có chắc muốn chuyển ${count} mục này vào thùng rác không?`,
                     {
                         icon: 'danger',
-                        confirmText: 'Xóa',
+                        confirmText: deleted_media ? 'Xóa vĩnh viễn' : 'Xóa',
                         cancelText: 'Hủy'
                     }
                 );
@@ -443,7 +735,7 @@
                 try {
                     const json = await window.fetchHelper.delete('media/bulk-delete', {
                         ids: ids,
-                        is_soft_delete: true
+                        is_soft_delete: !deleted_media
                     });
                     window.notify.toast.dismiss(loadingId);
 
@@ -452,19 +744,89 @@
                         return;
                     }
 
-                    window.notify.toast.success('Thành công', `Đã chuyển ${count} mục vào thùng rác`);
-
-                    // Remove items from UI directly
-                    ids.forEach(id => {
-                        const elements = document.querySelectorAll(`.media-row[data-id="${id}"], .media-grid-card[data-id="${id}"]`);
-                        elements.forEach(el => el.remove());
-                    });
-
+                    window.notify.toast.success('Thành công', deleted_media ? `Đã xóa vĩnh viễn ${count} mục` : `Đã chuyển ${count} mục vào thùng rác`);
                     store.clear();
+                    this.reloadItems();
                 } catch (error) {
                     console.error(error);
                     window.notify.toast.dismiss(loadingId);
                     window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi xóa');
+                }
+            },
+
+            async restore(id) {
+                try {
+                    const res = await window.fetchHelper.patch("media/restore/" + id);
+                    if (res.status_code === 200) {
+                        window.notify.toast.success('Thành công', `Đã khôi phục dữ liệu`);
+                        this.reloadItems({ includeDeleted: true });
+                        return;
+                    }
+                    window.notify.toast.error('Lỗi', res?.message || 'Khôi phục thất bại');
+                    return;
+
+                }
+                catch (error) {
+                    console.error(error);
+                    window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi khôi phục');
+                }
+            },
+            async emptyTrash() {
+                if (!deleted_media) {
+                    this.goManager();
+                    return;
+                }
+
+                const approved = await window.notify.modal.confirm(
+                    'Làm trống thùng rác',
+                    'Bạn có chắc muốn xoá vĩnh viễn toàn bộ dữ liệu trong thùng rác không?',
+                    { icon: 'danger', confirmText: 'Xóa vĩnh viễn', cancelText: 'Hủy' }
+                );
+                if (!approved) return;
+
+                const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
+                try {
+                    const json = await window.fetchHelper.delete('media/empty-trash');
+                    window.notify.toast.dismiss(loadingId);
+
+                    if (!json || json.success === false) {
+                        window.notify.toast.error('Lỗi', json?.message || 'Làm trống thùng rác thất bại');
+                        return;
+                    }
+
+                    window.notify.toast.success('Thành công', 'Đã làm trống thùng rác');
+                    this.reloadItems({ includeDeleted: true });
+                } catch (error) {
+                    console.error(error);
+                    window.notify.toast.dismiss(loadingId);
+                    window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi làm trống thùng rác');
+                }
+            },
+            async forceDownload(url, filename) {
+                try {
+                    // 1. Fetch dữ liệu từ URL về dưới dạng Blob
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error('Không thể tải file');
+
+                    const blob = await response.blob();
+
+                    // 2. Tạo một URL tạm thời trỏ đến Blob vừa tải
+                    const blobUrl = window.URL.createObjectURL(blob);
+
+                    // 3. Tạo thẻ <a> ảo và kích hoạt download
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = filename || url.split('/').pop() || 'download';
+                    document.body.appendChild(a);
+                    a.click();
+
+                    // 4. Dọn dẹp bộ nhớ
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(blobUrl);
+                } catch (error) {
+                    console.error('Lỗi tải file:', error);
+                    // Phương án dự phòng nếu bị chặn CORS: Mở trực tiếp link trong tab mới
+                    window.open(url, '_blank');
                 }
             }
         };
@@ -829,19 +1191,19 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 12px 16px;
-        background: var(--primary-light, rgba(0, 120, 215, 0.1));
-        border: 1.5px solid var(--primary);
+        padding: 10px 14px;
+        background: var(--sidebar-bg);
+        border: 1.5px solid var(--border);
         border-radius: 10px;
-        margin: 15px 10px 0 10px;
-        gap: 16px;
+        margin: 10px 10px 0 10px;
+        gap: 12px;
         animation: slideDown 0.2s ease-out;
     }
 
     @keyframes slideDown {
         from {
             opacity: 0;
-            transform: translateY(-10px);
+            transform: translateY(-8px);
         }
 
         to {
@@ -850,39 +1212,49 @@
         }
     }
 
-    .bulk-action-info {
+    .bulk-action-left {
         display: flex;
         align-items: center;
-        gap: 8px;
-        color: var(--primary);
-        font-weight: 500;
-        font-size: 14px;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
     }
 
-    .bulk-action-info .material-symbols-outlined {
+    .bulk-check-icon {
         font-size: 20px;
+        color: var(--foreground);
+        flex-shrink: 0;
+    }
+
+    .bulk-count-text {
+        font-weight: 500;
+        font-size: 14px;
+        color: var(--foreground);
+        white-space: nowrap;
     }
 
     .bulk-action-buttons {
         display: flex;
         gap: 8px;
+        flex-wrap: wrap;
     }
 
     .bulk-btn {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 8px 16px;
+        padding: 7px 14px;
         border-radius: 8px;
         font-size: 13px;
         font-weight: 500;
         cursor: pointer;
         border: none;
         transition: all 0.15s ease;
+        white-space: nowrap;
     }
 
     .bulk-btn .material-symbols-outlined {
-        font-size: 18px;
+        font-size: 17px;
     }
 
     .bulk-btn--secondary {
@@ -896,14 +1268,70 @@
     }
 
     .bulk-btn--danger {
-        background: var(--nc-error);
-        color: #fff;
+        background: transparent;
+        color: #ef4444;
+        border: none;
+        padding-left: 4px;
     }
 
     .bulk-btn--danger:hover {
-        opacity: 0.85;
+        color: #dc2626;
+    }
+
+    .bulk-close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    .bulk-close-btn:hover {
+        background: var(--border);
+        color: var(--foreground);
+    }
+
+    .bulk-close-btn .material-symbols-outlined {
+        font-size: 18px;
     }
 </style>
+
+<!-- Modal đổi tên file/thư mục (Grid View) -->
+<div x-data="mediaRenameModal" @open-rename-modal.window="openModal($event.detail)" x-show="isOpen"
+    class="nc-modal-overlay" style="display: none; z-index: 9999;" x-cloak>
+    <div class="nc-modal" @click.stop style="max-width: 400px; width: 100%;">
+        <div class="nc-modal__header"
+            style="display: flex; justify-content: space-between; align-items: center; padding: 16px;">
+            <h3 class="nc-modal__title" style="margin: 0; font-size: 16px;">Đổi tên</h3>
+            <button class="nc-toast__close"
+                style="margin: 0; width: 28px; height: 28px; font-size: 20px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;"
+                @click="closeModal()">&times;</button>
+        </div>
+        <div class="nc-modal__body" style="padding: 16px;">
+            <div>
+                <label style="display: block; font-size: 13px; margin-bottom: 6px; font-weight: 500;">Tên mới</label>
+                <input type="text" x-model="newName" x-ref="renameInput" class="form-control"
+                    style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 14px; box-sizing: border-box;"
+                    placeholder="Nhập tên mới..." @keydown.enter="submit()">
+            </div>
+        </div>
+        <div class="nc-modal__footer" style="padding: 12px 16px;">
+            <div class="nc-modal__actions nc-modal__actions--end"
+                style="width: 100%; justify-content: flex-end; gap: 10px;">
+                <button class="nc-modal__btn nc-modal__btn--secondary" @click="closeModal()">Hủy</button>
+                <button class="nc-modal__btn nc-modal__btn--primary" @click="submit()"
+                    x-bind:disabled="isDisable">Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Modal chọn thư mục đích để di chuyển -->
 <div x-data="folderMoveModal" @open-move-modal.window="openModal($event.detail.itemId)" x-show="isOpen"
@@ -1081,22 +1509,16 @@
                         <input type="file" x-ref="fileInput" class="form-control" style="display: none;"
                             @change="onFileSelected($event)" />
                     </div>
-                    <div x-show="fileName"
-                        style="margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 100%;">
-                        <span style="
-                            font-size: 13px;
-                            color: var(--foreground);
-                            word-break: break-all;
-                            overflow-wrap: anywhere;
-                            white-space: normal;
-                            line-height: 1.4;
-                            min-width: 0;
-                            flex: 1 1 auto;
-                            max-width: 100%;
-                        " x-text="fileName"></span>
-                        <button type="button"
-                            style="border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 18px; line-height: 1; flex-shrink: 0;"
-                            @click="clearFile()">&times;</button>
+                    <div x-show="fileName" style="margin-top: 12px;">
+                        <label style="display: block; font-size: 13px; margin-bottom: 6px; font-weight: 500;">Tên
+                            file</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="text" x-model="fileName" class="form-control"
+                                style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 14px; box-sizing: border-box;">
+                            <button type="button"
+                                style="border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 18px; line-height: 1; flex-shrink: 0;"
+                                @click="clearFile()">&times;</button>
+                        </div>
                     </div>
                 </div>
             </template>
@@ -1106,7 +1528,7 @@
                 style="width: 100%; justify-content: flex-end; gap: 10px;">
                 <button class="nc-modal__btn nc-modal__btn--secondary" @click="closeModal()">Hủy</button>
                 <button class="nc-modal__btn nc-modal__btn--primary" @click="submit()"
-                    x-text="mode === 'folder' ? 'Tạo mới' : 'Tải lên'"></button>
+                    x-text="mode === 'folder' ? 'Tạo mới' : 'Tải lên'" x-bind:disabled="isDisable"></button>
             </div>
         </div>
     </div>
@@ -1123,6 +1545,7 @@
             fileSizeBytes: null,
             maxFileSizeMb: 50,
             maxFileSizeLabel: '50 MB',
+            isDisable: false,
 
             openModal(data) {
                 this.mode = data.mode || 'folder';
@@ -1131,6 +1554,7 @@
                 this.fileName = '';
                 this.fileSizeBytes = null;
                 this.isOpen = true;
+                this.isDisable = false;
                 if (this.mode === 'folder') {
                     setTimeout(() => {
                         this.$refs.folderInput && this.$refs.folderInput.focus();
@@ -1194,20 +1618,23 @@
 
             async submit() {
                 if (this.mode === 'folder') {
+                    if (this.isDisable) return;
                     await this.submitFolder();
                 } else {
+                    if (this.isDisable) return;
                     await this.submitFile();
                 }
             },
 
             async submitFolder() {
+                if (this.isDisable) return;
                 if (!this.folderName.trim()) {
                     window.notify.toast.error('Lỗi', 'Vui lòng nhập tên thư mục');
                     return;
                 }
-
                 const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
                 try {
+                    this.isDisable = true;
                     const formData = new FormData();
                     formData.append('name', this.folderName.trim());
                     formData.append('is_folder', 'true');
@@ -1223,39 +1650,40 @@
                         window.notify.toast.success('Thành công', 'Đã tạo thư mục');
                         this.closeModal();
 
-                        const parentXData = document.querySelector('.media-header-bottom')?.__x;
-                        if (parentXData) {
-                            parentXData.reload();
-                        } else {
-                            window.location.reload();
-                        }
+                        window.mediaActions?.reloadItems();
                     } else {
                         window.notify.toast.error('Lỗi', res?.message || 'Tên thư mục đã tồn tại hoặc không hợp lệ');
                     }
+                    this.isDisable = false;
                 } catch (err) {
                     console.error(err);
                     window.notify.toast.dismiss(loadingId);
                     window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi tạo thư mục');
+                    this.isDisable = false;
                 }
             },
 
             async submitFile() {
+                if (this.isDisable) return;
+
                 const fileInput = this.$refs.fileInput;
                 if (!fileInput || !fileInput.files.length) {
                     window.notify.toast.error('Lỗi', 'Vui lòng chọn file để tải lên');
+                    this.isDisable = false;
                     return;
                 }
                 const maxBytes = this.maxFileSizeMb * 1024 * 1024;
                 if (this.fileSizeBytes && maxBytes && this.fileSizeBytes > maxBytes) {
                     window.notify.toast.error('Lỗi', 'File vượt quá giới hạn cho phép');
+                    this.isDisable = false;
                     return;
                 }
-
+                this.isDisable = true;
                 const file = fileInput.files[0];
                 const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
                 try {
                     const formData = new FormData();
-                    formData.append('name', file.name);
+                    formData.append('name', this.fileName.trim() || file.name);
                     formData.append('is_folder', 'false');
                     formData.append('file', file);
                     if (this.folderId && this.folderId !== 'null' && this.folderId !== '') {
@@ -1270,19 +1698,81 @@
                         window.notify.toast.success('Thành công', 'Đã tải file lên');
                         this.closeModal();
 
-                        const parentXData = document.querySelector('.media-header-bottom')?.__x;
-                        if (parentXData) {
-                            parentXData.reload();
-                        } else {
-                            window.location.reload();
-                        }
+                        window.mediaActions?.reloadItems();
                     } else {
                         window.notify.toast.error('Lỗi', res?.message || 'Tải file thất bại');
                     }
+
+                    this.isDisable = false;
                 } catch (err) {
                     console.error(err);
                     window.notify.toast.dismiss(loadingId);
                     window.notify.toast.error('Lỗi', 'Có lỗi xảy ra khi tải file');
+                    this.isDisable = false;
+                }
+            }
+        }));
+
+        Alpine.data('mediaRenameModal', () => ({
+            isOpen: false,
+            isDisable: false,
+            itemId: null,
+            newName: '',
+            oldName: '',
+            nameEl: null,
+            rowEl: null,
+            cardEl: null,
+
+            openModal(data) {
+                this.itemId = data.itemId;
+                this.oldName = data.oldName;
+                this.newName = data.oldName;
+                this.nameEl = data.nameEl;
+                this.rowEl = data.rowEl;
+                this.cardEl = data.cardEl;
+                this.isOpen = true;
+                this.isDisable = false;
+                setTimeout(() => {
+                    this.$refs.renameInput && this.$refs.renameInput.focus();
+                }, 100);
+            },
+
+            closeModal() {
+                this.isOpen = false;
+            },
+
+            async submit() {
+                if (this.isDisable) return;
+                const trimmedName = this.newName.trim();
+                if (!trimmedName) {
+                    window.notify.toast.error('Lỗi', 'Vui lòng nhập tên mới');
+                    return;
+                }
+                if (trimmedName === this.oldName) {
+                    this.closeModal();
+                    return;
+                }
+
+                const loadingId = window.notify.toast.loading('Đang xử lý', 'Vui lòng chờ...');
+                try {
+                    this.isDisable = true;
+                    const json = await window.fetchHelper.patch(`media/${this.itemId}`, { name: trimmedName });
+                    window.notify.toast.dismiss(loadingId);
+                    if (json && json.status_code === 200) {
+                        if (this.nameEl) this.nameEl.textContent = trimmedName;
+                        const otherEl = this.rowEl ? this.cardEl?.querySelector('.card-name') : this.rowEl?.querySelector('.media-name-text');
+                        if (otherEl) otherEl.textContent = trimmedName;
+                        window.notify.toast.success('Thành công', 'Đã đổi tên');
+                        this.closeModal();
+                    } else {
+                        window.notify.toast.error('Lỗi', json?.message || 'Đổi tên thất bại');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    window.notify.toast.dismiss(loadingId);
+                    window.notify.toast.error('Lỗi', 'Có lỗi xảy ra');
+                } finally {
+                    this.isDisable = false;
                 }
             }
         }));
@@ -1290,6 +1780,10 @@
         // Expose helper trigger for Alpine
         window.mediaCreateModal = {
             open: (data) => window.dispatchEvent(new CustomEvent('open-create-modal', { detail: data }))
+        };
+
+        window.mediaRenameModal = {
+            open: (data) => window.dispatchEvent(new CustomEvent('open-rename-modal', { detail: data }))
         };
     });
 </script>

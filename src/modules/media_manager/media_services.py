@@ -499,7 +499,7 @@ class MediaServices:
                 update_media_task = (
                     update(Medias)
                     .where(col(Medias.prefix).like(child_prefix))
-                    .values(deleted_at=None)
+                    .values(deleted_at=None, is_direct_delete=False)
                 )
                 await self.session.exec(update_media_task)
 
