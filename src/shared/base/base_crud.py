@@ -228,7 +228,7 @@ class BaseCrud(Generic[T]):
 
         m = self.model
 
-        if self.is_has_soft_delete(m):
+        if self.is_has_soft_delete(m) and soft_delete:
             if hasattr(m, "deleted_at"):
                 statement = statement.where(m.deleted_at == None)
 
@@ -260,11 +260,13 @@ class BaseCrud(Generic[T]):
 
     async def update(
         self,
-        condition: Callable[[Any], Any],
-        data: Any,
+        id: Any = None,
+        condition: Optional[Callable[[Any], Any]] = None,
+        data: Any = None,
         soft_delete: bool = True,
         autocommit: bool = True,
     ) -> Optional[T]:
+        # 1. Xử lý dữ liệu update đầu vào
         update_data = (
             data.model_dump(exclude_unset=True) if hasattr(data, "model_dump") else data
         )
@@ -272,10 +274,18 @@ class BaseCrud(Generic[T]):
         if not update_data:
             return None
 
+        # 2. Kiểm tra và tự động cập nhật trường updated_at nếu có
         if hasattr(self, "is_has_updated_at") and self.is_has_updated_at(self.model):
             update_data["updated_at"] = get_now_vn()
 
-        stmt = update(self.model).where(condition(self.model))
+        # 3. Xác định điều kiện WHERE (Ưu tiên id trước, condition sau)
+        if id is not None and self.is_has_primary_key(self.model):
+            where_clause = self.model.id == id
+        elif condition is not None:
+            where_clause = condition(self.model)
+        else:
+            return None
+        stmt = update(self.model).where(where_clause)
 
         if soft_delete and self.is_has_soft_delete(self.model):
             stmt = stmt.where(getattr(self.model, "deleted_at") == None)
@@ -287,6 +297,7 @@ class BaseCrud(Generic[T]):
 
         if autocommit:
             await self.session.commit()
+
         return db_obj
 
     async def delete(

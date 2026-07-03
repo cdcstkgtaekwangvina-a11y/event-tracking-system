@@ -15,6 +15,7 @@ class BaseMedia(SQLModel):
     media_metadata: Optional[dict[str, Any]] = Field(default=None, sa_type=JSONB)
     parent_id: Optional[int] = Field(default=None, index=True, foreign_key="medias.id")
     is_folder: bool = Field(default=False, nullable=False)
+    is_direct_delete: bool = Field(default=False)
     __table_args__ = (
         UniqueConstraint("name", "parent_id", name="uq_media_name_parent"),
     )
