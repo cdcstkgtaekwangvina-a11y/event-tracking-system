@@ -1,10 +1,9 @@
 from src.shared.base import BaseRequest, BaseRouter
 from fastapi import Depends
-from typing import Optional, cast
+from typing import Optional
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
-    CursorPaginationResponse,
 )
 from src.modules.media_manager.media_services import MediaServices
 from src.shared.middlewares.auth_middlewares import RequireAuth

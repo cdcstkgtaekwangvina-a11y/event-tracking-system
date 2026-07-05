@@ -42,6 +42,7 @@ dependencies:
       - email-validator==2.3.0
       - fastapi==0.136.1
       - fastapi-restful==0.6.0
+      - fastexcel==0.20.2
       - granian==2.7.4
       - greenlet==3.5.0
       - h11==0.16.0
@@ -55,6 +56,8 @@ dependencies:
       - markupsafe==3.0.3
       - mypy-extensions==1.1.0
       - orjson==3.11.9
+      - polars==1.42.1
+      - polars-runtime-32==1.42.1
       - psutil==5.9.8
       - pwdlib==0.3.0
       - pycparser==3.0
@@ -82,4 +85,5 @@ dependencies:
       - watchfiles==1.1.1
       - websockets==16.0
       - werkzeug==3.1.8
+      - xlsxwriter==3.2.9
       - yarg==0.1.10
