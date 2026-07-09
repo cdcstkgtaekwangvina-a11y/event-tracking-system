@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from src.shared.middlewares.handel_exception import handle_exceptions
 
+
 load_dotenv()
 
 environment: str = os.getenv("env") or "dev"
@@ -20,6 +21,7 @@ environment: str = os.getenv("env") or "dev"
 async def lifespan(app: FastAPI):
     print("Server is running")
     from database.models.app_db import init_db
+    from src.shared.base.base_queue import QueueServices
 
     for route in app.routes:
         if isinstance(route, APIRoute):
@@ -27,7 +29,11 @@ async def lifespan(app: FastAPI):
                 route.name = route.name.split(".")[-1]
 
     await init_db()
+    bg_host = QueueServices()
+    await bg_host.start()
+    await bg_host.fill_job_from_db()
     yield
+    await bg_host.stop()
     print("Server is shutdown")
 
 

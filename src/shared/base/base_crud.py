@@ -346,6 +346,7 @@ class BaseCrud(Generic[T]):
             self.statement = self.statement.where(self.model.deleted_at == None)
         stmt = select(exists(self.statement))
         result = await self.session.exec(stmt)
+        self.statement = select(self.model)
         return bool(result.first())
 
     async def count_async(
@@ -361,6 +362,7 @@ class BaseCrud(Generic[T]):
             self.statement = self.statement.where(self.model.deleted_at == None)
         count_statement = select(func.count()).select_from(self.statement.subquery())
         result = await self.session.exec(count_statement)
+        self.statement = select(self.model)
         return result.one() or 0
 
     async def pagination_async(
@@ -411,7 +413,10 @@ class BaseCrud(Generic[T]):
                     table = getattr(self.model, "__table__", None)
                     if table is not None:
                         for column in table.columns:
-                            if isinstance(column.type, String) or column.type.__class__.__name__ == 'AutoString':
+                            if (
+                                isinstance(column.type, String)
+                                or column.type.__class__.__name__ == "AutoString"
+                            ):
                                 search_conditions.append(
                                     column.ilike(f"%{pagination.search}%")
                                 )
@@ -516,7 +521,10 @@ class BaseCrud(Generic[T]):
                     table = getattr(self.model, "__table__", None)
                     if table is not None:
                         for column in table.columns:
-                            if isinstance(column.type, String) or column.type.__class__.__name__ == 'AutoString':
+                            if (
+                                isinstance(column.type, String)
+                                or column.type.__class__.__name__ == "AutoString"
+                            ):
                                 search_conditions.append(
                                     column.ilike(f"%{cursor_request.search}%")
                                 )
