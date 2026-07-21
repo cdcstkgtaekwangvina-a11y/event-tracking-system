@@ -1,12 +1,15 @@
-from sqlmodel import SQLModel, Field
-from .base_model import PrimaryModel, CreatedAtModel
 from datetime import datetime
+from enum import Enum
+from typing import Any, cast
+from uuid import UUID, uuid8
+
 from sqlalchemy import DateTime
 from sqlalchemy.dialects.postgresql import JSONB
-from typing import cast, Any
-from uuid import UUID, uuid8
-from enum import Enum
+from sqlmodel import Field, SQLModel
+
 from src.shared.base.base_schema import BaseSchema
+
+from .base_model import CreatedAtModel, PrimaryModel
 
 
 class JobStatus(str, Enum):
@@ -29,10 +32,10 @@ class BaseQueueJob(SQLModel):
     )
     progress: int = Field(default=0, ge=0, le=100)
     meta: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
-    logs: QueueJobLogs | None = Field(default=None, sa_type=JSONB)
+    logs: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
     next_payload: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
 
 
 class QueueJob(PrimaryModel[UUID], CreatedAtModel, BaseQueueJob, table=True):
     __tablename__: str = "queue_job"
-    id: UUID = Field(default=uuid8(), primary_key=True)
+    id: UUID = Field(default_factory=uuid8, primary_key=True)

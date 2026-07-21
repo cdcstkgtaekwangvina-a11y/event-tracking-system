@@ -1,8 +1,8 @@
 """init
 
-Revision ID: a867b02850a2
+Revision ID: 8a059d80d8e3
 Revises: 
-Create Date: 2026-07-09 18:08:43.939727
+Create Date: 2026-07-19 11:30:00.624822
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlmodel
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'a867b02850a2'
+revision: str = '8a059d80d8e3'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,13 +26,15 @@ def upgrade() -> None:
     sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.BIGINT(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=False),
     sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=True),
     sa.Column('position', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=True),
     sa.Column('gender', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=True),
     sa.Column('department', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('starting_date', sa.Date(), nullable=True),
+    sa.Column('qr_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('meta_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('medias',

@@ -1,31 +1,37 @@
-from src.shared.base.base_schema import BaseSchema
-from typing import Optional
-from pydantic import Field
 from datetime import date
-from database.models.employees import Employees
+from uuid import UUID
+
+from pydantic import Field
+
+from src.shared.base.base_schema import BaseSchema
 
 
 class EmployeeCreateRequest(BaseSchema):
     name: str = Field(max_length=300)
-    email: Optional[str] = Field(max_length=500)
-    position: Optional[str] = Field(max_length=300)
-    gender: Optional[str] = Field(max_length=20)
-    department: Optional[str]
-    starting_date: Optional[date]
+    email: str | None = Field(max_length=500)
+    position: str | None = Field(max_length=300)
+    gender: str | None = Field(max_length=20)
+    department: str | None
+    starting_date: date | None
 
 
 class EmployeeUpdateRequest(BaseSchema):
     name: str = Field(max_length=300)
-    email: Optional[str] = Field(max_length=500)
-    position: Optional[str] = Field(max_length=300)
-    gender: Optional[str] = Field(max_length=20)
-    department: Optional[str]
-    starting_date: Optional[date]
+    email: str | None = Field(max_length=500)
+    position: str | None = Field(max_length=300)
+    gender: str | None = Field(max_length=20)
+    department: str | None
+    starting_date: date | None
+
+
+class BulkUpsertEmployeeRequest(BaseSchema):
+    file_url: str
+    column_map: dict[str, str] | None = None
+    header_row: int | None = Field(default=None, ge=0)
 
 
 class BulkUpsertResponse(BaseSchema):
-    added_employees: list[Employees] = []
-    updated_employees: list[Employees] = []
+    job_id: UUID
 
 
 BulkUpsertResponse.model_rebuild()

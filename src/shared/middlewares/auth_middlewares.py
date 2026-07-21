@@ -1,8 +1,10 @@
-from fastapi import Request, HTTPException, Depends
+from typing import Optional, Sequence
+
+from fastapi import Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from typing import Sequence, Optional
-from src.modules.authentication.auth_services import AuthenticationServices
+
 from src.modules.authentication.auth_schemas import TokenData
+from src.modules.authentication.auth_services import AuthenticationServices
 
 
 class AuthContext:
@@ -90,3 +92,7 @@ class RequireAuth:
         req.state.is_authenticated = payload.valid
 
         return AuthContext(payload=payload, is_valid=payload.valid)
+
+
+def auth(roles: list[str] = None, is_required_auth: bool = True):
+    return Depends(RequireAuth(roles=roles, is_required_auth=is_required_auth))

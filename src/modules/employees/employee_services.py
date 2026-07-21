@@ -2,16 +2,21 @@ from database.models.app_db import SessionDep, SessionFactoryDep
 from database.models.employees import Employees
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
+
 from .employee_schemas import (
+    BulkUpsertEmployeeRequest,
+    BulkUpsertResponse,
     EmployeeCreateRequest,
     EmployeeUpdateRequest,
-    BulkUpsertResponse,
 )
-from typing import Any, Optional
 
 
 class EmployeeServices:
-    def __init__(self, session: SessionDep, session_factory: SessionFactoryDep):
+    def __init__(
+        self,
+        session: SessionDep,
+        session_factory: SessionFactoryDep,
+    ):
         self.session = session
         self.session_factory = session_factory
         self.crud = BaseCrud(session, Employees)
@@ -55,51 +60,30 @@ class EmployeeServices:
         return BaseResponse.ok(message="Xóa nhân viên thành công")
 
     async def bulk_upsert_employees(
-        self, employees: list[Any]
-    ) -> str:
-        from src.shared.queues import QueueServices
-        
-        queue_service = QueueServices()
-        job_id = await queue_service.enqueue_bulk_upsert_employees(employees)
-        return job_id
+        self, employees: BulkUpsertEmployeeRequest
+    ) -> BaseResponse[BulkUpsertResponse]:
+        from src.modules.queue_job.queue_job_schemas import CreateQueueJobSchema
+        from src.modules.queue_job.queue_job_services import QueueJobServices
+        from src.shared.constants.queue_keys import QueueKeys
 
-    async def bulk_upsert_employees_db(
-        self, employees: list[Employees]
-    ) -> Optional[BulkUpsertResponse]:
-        if not employees:
-            return BulkUpsertResponse()
-
-        incoming_ids = [e.id for e in employees if e.id is not None]
-
-        async with self.session_factory() as session:
-            from sqlmodel import col
-
-            crud = BaseCrud(session=session, model=Employees)
-            existing_employees = (
-                await crud.select(Employees)
-                .where(col(Employees.id).in_(incoming_ids))
-                .find_many(soft_delete=False)
+        job_service = QueueJobServices(session=self.session)
+        new_job = await job_service.create_job(
+            CreateQueueJobSchema(
+                type=QueueKeys.BULK_UPSERT_EMPLOYEES.value,
+                next_payload=employees.model_dump(),
             )
-
-            existing_ids = {e.id for e in existing_employees}
-
-            added_instances = []
-            updated_instances = []
-
-            # 3. Phân loại và xử lý dữ liệu
-            for emp in employees:
-                if emp.id in existing_ids:
-                    merged_emp = await session.merge(emp)
-                    updated_instances.append(merged_emp)
-                else:
-                    session.add(emp)
-                    added_instances.append(emp)
-
-            # 4. Commit một lần duy nhất cho toàn bộ transaction
-            await session.commit()
-
-        return BulkUpsertResponse(
-            updated_employees=updated_instances,
-            added_employees=added_instances,
         )
 
+        if new_job:
+            from src.shared.backgroundtasks.employee_bg_tasks import (
+                EmployeeBackgroundTask,
+            )
+
+            job = EmployeeBackgroundTask()
+            await job.bulk_upsert_employees_db(new_job.id)
+            return BaseResponse.ok(
+                BulkUpsertResponse(job_id=new_job.id),
+                message="Bulk upsert employee thành công",
+            )
+
+        return BaseResponse.fail(message="Bulk upsert employee thất bại")

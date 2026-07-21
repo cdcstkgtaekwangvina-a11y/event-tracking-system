@@ -22,7 +22,7 @@ ignore = [
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
-force-grid-wrap = 2
+
 
 [tool.ruff.format]
 quote-style = "double"
