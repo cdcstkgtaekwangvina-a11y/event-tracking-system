@@ -1,8 +1,10 @@
 import os
+from typing import Any, cast
+
 from dotenv import load_dotenv
 from fastapi.templating import Jinja2Templates
+
 from src.shared.schemas.page_schemas import PageSchema
-from typing import Any, cast
 
 
 def global_values(templates: Jinja2Templates) -> Jinja2Templates:
@@ -13,7 +15,7 @@ def global_values(templates: Jinja2Templates) -> Jinja2Templates:
             name="Lưu trữ", icon="photo_library", id="media", path="/admin/media"
         ),
         PageSchema(
-            name="Khách mời", icon="group", id="employee", path="/admin/employee"
+            name="Khách mời", icon="group", id="employees", path="/admin/employees"
         ),
         PageSchema(
             name="Tài khoản",

@@ -1,12 +1,11 @@
-import logging
-
 from database.models.app_db import SessionDep
 from database.models.queue_jobs import QueueJob
 from src.shared.base.base_crud import BaseCrud
+from src.shared.base.base_logger import get_logger
 
 from .queue_job_schemas import CreateQueueJobSchema
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class QueueJobServices:

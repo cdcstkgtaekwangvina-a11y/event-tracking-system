@@ -1,0 +1,72 @@
+<!-- Employee Delete Confirmation Modal -->
+<div class="emp-modal-backdrop hidden" id="emp-delete-modal-backdrop"
+     x-data="{
+        employeeId: null,
+        employeeName: '',
+        loading: false,
+        open(options = {}) {
+            this.employeeId = options.id;
+            this.employeeName = options.name || 'nhân viên này';
+            document.getElementById('emp-delete-modal-backdrop')?.classList.remove('hidden');
+        },
+        close() {
+            document.getElementById('emp-delete-modal-backdrop')?.classList.add('hidden');
+        },
+        async confirm() {
+            if (this.loading || !this.employeeId) return;
+            this.loading = true;
+            try {
+                const res = await window.fetchHelper.delete(`employees/${this.employeeId}`);
+                if (res.status_code === 200) {
+                    window.notify?.success(res.message || 'Xoá nhân viên thành công');
+                    this.close();
+                    htmx.ajax('GET', '{{ url_for('employees_table') }}', {
+                        target: '#emp-table-container',
+                        swap: 'innerHTML'
+                    });
+                } else {
+                    window.notify?.error(res.message || 'Xoá thất bại');
+                }
+            } catch(e) {
+                window.notify?.error('Có lỗi xảy ra khi xoá');
+            } finally {
+                this.loading = false;
+            }
+        }
+     }">
+    <div class="emp-modal emp-modal--sm" @click.outside="close">
+        <div class="emp-modal-header">
+            <h3 class="emp-modal-title emp-modal-title--danger">Xác nhận xoá</h3>
+            <button class="emp-modal-close" @click="close" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="emp-modal-body emp-delete-body">
+            <span class="material-symbols-outlined emp-delete-icon">warning</span>
+            <p class="emp-delete-text">
+                Bạn có chắc muốn xoá nhân viên
+                <strong x-text="employeeName">"..."</strong>?
+            </p>
+            <p class="emp-delete-sub">Hành động này không thể hoàn tác.</p>
+        </div>
+        <div class="emp-modal-footer">
+            <button type="button" class="emp-btn emp-btn-ghost" @click="close">Huỷ</button>
+            <button type="button" class="emp-btn emp-btn-danger" @click="confirm" :disabled="loading">
+                <span x-show="loading" class="emp-spinner emp-spinner-sm"></span>
+                <span x-text="loading ? 'Đang xoá...' : 'Xoá'">Xoá</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.employeeDeleteModal = {
+        open(options) {
+            const el = document.getElementById('emp-delete-modal-backdrop');
+            el?.dispatchEvent(new CustomEvent('emp-delete-open', { detail: options }));
+        }
+    };
+    document.getElementById('emp-delete-modal-backdrop')?.addEventListener('emp-delete-open', function(e) {
+        this._x_dataStack?.[0]?.open(e.detail);
+    });
+</script>

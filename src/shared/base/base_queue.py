@@ -1,12 +1,12 @@
 import asyncio
-import logging
 from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from src.shared.base.base_logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def queue_job(key: str):

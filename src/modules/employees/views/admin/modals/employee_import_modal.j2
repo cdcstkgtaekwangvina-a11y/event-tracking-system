@@ -1,0 +1,210 @@
+<!-- Employee Import Modal -->
+<div class="emp-modal-backdrop hidden" id="emp-import-modal-backdrop"
+     x-data="{
+        step: 'url',
+        fileUrl: '',
+        headerRow: 1,
+        rowCount: 20,
+        previewData: null,
+        columnMap: {},
+        requiredFields: ['name', 'email', 'position', 'department', 'gender', 'starting_date'],
+        fieldLabels: {
+            name: 'Họ và tên *',
+            email: 'Email',
+            position: 'Chức vụ',
+            department: 'Phòng ban',
+            gender: 'Giới tính',
+            starting_date: 'Ngày bắt đầu'
+        },
+        loading: false,
+        open() {
+            this.step = 'url';
+            this.fileUrl = '';
+            this.headerRow = 1;
+            this.rowCount = 20;
+            this.previewData = null;
+            this.columnMap = {};
+            document.getElementById('emp-import-modal-backdrop')?.classList.remove('hidden');
+        },
+        close() {
+            document.getElementById('emp-import-modal-backdrop')?.classList.add('hidden');
+        },
+        async previewFile() {
+            if (!this.fileUrl.trim()) {
+                window.notify?.error('Vui lòng nhập URL file');
+                return;
+            }
+            this.loading = true;
+            try {
+                const res = await window.fetchHelper.post('employees/read-sheet-file', {
+                    url: this.fileUrl,
+                    header_row: this.headerRow,
+                    row_count: this.rowCount
+                });
+                if (res.status_code === 200) {
+                    this.previewData = res.data;
+                    this.columnMap = {};
+                    this.step = 'map';
+                } else {
+                    window.notify?.error(res.message || 'Không thể đọc file');
+                }
+            } catch(e) {
+                window.notify?.error('Lỗi kết nối');
+            } finally {
+                this.loading = false;
+            }
+        },
+        async importData() {
+            if (!this.columnMap.name) {
+                window.notify?.error('Vui lòng map cột Họ và tên');
+                return;
+            }
+            this.loading = true;
+            try {
+                const res = await window.fetchHelper.post('employees/import', {
+                    file_url: this.fileUrl,
+                    header_row: this.headerRow,
+                    column_map: this.columnMap
+                });
+                if (res.status_code === 200) {
+                    window.notify?.success(res.message || 'Import thành công, đang xử lý...');
+                    this.close();
+                    setTimeout(() => {
+                        htmx.ajax('GET', '{{ url_for('employees_table') }}', {
+                            target: '#emp-table-container',
+                            swap: 'innerHTML'
+                        });
+                    }, 2000);
+                } else {
+                    window.notify?.error(res.message || 'Import thất bại');
+                }
+            } catch(e) {
+                window.notify?.error('Có lỗi xảy ra khi import');
+            } finally {
+                this.loading = false;
+            }
+        }
+     }">
+    <div class="emp-modal emp-modal--lg" @click.outside="close">
+        <div class="emp-modal-header">
+            <h3 class="emp-modal-title">Import nhân viên</h3>
+            <button class="emp-modal-close" @click="close" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <!-- Step indicator -->
+        <div class="emp-steps">
+            <div class="emp-step" :class="{ 'emp-step--active': step === 'url', 'emp-step--done': step === 'map' }">
+                <div class="emp-step-dot">1</div>
+                <span>Nhập URL file</span>
+            </div>
+            <div class="emp-step-line"></div>
+            <div class="emp-step" :class="{ 'emp-step--active': step === 'map' }">
+                <div class="emp-step-dot">2</div>
+                <span>Map cột dữ liệu</span>
+            </div>
+        </div>
+
+        <!-- Step 1: URL input -->
+        <div class="emp-modal-body" x-show="step === 'url'" x-transition>
+            <div class="emp-form-group emp-form-group--full">
+                <label class="emp-form-label">URL file (Excel / CSV / JSON)</label>
+                <input type="url"
+                       class="emp-form-input"
+                       x-model="fileUrl"
+                       placeholder="https://example.com/employees.xlsx"
+                       autocomplete="off" />
+                <p class="emp-form-hint">Hỗ trợ file .xlsx, .xls, .csv, .json</p>
+            </div>
+            <div class="emp-form-row">
+                <div class="emp-form-group">
+                    <label class="emp-form-label">Dòng tiêu đề</label>
+                    <input type="number" class="emp-form-input" x-model.number="headerRow" min="1" max="20" />
+                </div>
+                <div class="emp-form-group">
+                    <label class="emp-form-label">Số dòng preview</label>
+                    <input type="number" class="emp-form-input" x-model.number="rowCount" min="1" max="100" />
+                </div>
+            </div>
+            <div class="emp-modal-footer">
+                <button type="button" class="emp-btn emp-btn-ghost" @click="close">Huỷ</button>
+                <button type="button" class="emp-btn emp-btn-primary" @click="previewFile" :disabled="loading">
+                    <span x-show="loading" class="emp-spinner emp-spinner-sm"></span>
+                    <span x-text="loading ? 'Đang tải...' : 'Xem trước'">Xem trước</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: Column mapping -->
+        <div class="emp-modal-body" x-show="step === 'map'" x-transition>
+            <!-- Preview table -->
+            <div x-show="previewData && previewData.rows && previewData.rows.length > 0">
+                <p class="emp-form-hint" style="margin-bottom: 8px;">
+                    Preview (<span x-text="previewData?.rows?.length || 0"></span> dòng đầu):
+                </p>
+                <div class="emp-preview-table-wrapper">
+                    <table class="emp-preview-table">
+                        <thead>
+                            <tr>
+                                <template x-for="h in (previewData?.headers || [])" :key="h">
+                                    <th class="emp-preview-th" x-text="h"></th>
+                                </template>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(row, ri) in (previewData?.rows || []).slice(0, 5)" :key="ri">
+                                <tr>
+                                    <template x-for="h in (previewData?.headers || [])" :key="h">
+                                        <td class="emp-preview-td" x-text="row[h] ?? '—'"></td>
+                                    </template>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Column map -->
+            <div class="emp-col-map">
+                <p class="emp-form-label" style="margin-bottom: 12px; font-weight: 600;">Map cột dữ liệu:</p>
+                <div class="emp-col-map-grid">
+                    <template x-for="field in requiredFields" :key="field">
+                        <div class="emp-form-group">
+                            <label class="emp-form-label" x-text="fieldLabels[field]"></label>
+                            <select class="emp-form-input emp-form-select" x-model="columnMap[field]">
+                                <option value="">-- Không map --</option>
+                                <template x-for="h in (previewData?.headers || [])" :key="h">
+                                    <option :value="h" x-text="h"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div class="emp-modal-footer">
+                <button type="button" class="emp-btn emp-btn-ghost" @click="step = 'url'">
+                    <span class="material-symbols-outlined" style="font-size:18px">arrow_back</span>
+                    Quay lại
+                </button>
+                <button type="button" class="emp-btn emp-btn-primary" @click="importData" :disabled="loading">
+                    <span x-show="loading" class="emp-spinner emp-spinner-sm"></span>
+                    <span x-text="loading ? 'Đang import...' : 'Import'">Import</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.employeeImportModal = {
+        open() {
+            const el = document.getElementById('emp-import-modal-backdrop');
+            el?.dispatchEvent(new CustomEvent('emp-import-open'));
+        }
+    };
+    document.getElementById('emp-import-modal-backdrop')?.addEventListener('emp-import-open', function() {
+        this._x_dataStack?.[0]?.open();
+    });
+</script>

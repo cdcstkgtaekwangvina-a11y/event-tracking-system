@@ -1,19 +1,19 @@
-import io
 import math
 import os
 from datetime import date, datetime
 from typing import cast
 from uuid import UUID
 
-import httpx
-import polars as pl
+from polars import DataFrame
 
 from database.models.app_db import get_session_factory
 from database.models.employees import Employees
 from database.models.queue_jobs import JobStatus, QueueJob, QueueJobLogs
 from src.modules.employees.employee_schemas import BulkUpsertResponse
+from src.shared.base.base_client import BaseClient
 from src.shared.base.base_queue import queue_job, queue_service
 from src.shared.constants.queue_keys import QueueKeys
+from src.shared.helpers.file_handel import FileHandelHelper
 from src.shared.helpers.random_helpers import get_now_vn
 
 MAX_DETAILED_ERRORS = 500
@@ -26,31 +26,34 @@ class EmployeeBackgroundTask:
 
     async def _download_and_parse_file(
         self, file_url: str, header_row: int | None = None
-    ) -> pl.DataFrame:
+    ) -> DataFrame | None:
         """Tải file từ URL với Timeout 60s, tự động nhận diện định dạng."""
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with BaseClient() as client:
             response = await client.get(file_url)
-            response.raise_for_status()
             file_bytes = response.content
 
         content_type = response.headers.get("content-type", "").lower()
         url_path = file_url.split("?")[0]
         _, ext = os.path.splitext(url_path.lower())
 
+        pl = FileHandelHelper()
+
         if "spreadsheetml" in content_type or ext == ".xlsx":
             read_options = (
                 {"header_row": header_row} if header_row is not None else None
             )
-            return pl.read_excel(io.BytesIO(file_bytes), read_options=read_options)
+            return pl.read_sheet_file(
+                file_bytes, type="excel", read_options=read_options
+            )
 
         elif "csv" in content_type or ext == ".csv":
             csv_kwargs = {}
             if header_row is not None:
                 csv_kwargs["skip_rows"] = header_row
-            return pl.read_csv(io.BytesIO(file_bytes), **csv_kwargs)
+            return pl.read_sheet_file(file_bytes, **csv_kwargs)
 
         elif "json" in content_type or ext == ".json":
-            return pl.read_json(io.BytesIO(file_bytes))
+            return pl.read_json(file_bytes)
         else:
             raise ValueError(
                 f"Định dạng file không được hỗ trợ (Content-Type: {content_type}, Ext: {ext}). "
@@ -101,6 +104,17 @@ class EmployeeBackgroundTask:
                 df = await self._download_and_parse_file(
                     file_url, header_row=header_row
                 )
+
+                if df is None:
+                    job.status = JobStatus.FAILED
+                    cast(list, job_logs.errors).append(
+                        {
+                            "global_error": "Đã xảy ra lỗi trong quá trình đọc file. Hãy kiểm tra lại file."
+                        }
+                    )
+                    job.logs = job_logs.model_dump()
+                    await session.commit()
+                    return
 
                 if column_map:
                     valid_map = {k: v for k, v in column_map.items() if k in df.columns}

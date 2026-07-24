@@ -34,4 +34,15 @@ class BulkUpsertResponse(BaseSchema):
     job_id: UUID
 
 
+class ReadSheetFile(BaseSchema):
+    url: str
+    row_count: int = Field(default=10, gt=0)
+    header_row: int | None = Field(default=None, ge=1)
+
+
+class ReadSheetFileResponse(BaseSchema):
+    row_index: int
+    rows: list[list[str | None]]
+
+
 BulkUpsertResponse.model_rebuild()

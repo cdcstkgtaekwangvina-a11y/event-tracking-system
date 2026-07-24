@@ -1,0 +1,167 @@
+<!-- Employee Create / Edit Modal -->
+<div class="emp-modal-backdrop hidden" id="emp-form-modal-backdrop"
+     x-data="{
+        mode: 'create',
+        employee: null,
+        loading: false,
+        form: {
+            name: '',
+            email: '',
+            position: '',
+            gender: '',
+            department: '',
+            starting_date: ''
+        },
+        open(options = {}) {
+            this.mode = options.mode || 'create';
+            if (options.mode === 'edit' && options.employee) {
+                this.employee = options.employee;
+                this.form = {
+                    name: options.employee.name || '',
+                    email: options.employee.email || '',
+                    position: options.employee.position || '',
+                    gender: options.employee.gender || '',
+                    department: options.employee.department || '',
+                    starting_date: options.employee.starting_date || ''
+                };
+            } else {
+                this.employee = null;
+                this.form = { name: '', email: '', position: '', gender: '', department: '', starting_date: '' };
+            }
+            document.getElementById('emp-form-modal-backdrop')?.classList.remove('hidden');
+        },
+        close() {
+            document.getElementById('emp-form-modal-backdrop')?.classList.add('hidden');
+        },
+        async submit() {
+            if (this.loading) return;
+            if (!this.form.name?.trim()) {
+                window.notify?.error('Tên nhân viên không được để trống');
+                return;
+            }
+            this.loading = true;
+            try {
+                const url = this.mode === 'edit'
+                    ? `/api/employees/${this.employee.id}`
+                    : '/api/employees';
+                const method = this.mode === 'edit' ? 'PUT' : 'POST';
+                const res = await window.fetchHelper[this.mode === 'edit' ? 'put' : 'post'](
+                    this.mode === 'edit' ? `employees/${this.employee.id}` : 'employees',
+                    this.form
+                );
+                if (res.status_code === 200 || res.status_code === 201) {
+                    window.notify?.success(res.message || (this.mode === 'edit' ? 'Cập nhật thành công' : 'Thêm nhân viên thành công'));
+                    this.close();
+                    htmx.ajax('GET', '{{ url_for('employees_table') }}', {
+                        target: '#emp-table-container',
+                        swap: 'innerHTML'
+                    });
+                } else {
+                    window.notify?.error(res.message || 'Có lỗi xảy ra');
+                }
+            } catch(e) {
+                window.notify?.error('Có lỗi xảy ra khi lưu dữ liệu');
+            } finally {
+                this.loading = false;
+            }
+        }
+    }">
+    <div class="emp-modal" @click.outside="close">
+        <div class="emp-modal-header">
+            <h3 class="emp-modal-title" x-text="mode === 'edit' ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'">
+                Thêm nhân viên mới
+            </h3>
+            <button class="emp-modal-close" @click="close" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <form class="emp-modal-body" @submit.prevent="submit">
+            <div class="emp-form-row">
+                <div class="emp-form-group emp-form-group--full">
+                    <label class="emp-form-label">Họ và tên <span class="emp-required">*</span></label>
+                    <input type="text"
+                           class="emp-form-input"
+                           x-model="form.name"
+                           placeholder="Nguyễn Văn A"
+                           maxlength="300"
+                           autocomplete="off"
+                           required />
+                </div>
+            </div>
+
+            <div class="emp-form-row">
+                <div class="emp-form-group">
+                    <label class="emp-form-label">Email</label>
+                    <input type="email"
+                           class="emp-form-input"
+                           x-model="form.email"
+                           placeholder="example@company.com"
+                           maxlength="500"
+                           autocomplete="off" />
+                </div>
+                <div class="emp-form-group">
+                    <label class="emp-form-label">Giới tính</label>
+                    <select class="emp-form-input emp-form-select" x-model="form.gender">
+                        <option value="">-- Chọn --</option>
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                        <option value="Khác">Khác</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="emp-form-row">
+                <div class="emp-form-group">
+                    <label class="emp-form-label">Phòng ban</label>
+                    <input type="text"
+                           class="emp-form-input"
+                           x-model="form.department"
+                           placeholder="IT, HR, Sales..."
+                           autocomplete="off" />
+                </div>
+                <div class="emp-form-group">
+                    <label class="emp-form-label">Chức vụ</label>
+                    <input type="text"
+                           class="emp-form-input"
+                           x-model="form.position"
+                           placeholder="Developer, Manager..."
+                           maxlength="300"
+                           autocomplete="off" />
+                </div>
+            </div>
+
+            <div class="emp-form-row">
+                <div class="emp-form-group">
+                    <label class="emp-form-label">Ngày bắt đầu</label>
+                    <input type="date"
+                           class="emp-form-input"
+                           x-model="form.starting_date" />
+                </div>
+            </div>
+
+            <div class="emp-modal-footer">
+                <button type="button" class="emp-btn emp-btn-ghost" @click="close">Huỷ</button>
+                <button type="submit" class="emp-btn emp-btn-primary" :disabled="loading">
+                    <span x-show="loading" class="emp-spinner emp-spinner-sm"></span>
+                    <span x-text="loading ? 'Đang lưu...' : (mode === 'edit' ? 'Cập nhật' : 'Thêm mới')">Thêm mới</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    window.employeeFormModal = {
+        open(options) {
+            const el = document.getElementById('emp-form-modal-backdrop');
+            if (!el) return;
+            Alpine.store && Alpine.$data ? Alpine.$data(el).open(options) : el._x_dataStack?.[0]?.open(options);
+            // fallback: dispatch custom event
+            el.dispatchEvent(new CustomEvent('emp-modal-open', { detail: options }));
+        }
+    };
+    document.getElementById('emp-form-modal-backdrop')?.addEventListener('emp-modal-open', function(e) {
+        this._x_dataStack?.[0]?.open(e.detail);
+    });
+</script>

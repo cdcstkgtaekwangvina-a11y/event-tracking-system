@@ -1,5 +1,4 @@
 import orjson
-import logging
 import os
 from collections.abc import Callable, Awaitable
 from datetime import datetime
@@ -13,10 +12,11 @@ from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
     PaginationRequest,
 )
+from src.shared.base.base_logger import get_logger
 
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RedisServices:
