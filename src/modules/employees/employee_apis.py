@@ -2,7 +2,7 @@ from fastapi import Depends
 
 from src.shared.base import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.schemas.pagination_schemas import PaginationRequest
+from src.shared.schemas.pagination_schemas import PaginationQuery
 
 from .employee_schemas import (
     BulkUpsertEmployeeRequest,
@@ -22,15 +22,15 @@ class EmployeeController:
     def __init__(self, service: EmployeeServices = Depends()):
         self.service = service
 
-    @router.get_api("")
-    async def get_employees(self, pagination: PaginationRequest = Depends()):
+    @router.get_api()
+    async def get_employees(self, pagination: PaginationQuery):
         return await self.service.get_employees(pagination)
 
     @router.get_api("{employee_id}")
     async def get_employee_by_id(self, employee_id: int):
         return await self.service.get_employee_by_id(employee_id)
 
-    @router.post_api("")
+    @router.post_api()
     async def create_employee(self, payload: EmployeeCreateRequest):
         return await self.service.create_employee(payload)
 

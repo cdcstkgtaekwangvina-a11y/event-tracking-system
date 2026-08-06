@@ -1,22 +1,25 @@
 import asyncio
-from typing import Optional, Any, cast
+from typing import Any, cast
+from uuid import uuid8
+
 from fastapi import UploadFile
+from sqlmodel import and_, col, or_
+
 from database.models.app_db import SessionDep, SessionFactoryDep
 from database.models.media import Medias
-from sqlmodel import and_, col, or_
+from src.modules.setting.setting_services import AppSettingServicesDep
 from src.shared.base import BaseCrud, BaseResponse
-from src.shared.services.vercel_blob import VercelBlobDep
-from .media_select import ValidateNameSelect, MediaSelect, PrefixSelect
+from src.shared.constants.cache_tags import CacheTags
 from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
     CursorPaginationResponse,
 )
-from src.modules.setting.setting_services import AppSettingServicesDep
-from .media_schemas import CreateMediaSchema, MediaMetaData, MediaSchema, UpdateMedia
-from .media_constants import MediaType
-from uuid import uuid8
 from src.shared.services.redis_services import RedisDep
-from src.shared.constants.cache_tags import CacheTags
+from src.shared.services.vercel_blob import VercelBlobDep
+
+from .media_constants import MediaType
+from .media_schemas import CreateMediaSchema, MediaMetaData, MediaSchema, UpdateMedia
+from .media_select import MediaSelect, PrefixSelect, ValidateNameSelect
 
 
 class MediaServices:
@@ -37,7 +40,7 @@ class MediaServices:
 
     # Validation helpers
 
-    def get_file_metadata(self, file: UploadFile) -> Optional[MediaMetaData]:
+    def get_file_metadata(self, file: UploadFile) -> MediaMetaData | None:
         if not file.content_type:
             return None
 
@@ -226,7 +229,7 @@ class MediaServices:
 
     async def get_one_media_raw(
         self, id: int, deleted_media: bool = False
-    ) -> Optional[MediaSchema]:
+    ) -> MediaSchema | None:
 
         async def get_media_async():
             self.crud.select(MediaSelect)
@@ -436,8 +439,9 @@ class MediaServices:
                         return BaseResponse.not_found("Không tìm thấy folder hoặc file")
 
             else:
-                from src.shared.helpers.time_extensions import get_now_vn
                 from sqlmodel import update
+
+                from src.shared.helpers.time_extensions import get_now_vn
 
                 now = get_now_vn()
 
