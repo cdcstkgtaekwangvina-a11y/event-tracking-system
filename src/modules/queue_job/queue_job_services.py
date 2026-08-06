@@ -1,14 +1,13 @@
-from uuid import UUID
-
-from src.shared.base.base_response import BaseResponse
-from src.shared.constants.cache_tags import CacheTags
-from src.shared.services.redis_services import RedisDep
+from uuid import UUID, uuid8
 
 from database.models.app_db import SessionDep
 from database.models.queue_jobs import QueueJob
 from src.shared.base.base_crud import BaseCrud
 from src.shared.base.base_logger import get_logger
+from src.shared.base.base_response import BaseResponse
+from src.shared.constants.cache_tags import CacheTags
 from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
+from src.shared.services.redis_services import RedisDep
 
 from .queue_job_schemas import CreateQueueJobSchema, QueueJobSchema
 
@@ -64,7 +63,9 @@ class QueueJobServices:
 
     async def create_job(self, create_job: CreateQueueJobSchema) -> QueueJob | None:
         """Creates a pending queue job record."""
-        new_job = await self.crud.create(create_job)
+        new_job = await self.crud.create(
+            QueueJob(id=uuid8(), **create_job.model_dump())
+        )
         if not new_job:
             return None
         return new_job

@@ -162,7 +162,6 @@ class EmployeeServices:
     async def bulk_upsert_employees(
         self, employees: BulkUpsertEmployeeRequest
     ) -> BaseResponse[BulkUpsertResponse]:
-        import asyncio
 
         from src.modules.queue_job.queue_job_schemas import CreateQueueJobSchema
         from src.modules.queue_job.queue_job_services import QueueJobServices
@@ -181,12 +180,13 @@ class EmployeeServices:
         )
 
         if new_job:
-            from src.shared.backgroundtasks.employee_bg_tasks import (
-                EmployeeBackgroundTask,
-            )
+            from src.shared.base.base_queue import queue_service
 
-            job = EmployeeBackgroundTask()
-            asyncio.create_task(job.bulk_upsert_employees_db(new_job.id))
+            await queue_service.enqueue_by_type(
+                QueueKeys.BULK_UPSERT_EMPLOYEES.value,
+                employees.model_dump(),
+                str(new_job.id),
+            )
             return BaseResponse.ok(
                 BulkUpsertResponse(job_id=new_job.id),
                 message="Bulk upsert employee thành công",
