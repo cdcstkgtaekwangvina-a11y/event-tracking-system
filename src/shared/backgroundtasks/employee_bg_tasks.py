@@ -5,6 +5,7 @@ from typing import cast
 from uuid import UUID
 
 from polars import DataFrame
+from sqlmodel import func, select
 
 from database.models.app_db import get_session_factory
 from database.models.employees import Employees
@@ -38,19 +39,11 @@ class EmployeeBackgroundTask:
 
         pl = FileHandelHelper()
 
-        if "spreadsheetml" in content_type or ext == ".xlsx":
-            read_options = (
-                {"header_row": header_row} if header_row is not None else None
-            )
-            return pl.read_sheet_file(
-                file_bytes, type="excel", read_options=read_options
-            )
+        if "spreadsheetml" in content_type or ext in (".xlsx", ".xls"):
+            return pl.read_sheet_file(file_bytes, type="excel", header_row=header_row)
 
         elif "csv" in content_type or ext == ".csv":
-            csv_kwargs = {}
-            if header_row is not None:
-                csv_kwargs["skip_rows"] = header_row
-            return pl.read_sheet_file(file_bytes, **csv_kwargs)
+            return pl.read_sheet_file(file_bytes, type="csv", header_row=header_row)
 
         elif "json" in content_type or ext == ".json":
             return pl.read_json(file_bytes)
@@ -299,6 +292,22 @@ class EmployeeBackgroundTask:
                 job.progress = 100
                 job.finished_at = get_now_vn()
                 job.logs = job_logs.model_dump()
+
+                if successful_rows_count > 0:
+                    max_id_stmt = select(func.max(Employees.id))
+                    max_id_result = await session.exec(max_id_stmt)
+                    max_id = max_id_result.first()
+
+                    if max_id is not None:
+                        sync_seq_stmt = select(
+                            func.setval(
+                                func.pg_get_serial_sequence(
+                                    Employees.__tablename__, "id"
+                                ),
+                                max_id,
+                            )
+                        )
+                        await session.exec(sync_seq_stmt)
                 await session.commit()
 
             except Exception as global_err:

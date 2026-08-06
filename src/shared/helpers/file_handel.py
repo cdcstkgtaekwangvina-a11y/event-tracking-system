@@ -12,16 +12,24 @@ class FileHandelHelper:
         header_row: int | None = None,
         **kwargs,
     ) -> DataFrame | None:
+        # Nếu header_row nằm trong kwargs["read_options"], lấy ra sử dụng
+        if header_row is None and "read_options" in kwargs and isinstance(kwargs["read_options"], dict):
+            header_row = kwargs["read_options"].get("header_row")
+
         # Trường hợp 1: Có chỉ định dòng header rõ ràng
         if header_row is not None:
-            return read_excel(buffer, read_options={"header_row": header_row}, **kwargs)
+            read_options = kwargs.pop("read_options", {}) or {}
+            read_options["header_row"] = header_row
+            return read_excel(buffer, read_options=read_options, **kwargs)
 
         # Trường hợp 2: Bỏ qua phân tích, đọc mặc định theo Polars
         if not analytics_file:
             return read_excel(buffer, **kwargs)
 
         # Trường hợp 3: Phân tích file (analytics_file == True)
-        df_sample = read_excel(buffer, has_header=False, **kwargs).head(50)
+        # Bỏ read_options khi read_excel(has_header=False) để tránh xung độtPolars
+        sample_kwargs = {k: v for k, v in kwargs.items() if k != "read_options"}
+        df_sample = read_excel(buffer, has_header=False, **sample_kwargs).head(50)
 
         if df_sample.is_empty():
             return None
@@ -65,11 +73,14 @@ class FileHandelHelper:
         buffer.seek(0)
 
         if has_header:
+            read_options = kwargs.pop("read_options", {}) or {}
+            read_options["header_row"] = guessed_header_index
             df = read_excel(
-                buffer, read_options={"header_row": guessed_header_index}, **kwargs
+                buffer, read_options=read_options, **kwargs
             )
         else:
-            df = read_excel(buffer, has_header=False, **kwargs)
+            sample_kwargs = {k: v for k, v in kwargs.items() if k != "read_options"}
+            df = read_excel(buffer, has_header=False, **sample_kwargs)
 
         return df
 

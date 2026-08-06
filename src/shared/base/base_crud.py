@@ -425,7 +425,9 @@ class BaseCrud(Generic[T]):
                         if hasattr(self.model, field):
                             column = getattr(self.model, field)
                             search_conditions.append(
-                                func.unaccent(column).ilike(func.unaccent(f"%{pagination.search}%"))
+                                func.unaccent(column).ilike(
+                                    func.unaccent(f"%{pagination.search}%")
+                                )
                             )
                 else:
                     table = getattr(self.model, "__table__", None)
@@ -436,7 +438,9 @@ class BaseCrud(Generic[T]):
                                 or column.type.__class__.__name__ == "AutoString"
                             ):
                                 search_conditions.append(
-                                    func.unaccent(column).ilike(func.unaccent(f"%{pagination.search}%"))
+                                    func.unaccent(column).ilike(
+                                        func.unaccent(f"%{pagination.search}%")
+                                    )
                                 )
 
             if search_conditions:
@@ -455,18 +459,17 @@ class BaseCrud(Generic[T]):
                 self.statement = self.statement.order_by(asc(sort_column))
         else:
             sort_col = None
-            if self.is_has_updated_at(self.model):
-                sort_col = cast(Any, self.model.updated_at)
-            elif self.is_has_created_at(self.model):
+            if self.is_has_created_at(self.model):
                 sort_col = cast(Any, self.model.created_at)
+            elif self.is_has_updated_at(self.model):
+                sort_col = cast(Any, self.model.updated_at)
             else:
                 # Fallback an toàn về khóa chính (id) nếu không có timestamp
                 sort_col = cast(Any, getattr(self.model, "id", None))
 
             if sort_col is not None:
-                self.statement = self.statement.order_by(
-                    desc(sort_col) if pagination.is_desc else asc(sort_col)
-                )
+                # Mặc định: mới nhất lên trên (DESC theo created_at)
+                self.statement = self.statement.order_by(desc(sort_col))
 
         # 5. ÁP DỤNG LIMIT & OFFSET
         offset = (pagination.page - 1) * pagination.limit
@@ -533,7 +536,9 @@ class BaseCrud(Generic[T]):
                         if hasattr(self.model, field):
                             column = getattr(self.model, field)
                             search_conditions.append(
-                                func.unaccent(column).ilike(func.unaccent(f"%{cursor_request.search}%"))
+                                func.unaccent(column).ilike(
+                                    func.unaccent(f"%{cursor_request.search}%")
+                                )
                             )
                 else:
                     table = getattr(self.model, "__table__", None)
@@ -544,7 +549,9 @@ class BaseCrud(Generic[T]):
                                 or column.type.__class__.__name__ == "AutoString"
                             ):
                                 search_conditions.append(
-                                    func.unaccent(column).ilike(func.unaccent(f"%{cursor_request.search}%"))
+                                    func.unaccent(column).ilike(
+                                        func.unaccent(f"%{cursor_request.search}%")
+                                    )
                                 )
 
             if search_conditions:

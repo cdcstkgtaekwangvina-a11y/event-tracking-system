@@ -2,11 +2,41 @@
 "templates/layouts/admin_blank.j2"%}
 {% block admin_title %}Quản lý Nhân viên{% endblock %}
 {% block admin_body %}
-<div class="emp-container">
+<div class="emp-container" x-data="{
+    selectedIds: [],
+    allIds: [],
+    toggleSelectAll(ids) {
+        if (this.selectedIds.length === ids.length) {
+            this.selectedIds = [];
+        } else {
+            this.selectedIds = [...ids];
+        }
+    },
+    toggleSelect(id) {
+        const idx = this.selectedIds.indexOf(id);
+        if (idx > -1) {
+            this.selectedIds.splice(idx, 1);
+        } else {
+            this.selectedIds.push(id);
+        }
+    },
+    clearSelection() {
+        this.selectedIds = [];
+    }
+}" @emp-deleted.window="clearSelection()">
     <!-- Header -->
     <div class="emp-header">
         <h1 class="emp-title">Quản lý Nhân viên</h1>
         <div class="emp-header-actions">
+            <button type="button" 
+                    class="emp-btn emp-btn-danger" 
+                    id="btn-bulk-delete"
+                    x-show="selectedIds.length > 0"
+                    x-transition
+                    @click="window.employeeDeleteModal?.open({ mode: 'bulk', ids: selectedIds })">
+                <span class="material-symbols-outlined">delete</span>
+                Xoá đã chọn (<span x-text="selectedIds.length"></span>)
+            </button>
             <button type="button" class="emp-btn emp-btn-secondary" id="btn-import-employees"
                 onclick="window.employeeImportModal?.open()">
                 <span class="material-symbols-outlined">upload</span>
@@ -26,8 +56,7 @@
     </div>
 
     <!-- Search -->
-    <div class="emp-search-wrapper"
-         x-data="{
+    <div class="emp-search-wrapper" x-data="{
              searchQuery: '',
              history: [],
              showDropdown: false,
@@ -77,23 +106,13 @@
                  this.history = [];
                  localStorage.removeItem('emp_search_history');
              }
-         }"
-         @click.outside="showDropdown = false">
+         }" @click.outside="showDropdown = false">
         <span class="material-symbols-outlined emp-search-icon">search</span>
-        <input type="text"
-               class="emp-search-input"
-               id="emp-search-input"
-               placeholder="Tìm kiếm nhân viên... (Nhấn Enter để tìm)"
-               autocomplete="off"
-               x-model="searchQuery"
-               @focus="showDropdown = true"
-               @keydown.enter="saveToHistory(searchQuery.trim())"
-               hx-get="{{ url_for('employees_table') }}"
-               hx-trigger="keyup[key=='Enter'], search-triggered"
-               hx-target="#emp-table-container"
-               hx-swap="innerHTML"
-               name="search"
-               hx-include="#emp-search-input" />
+        <input type="text" class="emp-search-input" id="emp-search-input"
+            placeholder="Tìm kiếm nhân viên... (Nhấn Enter để tìm)" autocomplete="off" x-model="searchQuery"
+            @focus="showDropdown = true" @keydown.enter="saveToHistory(searchQuery.trim())"
+            hx-get="{{ url_for('employees_table') }}" hx-trigger="keyup[key=='Enter'], search-triggered"
+            hx-target="#emp-table-container" hx-swap="innerHTML" name="search" hx-include="#emp-search-input" />
 
         <!-- Dropdown lịch sử -->
         <div class="emp-search-dropdown" x-show="showDropdown && history.length > 0" x-transition>
@@ -130,5 +149,6 @@
 {% include "modules/employees/views/admin/modals/employee_delete_modal.j2" %}
 
 <link rel="stylesheet" href="/static/css/employees.css">
-<script src="/static/js/employees.js" defer></script>
+<script src="/static/js/employees.js"></script>
+
 {% endblock %}

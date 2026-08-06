@@ -5,6 +5,7 @@ from src.modules.employees.employee_routes import router as employee_routes
 from src.modules.media_manager.media_routes import router as media_routes
 from src.modules.user.user_routes import router as user_routes
 from src.modules.setting.setting_routes import router as setting_routes
+from src.modules.queue_job.queue_job_routes import router as queue_job_routes
 
 router = APIRouter()
 
@@ -14,3 +15,4 @@ router.include_router(employee_routes)
 router.include_router(media_routes)
 router.include_router(user_routes)
 router.include_router(setting_routes)
+router.include_router(queue_job_routes)

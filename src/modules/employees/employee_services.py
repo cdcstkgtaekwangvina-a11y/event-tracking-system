@@ -32,9 +32,57 @@ class EmployeeServices:
     async def create_employee(
         self, employee: EmployeeCreateRequest
     ) -> BaseResponse[Employees]:
-        new_employee = await self.crud.create(employee)
+        # Nếu user nhập mã nhân viên, kiểm tra ID đã tồn tại chưa
+        if employee.id is not None:
+            existing = await self.crud.find_by_id(employee.id, soft_delete=False)
+            if existing:
+                return BaseResponse.error(
+                    message=f"Mã nhân viên {employee.id:08d} đã tồn tại"
+                )
+
+        # Tạo dict dữ liệu, loại bỏ id nếu None để DB tự sinh
+        create_data = employee.model_dump(exclude_none=True)
+        new_employee = await self.crud.create(create_data)
+
+        # Nếu tạo với custom ID, đồng bộ sequence để tránh xung đột
+        if employee.id is not None:
+            from sqlmodel import func, select as sql_select
+
+            max_id_result = await self.session.exec(sql_select(func.max(Employees.id)))
+            max_id = max_id_result.first()
+            if max_id is not None:
+                await self.session.exec(
+                    sql_select(
+                        func.setval(
+                            func.pg_get_serial_sequence(Employees.__tablename__, "id"),
+                            max_id,
+                        )
+                    )
+                )
+                await self.session.commit()
+
         await self.redis.invalidate_tags_async(CacheTags.EMPLOYEE)
         return BaseResponse.created(new_employee, message="Thêm nhân viên thành công")
+
+    def _detect_sheet_file_type(self, file_url: str, file_bytes: bytes) -> str:
+        clean_url = file_url.split("?")[0].lower()
+
+        if (
+            file_bytes.startswith(b"PK\x03\x04")
+            or file_bytes.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+            or clean_url.endswith((".xlsx", ".xls"))
+        ):
+            return "excel"
+
+        if file_bytes.strip().startswith((b"{", b"[")) or clean_url.endswith(".json"):
+            return "json"
+
+        if b"," in file_bytes[:2048] or clean_url.endswith(".csv"):
+            return "csv"
+
+        raise ValueError(
+            "Định dạng file không được hỗ trợ. Hệ thống chỉ chấp nhận .xlsx, .xls, .csv, hoặc .json"
+        )
 
     async def get_employees_raw(
         self, pagination: PaginationRequest
@@ -101,14 +149,27 @@ class EmployeeServices:
         await self.redis.invalidate_tags_async(CacheTags.EMPLOYEE)
         return BaseResponse.ok(message="Xóa nhân viên thành công")
 
+    async def bulk_delete_employees(self, ids: list[int]) -> BaseResponse[dict]:
+        delete_emps = await self.crud.delete(condition=lambda e: e.id.in_(ids))
+        if delete_emps:
+            await self.redis.invalidate_tags_async(CacheTags.EMPLOYEE)
+            return BaseResponse.ok(message="Xóa nhân viên thành công")
+        return BaseResponse.fail(message="Xóa nhân viên thất bại")
+
     async def bulk_upsert_employees(
         self, employees: BulkUpsertEmployeeRequest
     ) -> BaseResponse[BulkUpsertResponse]:
+        import asyncio
+
         from src.modules.queue_job.queue_job_schemas import CreateQueueJobSchema
         from src.modules.queue_job.queue_job_services import QueueJobServices
         from src.shared.constants.queue_keys import QueueKeys
 
-        job_service = QueueJobServices(session=self.session)
+        # để phù hợp với thứ tự cột trong file excel của user
+        if employees.header_row is not None and employees.header_row >= 1:
+            employees.header_row -= 1
+
+        job_service = QueueJobServices(session=self.session, redis=self.redis)
         new_job = await job_service.create_job(
             CreateQueueJobSchema(
                 type=QueueKeys.BULK_UPSERT_EMPLOYEES.value,
@@ -122,7 +183,7 @@ class EmployeeServices:
             )
 
             job = EmployeeBackgroundTask()
-            await job.bulk_upsert_employees_db(new_job.id)
+            asyncio.create_task(job.bulk_upsert_employees_db(new_job.id))
             return BaseResponse.ok(
                 BulkUpsertResponse(job_id=new_job.id),
                 message="Bulk upsert employee thành công",
@@ -130,26 +191,15 @@ class EmployeeServices:
 
         return BaseResponse.fail(message="Bulk upsert employee thất bại")
 
-    async def read_sheet_file(self, file: ReadSheetFile) -> BaseResponse[Any]:
+    async def read_import_file(self, file: ReadSheetFile) -> BaseResponse[Any]:
         from src.shared.base.base_client import BaseClient
 
         async with BaseClient() as client:
             response = await client.get(file.url)
             file_bytes = response.content
 
-        clean_url = file.url.split("?")[0].lower()
-
         # 2. Nhận diện file type
-        if (
-            file_bytes.startswith(b"PK\x03\x04")
-            or file_bytes.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
-            or clean_url.endswith((".xlsx", ".xls"))
-        ):
-            file_type = "excel"
-        elif file_bytes.strip().startswith((b"{", b"[")) or clean_url.endswith(".json"):
-            file_type = "json"
-        else:
-            file_type = "csv"
+        file_type = self._detect_sheet_file_type(file.url, file_bytes)
 
         header_row_index = file.header_row - 1 if file.header_row else None
         fh = FileHandelHelper()
@@ -157,13 +207,15 @@ class EmployeeServices:
         # 3. Phân nhánh đọc file dựa trên type
         if file_type == "json":
             df = fh.read_json(file_bytes)
-        else:
+        elif file_type in ("excel", "csv"):
             df = fh.read_sheet_file(
                 file_bytes=file_bytes,
                 type=file_type,
                 analytics_file=True,
                 header_row=header_row_index,
             )
+        else:
+            return BaseResponse.fail(message="Định dạng file không được hỗ trợ")
 
         if df is None or df.is_empty():
             return BaseResponse.error(

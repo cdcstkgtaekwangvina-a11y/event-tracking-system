@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import Field
 
@@ -12,3 +14,12 @@ class CreateQueueJobSchema(BaseSchema):
     meta: dict[str, Any] | None = Field(default=None)
     logs: QueueJobLogs | None = Field(default=None)
     next_payload: dict[str, Any] | None = Field(default=None)
+
+
+class QueueJobSchema(BaseSchema):
+    id: UUID
+    type: str
+    status: str
+    finished_at: datetime | None
+    progress: int = Field(default=0, ge=0, le=100)
+    logs: dict[str, Any] | None

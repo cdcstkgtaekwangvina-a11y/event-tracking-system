@@ -1,0 +1,493 @@
+/* ============================================
+   QUEUE JOBS MODULE - queue_jobs.css
+   ============================================ */
+
+.qj-container {
+    padding: 30px;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.qj-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.qj-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--foreground);
+    margin: 0;
+}
+
+.qj-sub {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 4px 0 0 0;
+}
+
+.qj-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.qj-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.18s ease;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.qj-btn-secondary {
+    background-color: var(--card);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+}
+
+.qj-btn-secondary:hover {
+    background-color: var(--border);
+}
+
+.qj-btn-ghost {
+    background-color: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.qj-btn-ghost:hover {
+    background-color: var(--border);
+    color: var(--foreground);
+}
+
+/* Toolbar & Tabs */
+.qj-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.qj-status-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: var(--card);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.qj-status-tab {
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.qj-status-tab:hover {
+    color: var(--foreground);
+}
+
+.qj-status-tab--active {
+    background-color: var(--foreground);
+    color: var(--background);
+}
+
+/* Search Box */
+.qj-search-box {
+    position: relative;
+    width: 280px;
+}
+
+.qj-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 20px;
+}
+
+.qj-search-input {
+    width: 100%;
+    padding: 9px 12px 9px 38px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-color: var(--card);
+    color: var(--foreground);
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.18s ease;
+}
+
+.qj-search-input:focus {
+    border-color: var(--primary);
+}
+
+/* Table */
+.qj-table-wrapper {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.qj-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 14px;
+}
+
+.qj-th {
+    padding: 14px 16px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    background-color: rgba(0, 0, 0, 0.02);
+    white-space: nowrap;
+}
+
+.qj-th-sort {
+    cursor: pointer;
+    user-select: none;
+}
+
+.qj-th-sort:hover {
+    color: var(--foreground);
+}
+
+.qj-tr {
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.15s ease;
+}
+
+.qj-tr:last-child {
+    border-bottom: none;
+}
+
+.qj-tr:hover {
+    background-color: rgba(99, 102, 241, 0.03);
+}
+
+.qj-td {
+    padding: 14px 16px;
+    color: var(--foreground);
+    vertical-align: middle;
+}
+
+.qj-id-text {
+    font-family: monospace;
+    font-size: 13px;
+    color: var(--primary);
+}
+
+.qj-type-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    background-color: rgba(99, 102, 241, 0.1);
+    color: var(--primary);
+}
+
+/* Status Badges */
+.qj-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.qj-status-running {
+    background-color: rgba(59, 130, 246, 0.12);
+    color: #3b82f6;
+}
+
+.qj-status-success {
+    background-color: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
+}
+
+.qj-status-failed {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+}
+
+.qj-status-cancelled {
+    background-color: rgba(156, 163, 175, 0.12);
+    color: #9ca3af;
+}
+
+.qj-status-pending {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+}
+
+.qj-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.qj-status-icon {
+    font-size: 14px;
+}
+
+/* Progress Bar */
+.qj-progress-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 140px;
+}
+
+.qj-progress-bar {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background-color: var(--border);
+    overflow: hidden;
+}
+
+.qj-progress-fill {
+    height: 100%;
+    background-color: var(--primary);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.qj-progress-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-width: 30px;
+}
+
+/* Action Button */
+.qj-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background-color: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.qj-action-btn:hover {
+    background-color: var(--primary);
+    color: var(--background);
+    border-color: var(--primary);
+}
+
+/* Empty State */
+.qj-empty {
+    padding: 60px 20px;
+    text-align: center;
+}
+
+.qj-empty-icon {
+    font-size: 48px;
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+.qj-empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--foreground);
+    margin: 12px 0 4px 0;
+}
+
+.qj-empty-sub {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* Pagination */
+.qj-pagination {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--border);
+}
+
+.qj-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--foreground);
+    cursor: pointer;
+}
+
+.qj-page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.qj-page-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 4px;
+}
+
+/* Modal */
+.qj-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.qj-modal {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    overflow: hidden;
+}
+
+.qj-modal--lg {
+    max-width: 720px;
+}
+
+.qj-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.qj-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--foreground);
+    margin: 0;
+}
+
+.qj-modal-sub {
+    font-size: 13px;
+    font-family: monospace;
+    color: var(--text-secondary);
+    margin: 4px 0 0 0;
+}
+
+.qj-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+}
+
+.qj-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.qj-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+}
+
+.qj-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+}
+
+.qj-tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.qj-tab--active {
+    background-color: var(--primary);
+    color: var(--background);
+}
+
+.qj-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 6px;
+}
+
+.qj-code-block {
+    background-color: rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 13px;
+    color: var(--foreground);
+    max-height: 350px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}

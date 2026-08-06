@@ -6,6 +6,7 @@ from src.shared.schemas.pagination_schemas import PaginationRequest
 
 from .employee_schemas import (
     BulkUpsertEmployeeRequest,
+    EmployeeBulkDeleteRequest,
     EmployeeCreateRequest,
     EmployeeUpdateRequest,
     ReadSheetFile,
@@ -37,6 +38,10 @@ class EmployeeController:
     async def update_employee(self, employee_id: int, payload: EmployeeUpdateRequest):
         return await self.service.update_employee(employee_id, payload)
 
+    @router.delete_api("bulk")
+    async def delete_bulk_employees(self, payload: EmployeeBulkDeleteRequest):
+        return await self.service.bulk_delete_employees(payload.ids)
+
     @router.delete_api("{employee_id}")
     async def delete_employee(self, employee_id: int):
         return await self.service.delete_employee(employee_id)
@@ -49,7 +54,6 @@ class EmployeeController:
     async def import_employee(self, payload: BulkUpsertEmployeeRequest):
         return await self.service.bulk_upsert_employees(payload)
 
-    @router.post_api("read-sheet-file")
+    @router.post_api("read-import-file")
     async def read_sheet_file(self, payload: ReadSheetFile):
-        return await self.service.read_sheet_file(payload)
-
+        return await self.service.read_import_file(payload)

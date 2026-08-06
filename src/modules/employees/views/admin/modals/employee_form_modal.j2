@@ -1,72 +1,12 @@
 <!-- Employee Create / Edit Modal -->
-<div class="emp-modal-backdrop hidden" id="emp-form-modal-backdrop"
-     x-data="{
-        mode: 'create',
-        employee: null,
-        loading: false,
-        form: {
-            name: '',
-            email: '',
-            position: '',
-            gender: '',
-            department: '',
-            starting_date: ''
-        },
-        open(options = {}) {
-            this.mode = options.mode || 'create';
-            if (options.mode === 'edit' && options.employee) {
-                this.employee = options.employee;
-                this.form = {
-                    name: options.employee.name || '',
-                    email: options.employee.email || '',
-                    position: options.employee.position || '',
-                    gender: options.employee.gender || '',
-                    department: options.employee.department || '',
-                    starting_date: options.employee.starting_date || ''
-                };
-            } else {
-                this.employee = null;
-                this.form = { name: '', email: '', position: '', gender: '', department: '', starting_date: '' };
-            }
-            document.getElementById('emp-form-modal-backdrop')?.classList.remove('hidden');
-        },
-        close() {
-            document.getElementById('emp-form-modal-backdrop')?.classList.add('hidden');
-        },
-        async submit() {
-            if (this.loading) return;
-            if (!this.form.name?.trim()) {
-                window.notify?.error('Tên nhân viên không được để trống');
-                return;
-            }
-            this.loading = true;
-            try {
-                const url = this.mode === 'edit'
-                    ? `/api/employees/${this.employee.id}`
-                    : '/api/employees';
-                const method = this.mode === 'edit' ? 'PUT' : 'POST';
-                const res = await window.fetchHelper[this.mode === 'edit' ? 'put' : 'post'](
-                    this.mode === 'edit' ? `employees/${this.employee.id}` : 'employees',
-                    this.form
-                );
-                if (res.status_code === 200 || res.status_code === 201) {
-                    window.notify?.success(res.message || (this.mode === 'edit' ? 'Cập nhật thành công' : 'Thêm nhân viên thành công'));
-                    this.close();
-                    htmx.ajax('GET', '{{ url_for('employees_table') }}', {
-                        target: '#emp-table-container',
-                        swap: 'innerHTML'
-                    });
-                } else {
-                    window.notify?.error(res.message || 'Có lỗi xảy ra');
-                }
-            } catch(e) {
-                window.notify?.error('Có lỗi xảy ra khi lưu dữ liệu');
-            } finally {
-                this.loading = false;
-            }
-        }
-    }">
-    <div class="emp-modal" @click.outside="close">
+<div class="emp-modal-backdrop" id="emp-form-modal-backdrop"
+     x-show="isOpen"
+     style="display: none;"
+     x-cloak
+     @click.self="close"
+     @emp-form-open.window="open($event.detail)"
+     x-data="employeeFormModal()">
+    <div class="emp-modal" @click.stop>
         <div class="emp-modal-header">
             <h3 class="emp-modal-title" x-text="mode === 'edit' ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'">
                 Thêm nhân viên mới
@@ -77,6 +17,19 @@
         </div>
 
         <form class="emp-modal-body" @submit.prevent="submit">
+            <!-- Mã nhân viên (chỉ hiển thị khi tạo mới) -->
+            <div class="emp-form-row" x-show="mode === 'create'" x-transition>
+                <div class="emp-form-group emp-form-group--full">
+                    <label class="emp-form-label">Mã nhân viên <span class="emp-form-hint">(tuỳ chọn, để trống sẽ tự sinh)</span></label>
+                    <input type="number"
+                           class="emp-form-input"
+                           x-model="form.id"
+                           placeholder="Ví dụ: 100"
+                           min="1"
+                           autocomplete="off" />
+                </div>
+            </div>
+
             <div class="emp-form-row">
                 <div class="emp-form-group emp-form-group--full">
                     <label class="emp-form-label">Họ và tên <span class="emp-required">*</span></label>
@@ -152,16 +105,99 @@
 </div>
 
 <script>
-    window.employeeFormModal = {
-        open(options) {
-            const el = document.getElementById('emp-form-modal-backdrop');
-            if (!el) return;
-            Alpine.store && Alpine.$data ? Alpine.$data(el).open(options) : el._x_dataStack?.[0]?.open(options);
-            // fallback: dispatch custom event
-            el.dispatchEvent(new CustomEvent('emp-modal-open', { detail: options }));
-        }
-    };
-    document.getElementById('emp-form-modal-backdrop')?.addEventListener('emp-modal-open', function(e) {
-        this._x_dataStack?.[0]?.open(e.detail);
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('employeeFormModal', () => ({
+            isOpen: false,
+            mode: 'create',
+            employee: null,
+            loading: false,
+            form: {
+                id: '',
+                name: '',
+                email: '',
+                position: '',
+                gender: '',
+                department: '',
+                starting_date: ''
+            },
+            init() {
+                window.employeeFormModal = this;
+            },
+            open(options = {}) {
+                this.mode = options.mode || 'create';
+                if (options.mode === 'edit' && options.employee) {
+                    this.employee = options.employee;
+                    this.form = {
+                        id: '',
+                        name: options.employee.name || '',
+                        email: options.employee.email || '',
+                        position: options.employee.position || '',
+                        gender: options.employee.gender || '',
+                        department: options.employee.department || '',
+                        starting_date: options.employee.starting_date || ''
+                    };
+                } else {
+                    this.employee = null;
+                    this.form = { id: '', name: '', email: '', position: '', gender: '', department: '', starting_date: '' };
+                }
+                this.isOpen = true;
+                const el = document.getElementById('emp-form-modal-backdrop');
+                if (el) {
+                    el.classList.remove('hidden');
+                    el.style.display = 'flex';
+                }
+            },
+            close() {
+                this.isOpen = false;
+                const el = document.getElementById('emp-form-modal-backdrop');
+                if (el) {
+                    el.style.display = 'none';
+                }
+            },
+            async submit() {
+                if (this.loading) return;
+                if (!this.form.name?.trim()) {
+                    window.notify?.toast?.error?.('Lỗi', 'Tên nhân viên không được để trống');
+                    return;
+                }
+                this.loading = true;
+                try {
+                    const payload = { ...this.form };
+                    if (this.mode === 'create' && payload.id) {
+                        payload.id = parseInt(payload.id, 10);
+                        if (isNaN(payload.id) || payload.id <= 0) {
+                            window.notify?.toast?.error?.('Lỗi', 'Mã nhân viên phải là số dương');
+                            this.loading = false;
+                            return;
+                        }
+                    } else {
+                        delete payload.id;
+                    }
+                    const endpoint = this.mode === 'edit' ? ('employees/' + this.employee.id) : 'employees';
+                    const method = this.mode === 'edit' ? 'put' : 'post';
+                    const res = await window.fetchHelper[method](endpoint, payload);
+                    if (res.status_code === 200 || res.status_code === 201) {
+                        window.notify?.toast?.success?.('Thành công', res.message || (this.mode === 'edit' ? 'Cập nhật thành công' : 'Thêm nhân viên thành công'));
+                        this.close();
+                        const tableUrl = new URL('{{ url_for("employees_table") }}', window.location.origin);
+                        const curParams = new URLSearchParams(window.location.search);
+                        ['page','limit','search','sort_field','is_desc'].forEach(k => {
+                            if (curParams.has(k)) tableUrl.searchParams.set(k, curParams.get(k));
+                        });
+                        if (this.mode === 'create') tableUrl.searchParams.set('page', '1');
+                        htmx.ajax('GET', tableUrl.toString(), {
+                            target: '#emp-table-container',
+                            swap: 'innerHTML'
+                        });
+                    } else {
+                        window.notify?.toast?.error?.('Lỗi', res.message || 'Có lỗi xảy ra');
+                    }
+                } catch(e) {
+                    window.notify?.toast?.error?.('Lỗi', 'Có lỗi xảy ra khi lưu dữ liệu');
+                } finally {
+                    this.loading = false;
+                }
+            }
+        }));
     });
 </script>

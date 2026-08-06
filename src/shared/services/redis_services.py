@@ -1,18 +1,20 @@
-import orjson
 import os
-from collections.abc import Callable, Awaitable
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
-from typing import Any, Optional, Sequence, cast, Annotated
+from typing import Annotated, Any, cast
+
+import orjson
 import redis.asyncio as redis
 from dotenv import load_dotenv
 from fastapi import Depends
 from pydantic import BaseModel
+
+from src.shared.base.base_logger import get_logger
 from src.shared.constants.cache_tags import CacheTags
 from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
     PaginationRequest,
 )
-from src.shared.base.base_logger import get_logger
 
 load_dotenv()
 
@@ -105,8 +107,8 @@ class RedisServices:
         self,
         key: str,
         value: Any,
-        logical_expires_at: Optional[float],
-        tags: Optional[Sequence[str]] = None,
+        logical_expires_at: float | None,
+        tags: Sequence[str] | None = None,
         **kwargs,
     ):
         tag_versions = await self._get_tag_versions(tags) if tags else {}
@@ -147,9 +149,9 @@ class RedisServices:
         self,
         key: str,
         async_func: Callable[[], Awaitable[T]],
-        tags: Optional[Sequence[str]] = None,
-        expires: Optional[int | datetime] = 600,
-        model_class: Optional[type[T]] = None,
+        tags: Sequence[str] | None = None,
+        expires: int | datetime | None = 600,
+        model_class: type[T] | None = None,
         **kwargs,
     ) -> T:
         now = datetime.now().timestamp()
@@ -274,7 +276,7 @@ class RedisServices:
         return f"{prefix}:cursor:{req.search}:{req.filters}:{req.limit}:{req.cursor}:{req.sort_field}:{req.is_desc}:cursor_desc-{req.is_cursor_desc}"
 
     def get_pagination_key(self, prefix: CacheTags, req: PaginationRequest) -> str:
-        return f"pagination:{req.page}:{req.limit}:{req.sort_field}:{req.is_desc}:{req.filters}:{req.search}"
+        return f"pagination-{prefix}:{req.page}:{req.limit}:{req.sort_field}:{req.is_desc}:{req.filters}:{req.search}"
 
 
 RedisDep = Annotated[RedisServices, Depends()]

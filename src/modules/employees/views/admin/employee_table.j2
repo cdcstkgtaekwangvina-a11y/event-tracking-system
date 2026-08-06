@@ -26,9 +26,17 @@
 {% endmacro %}
 
 {% if employees %}
+{% set page_ids = employees | map(attribute='id') | list %}
 <table class="emp-table">
     <thead>
         <tr>
+            <th class="emp-th emp-th-checkbox" style="width: 40px; text-align: center;">
+                <input type="checkbox"
+                       class="emp-checkbox"
+                       :checked="selectedIds.length > 0 && {{ page_ids | tojson }}.every(id => selectedIds.includes(id))"
+                       @change="toggleSelectAll({{ page_ids | tojson }})"
+                       title="Chọn tất cả trang này" />
+            </th>
             {{ sort_th('ID', 'id', 'emp-th-id') }}
             {{ sort_th('Tên', 'name') }}
             {{ sort_th('Email', 'email') }}
@@ -41,7 +49,13 @@
     </thead>
     <tbody>
         {% for emp in employees %}
-        <tr class="emp-tr" id="emp-row-{{ emp.id }}">
+        <tr class="emp-tr" id="emp-row-{{ emp.id }}" :class="{ 'emp-tr--selected': selectedIds.includes({{ emp.id }}) }">
+            <td class="emp-td emp-td-checkbox" style="text-align: center;">
+                <input type="checkbox"
+                       class="emp-checkbox"
+                       :checked="selectedIds.includes({{ emp.id }})"
+                       @change="toggleSelect({{ emp.id }})" />
+            </td>
             <td class="emp-td emp-td-id">{{ "%08d" | format(emp.id | int) }}</td>
             <td class="emp-td emp-td-name">{{ emp.name }}</td>
             <td class="emp-td emp-td-email">
@@ -61,13 +75,13 @@
                 <button type="button"
                         class="emp-action-btn emp-action-edit"
                         title="Chỉnh sửa"
-                        onclick="window.employeeFormModal?.open({ mode: 'edit', employee: {{ (emp.model_dump(mode='json') if emp.model_dump is defined else emp) | tojson }} })">
+                        onclick='window.employeeFormModal?.open({ mode: "edit", employee: {{ (emp.model_dump(mode="json") if emp.model_dump is defined else emp | tojson) | forceescape }} })'>
                     <span class="material-symbols-outlined">edit</span>
                 </button>
                 <button type="button"
                         class="emp-action-btn emp-action-delete"
                         title="Xoá"
-                        onclick="window.employeeDeleteModal?.open({ id: {{ emp.id }}, name: '{{ emp.name | replace("'", "\\'") }}' })">
+                        onclick='window.employeeDeleteModal?.open({ id: {{ emp.id }}, name: {{ (emp.name if emp.name is defined else "") | tojson | forceescape }} })'>
                     <span class="material-symbols-outlined">delete</span>
                 </button>
             </td>

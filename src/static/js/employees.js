@@ -15,50 +15,123 @@ window.employeeActions = {
 
 /**
  * Bootstrap Alpine.js-based modal open helpers.
- * Alpine.js registers x-data on the DOM element.
- * We dispatch custom events that the x-data block listens to.
+ * Use window-level CustomEvents so Alpine x-on listeners can catch them
+ * regardless of initialization order.
  */
-document.addEventListener('DOMContentLoaded', () => {
-    // Employee Form Modal
-    const formBackdrop = document.getElementById('emp-form-modal-backdrop');
-    if (formBackdrop) {
-        formBackdrop.addEventListener('emp-modal-open', function (e) {
-            this._x_dataStack?.[0]?.open(e.detail);
-        });
-        window.employeeFormModal = {
-            open(options = {}) {
-                formBackdrop.dispatchEvent(
-                    new CustomEvent('emp-modal-open', { detail: options })
-                );
-            },
-        };
-    }
+window.employeeFormModal = {
+    open(options = {}) {
+        window.dispatchEvent(new CustomEvent('emp-form-open', { detail: options }));
+        const el = document.getElementById('emp-form-modal-backdrop');
+        if (el) {
+            el.classList.remove('hidden');
+            el.style.display = 'flex';
+            if (window.Alpine && window.Alpine.$data) {
+                try {
+                    const data = window.Alpine.$data(el);
+                    if (data && typeof data.open === 'function') data.open(options);
+                } catch(e) {}
+            }
+        }
+    },
+};
 
-    // Employee Delete Modal
-    const deleteBackdrop = document.getElementById('emp-delete-modal-backdrop');
-    if (deleteBackdrop) {
-        deleteBackdrop.addEventListener('emp-delete-open', function (e) {
-            this._x_dataStack?.[0]?.open(e.detail);
-        });
-        window.employeeDeleteModal = {
-            open(options = {}) {
-                deleteBackdrop.dispatchEvent(
-                    new CustomEvent('emp-delete-open', { detail: options })
-                );
-            },
-        };
+window.employeeDeleteModal = {
+    open(options = {}) {
+        window.dispatchEvent(new CustomEvent('emp-delete-open', { detail: options }));
+        const el = document.getElementById('emp-delete-modal-backdrop');
+        if (el) {
+            el.classList.remove('hidden');
+            el.style.display = 'flex';
+            if (window.Alpine && window.Alpine.$data) {
+                try {
+                    const data = window.Alpine.$data(el);
+                    if (data && typeof data.open === 'function') data.open(options);
+                } catch(e) {}
+            }
+        }
+    },
+};
+window.employeeFormModal = {
+    open(options) {
+        window.dispatchEvent(new CustomEvent('emp-form-open', { detail: options || {} }));
+        const el = document.getElementById('emp-form-modal-backdrop');
+        if (el) {
+            el.classList.remove('hidden');
+            el.style.display = 'flex';
+            if (window.Alpine && window.Alpine.$data) {
+                try {
+                    const data = window.Alpine.$data(el);
+                    if (data && typeof data.open === 'function') data.open(options || {});
+                } catch(e) {}
+            }
+        }
     }
+};
+window.employeeFormModal = {
+    open(options) {
+        window.dispatchEvent(new CustomEvent('emp-form-open', { detail: options || {} }));
+        const el = document.getElementById('emp-form-modal-backdrop');
+        if (el) {
+            el.classList.remove('hidden');
+            el.style.display = 'flex';
+            if (window.Alpine && window.Alpine.$data) {
+                try {
+                    const data = window.Alpine.$data(el);
+                    if (data && typeof data.open === 'function') data.open(options || {});
+                } catch(e) {}
+            }
+        }
+    }
+};
 
-    // Employee Import Modal
-    const importBackdrop = document.getElementById('emp-import-modal-backdrop');
-    if (importBackdrop) {
-        importBackdrop.addEventListener('emp-import-open', function () {
-            this._x_dataStack?.[0]?.open();
-        });
-        window.employeeImportModal = {
-            open() {
-                importBackdrop.dispatchEvent(new CustomEvent('emp-import-open'));
-            },
-        };
+
+window.employeeImportModal = {
+    open() {
+        window.dispatchEvent(new CustomEvent('emp-import-open'));
+        const el = document.getElementById('emp-import-modal-backdrop');
+        if (el) {
+            el.classList.remove('hidden');
+            el.style.display = 'flex';
+            if (window.Alpine && window.Alpine.$data) {
+                try {
+                    const data = window.Alpine.$data(el);
+                    if (data && typeof data.open === 'function') data.open();
+                } catch(e) {}
+            }
+        }
+    },
+};
+
+window.employeeFormModal = {
+    open(options) {
+        window.dispatchEvent(new CustomEvent('emp-form-open', { detail: options || {} }));
+        const el = document.getElementById('emp-form-modal-backdrop');
+        if (el) {
+            el.classList.remove('hidden');
+            el.style.display = 'flex';
+            if (window.Alpine && window.Alpine.$data) {
+                try {
+                    const data = window.Alpine.$data(el);
+                    if (data && typeof data.open === 'function') data.open(options || {});
+                } catch(e) {}
+            }
+        }
     }
-});
+};
+
+window.employeeFormModal = {
+    open(options) {
+        window.dispatchEvent(new CustomEvent('emp-form-open', { detail: options || {} }));
+        const el = document.getElementById('emp-form-modal-backdrop');
+        if (el) {
+            el.classList.remove('hidden');
+            el.style.display = 'flex';
+            if (window.Alpine && window.Alpine.$data) {
+                try {
+                    const data = window.Alpine.$data(el);
+                    if (data && typeof data.open === 'function') data.open(options || {});
+                } catch(e) {}
+            }
+        }
+    }
+};
