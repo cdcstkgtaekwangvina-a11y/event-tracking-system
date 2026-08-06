@@ -42,11 +42,30 @@
                 <span class="material-symbols-outlined">upload</span>
                 Import
             </button>
-            <button type="button" class="emp-btn emp-btn-secondary" id="btn-export-employees"
-                onclick="window.employeeActions?.exportEmployees()">
-                <span class="material-symbols-outlined">download</span>
-                Export
-            </button>
+            <div class="emp-export-dropdown" x-data="{ open: false }" @click.outside="open = false" style="position: relative; display: inline-block;">
+                <button type="button" class="emp-btn emp-btn-secondary" id="btn-export-employees" @click="open = !open">
+                    <span class="material-symbols-outlined">download</span>
+                    Export
+                    <span class="material-symbols-outlined" style="font-size:16px; margin-left:2px;">expand_more</span>
+                </button>
+                <div x-show="open" x-cloak style="position: absolute; right: 0; top: calc(100% + 4px); z-index: 50; background: var(--card, #12122a); border: 1px solid var(--border, rgba(255,255,255,0.15)); border-radius: 10px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); min-width: 170px;">
+                    <button type="button" style="display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:0; background:transparent; color:var(--foreground,#fff); border-radius:6px; cursor:pointer; font-size:13px; text-align:left;"
+                            @click="open = false; window.employeeActions?.exportEmployees('excel')">
+                        <span class="material-symbols-outlined" style="font-size:18px; color:#10b981;">table_view</span>
+                        Xuất Excel (.xlsx)
+                    </button>
+                    <button type="button" style="display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:0; background:transparent; color:var(--foreground,#fff); border-radius:6px; cursor:pointer; font-size:13px; text-align:left;"
+                            @click="open = false; window.employeeActions?.exportEmployees('csv')">
+                        <span class="material-symbols-outlined" style="font-size:18px; color:#3b82f6;">csv</span>
+                        Xuất CSV (.csv)
+                    </button>
+                    <button type="button" style="display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:0; background:transparent; color:var(--foreground,#fff); border-radius:6px; cursor:pointer; font-size:13px; text-align:left;"
+                            @click="open = false; window.employeeActions?.exportEmployees('json')">
+                        <span class="material-symbols-outlined" style="font-size:18px; color:#f59e0b;">data_object</span>
+                        Xuất JSON (.json)
+                    </button>
+                </div>
+            </div>
             <button type="button" class="emp-btn emp-btn-primary" id="btn-add-employee"
                 onclick="window.employeeFormModal?.open({ mode: 'create' })">
                 <span class="material-symbols-outlined">add</span>

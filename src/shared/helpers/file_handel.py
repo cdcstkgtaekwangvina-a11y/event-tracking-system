@@ -1,7 +1,11 @@
+from collections.abc import Sequence
 from io import BytesIO
 from typing import Any, Literal
 
-from polars import DataFrame, DataType, read_csv, read_excel, read_json, read_ndjson
+import orjson
+from polars import DataFrame, read_csv, read_excel, read_json, read_ndjson
+
+InputData = DataFrame | dict[str, Any] | Sequence[Any]
 
 
 class FileHandelHelper:
@@ -12,22 +16,21 @@ class FileHandelHelper:
         header_row: int | None = None,
         **kwargs,
     ) -> DataFrame | None:
-        # Nếu header_row nằm trong kwargs["read_options"], lấy ra sử dụng
-        if header_row is None and "read_options" in kwargs and isinstance(kwargs["read_options"], dict):
+        if (
+            header_row is None
+            and "read_options" in kwargs
+            and isinstance(kwargs["read_options"], dict)
+        ):
             header_row = kwargs["read_options"].get("header_row")
 
-        # Trường hợp 1: Có chỉ định dòng header rõ ràng
         if header_row is not None:
             read_options = kwargs.pop("read_options", {}) or {}
             read_options["header_row"] = header_row
             return read_excel(buffer, read_options=read_options, **kwargs)
 
-        # Trường hợp 2: Bỏ qua phân tích, đọc mặc định theo Polars
         if not analytics_file:
             return read_excel(buffer, **kwargs)
 
-        # Trường hợp 3: Phân tích file (analytics_file == True)
-        # Bỏ read_options khi read_excel(has_header=False) để tránh xung độtPolars
         sample_kwargs = {k: v for k, v in kwargs.items() if k != "read_options"}
         df_sample = read_excel(buffer, has_header=False, **sample_kwargs).head(50)
 
@@ -38,7 +41,6 @@ class FileHandelHelper:
         global_max_cols = 0
         row_analysis = []
 
-        # BƯỚC 1: Quét tìm số cột tối đa có dữ liệu
         for i, row in enumerate(rows):
             valid_cells = [c for c in row if c is not None and str(c).strip() != ""]
             col_count = len(valid_cells)
@@ -57,7 +59,6 @@ class FileHandelHelper:
                 }
             )
 
-        # BƯỚC 2: Quyết định dòng Header (Dòng đầu tiệm cận max cột & chủ yếu là text)
         has_header = False
         guessed_header_index = 0
         for item in row_analysis:
@@ -69,15 +70,12 @@ class FileHandelHelper:
                 guessed_header_index = item["index"]
                 break
 
-        # BƯỚC 3: Đọc file chính thức dựa vào kết quả đoán
         buffer.seek(0)
 
         if has_header:
             read_options = kwargs.pop("read_options", {}) or {}
             read_options["header_row"] = guessed_header_index
-            df = read_excel(
-                buffer, read_options=read_options, **kwargs
-            )
+            df = read_excel(buffer, read_options=read_options, **kwargs)
         else:
             sample_kwargs = {k: v for k, v in kwargs.items() if k != "read_options"}
             df = read_excel(buffer, has_header=False, **sample_kwargs)
@@ -91,15 +89,12 @@ class FileHandelHelper:
         header_row: int | None = None,
         **kwargs,
     ) -> DataFrame | None:
-        # Trường hợp 1: Có chỉ định dòng header rõ ràng
         if header_row is not None:
             return read_csv(buffer, has_header=True, skip_rows=header_row, **kwargs)
 
-        # Trường hợp 2: Bỏ qua phân tích, đọc mặc định theo Polars
         if not analytics_file:
             return read_csv(buffer, **kwargs)
 
-        # Trường hợp 3: Phân tích file (analytics_file == True)
         try:
             df_sample = read_csv(buffer, has_header=False, n_rows=50, **kwargs)
         except Exception:
@@ -115,7 +110,6 @@ class FileHandelHelper:
         global_max_cols = 0
         row_analysis = []
 
-        # BƯỚC 1: Quét tìm số cột tối đa có dữ liệu
         for i, row in enumerate(rows):
             valid_cells = [c for c in row if c is not None and str(c).strip() != ""]
             col_count = len(valid_cells)
@@ -134,7 +128,6 @@ class FileHandelHelper:
                 }
             )
 
-        # BƯỚC 2: Quyết định dòng Header
         has_header = False
         guessed_header_index = 0
         for item in row_analysis:
@@ -146,7 +139,6 @@ class FileHandelHelper:
                 guessed_header_index = item["index"]
                 break
 
-        # BƯỚC 3: Đọc file chính thức dựa vào kết quả đoán
         buffer.seek(0)
 
         if has_header:
@@ -171,10 +163,8 @@ class FileHandelHelper:
         match type:
             case "excel":
                 return self.__read_excel(buffer, analytics_file, header_row, **kwargs)
-
             case "csv":
                 return self.__read_csv(buffer, analytics_file, header_row, **kwargs)
-
             case _:
                 raise ValueError("Invalid file type")
 
@@ -183,15 +173,10 @@ class FileHandelHelper:
         file: bytes,
         **kwargs,
     ) -> DataFrame | None:
-        """
-        Đọc file JSON từ bytes.
-        JSON đã tự định nghĩa Header thông qua Key, nên không cần đoán cấu trúc.
-        """
         buffer = BytesIO(file)
         try:
             df = read_json(buffer, **kwargs)
             return df if not df.is_empty() else None
-
         except Exception as e_json:
             try:
                 buffer.seek(0)
@@ -202,19 +187,27 @@ class FileHandelHelper:
                     f"Định dạng JSON không hợp lệ hoặc không được hỗ trợ. Lỗi: {str(e_json)}"
                 )
 
-    def _ensure_dataframe(self, data: DataType) -> DataFrame:
+    def _ensure_dataframe(self, data: InputData) -> DataFrame:
         """Tự động chuyển đổi dict/list thành Polars DataFrame nếu chưa phải"""
         if isinstance(data, DataFrame):
             return data
-        if isinstance(data, (list, dict)):
+
+        if isinstance(data, dict):
             return DataFrame(data)
+
+        if isinstance(data, (list, tuple)):
+            if not data:
+                return DataFrame()
+
+            return DataFrame(data, infer_schema_length=None)
+
         raise TypeError(
             f"Dữ liệu không hợp lệ. Kỳ vọng DataFrame, list hoặc dict, nhưng nhận được {type(data).__name__}"
         )
 
     def export_csv_bytes(
         self,
-        data: DataType,
+        data: InputData,
         config: dict[str, Any] | None = None,
     ) -> bytes:
         df = self._ensure_dataframe(data)
@@ -227,7 +220,9 @@ class FileHandelHelper:
         return buffer.getvalue()
 
     def export_excel_bytes(
-        self, data: DataType, config: dict[str, Any] | None = None
+        self,
+        data: InputData,
+        config: dict[str, Any] | None = None,
     ) -> bytes:
         df = self._ensure_dataframe(data)
         if df.is_empty():
@@ -239,25 +234,30 @@ class FileHandelHelper:
         return buffer.getvalue()
 
     def export_json_bytes(
-        self, data: DataType, config: dict[str, Any] | None = None
+        self,
+        data: InputData,
+        config: dict[str, Any] | None = None,
     ) -> bytes:
         df = self._ensure_dataframe(data)
         if df.is_empty():
             raise ValueError("Dữ liệu đang trống, không có gì để xuất.")
 
-        config = config or {}
-        config.setdefault("row_oriented", True)
-        buffer = BytesIO()
-        df.write_json(buffer, **config)
-        return buffer.getvalue()
+        config = (config or {}).copy()
+        pretty = config.pop("pretty", False)
+
+        records = df.to_dicts()
+
+        if pretty:
+            return orjson.dumps(records, option=orjson.OPT_INDENT_2)
+
+        return orjson.dumps(records)
 
     def export_file(
         self,
-        data: DataType,
+        data: InputData,
         type: Literal["excel", "csv", "json"],
         config: dict[str, Any] | None = None,
     ) -> bytes:
-        """Hàm API công khai để xuất file (Truyền thẳng data kiểu DataType vào)"""
         match type:
             case "excel":
                 return self.export_excel_bytes(data, config)

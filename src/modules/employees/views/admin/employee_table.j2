@@ -75,7 +75,7 @@
                 <button type="button"
                         class="emp-action-btn emp-action-edit"
                         title="Chỉnh sửa"
-                        onclick='window.employeeFormModal?.open({ mode: "edit", employee: {{ (emp.model_dump(mode="json") if emp.model_dump is defined else emp | tojson) | forceescape }} })'>
+                        onclick='window.employeeFormModal?.open({ mode: "edit", employee: {{ (emp.model_dump(mode="json") if emp.model_dump is defined else emp) | tojson | forceescape }} })'>
                     <span class="material-symbols-outlined">edit</span>
                 </button>
                 <button type="button"

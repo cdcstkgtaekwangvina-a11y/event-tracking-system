@@ -1,5 +1,7 @@
 from typing import Any
 
+from fastapi.responses import StreamingResponse
+
 from database.models.app_db import SessionDep, SessionFactoryDep
 from database.models.employees import Employees
 from src.shared.base import BaseCrud, BaseResponse
@@ -13,6 +15,7 @@ from .employee_schemas import (
     BulkUpsertResponse,
     EmployeeCreateRequest,
     EmployeeUpdateRequest,
+    ExportEmployeeRequest,
     ReadSheetFile,
 )
 
@@ -239,45 +242,63 @@ class EmployeeServices:
             message="Read sheet file thành công",
         )
 
-    async def export_employees(self) -> Any:
-        import csv
-        import io
-
-        from fastapi.responses import Response
-
-        employees = await self.crud.find_many()
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(
-            [
-                "ID",
-                "Họ và tên",
-                "Email",
-                "Phòng ban",
-                "Chức vụ",
-                "Giới tính",
-                "Ngày bắt đầu",
+    async def export_employees(
+        self, payload: ExportEmployeeRequest
+    ) -> StreamingResponse | None:
+        employees = await self.crud.select(Employees).find_many()
+        if not employees:
+            return None
+        mapped_employees = []
+        if payload.file_type == "json":
+            mapped_employees = [emp.model_dump(mode="json") for emp in employees]
+        else:
+            mapped_employees = [
+                {
+                    "Mã nhân viên": emp.id,
+                    "Họ và tên": emp.name,
+                    "Email": emp.email,
+                    "Khoa": emp.department,
+                    "Giới tính": emp.gender,
+                    "Chức vụ": emp.position,
+                    "Ngày vào công ty": (
+                        emp.starting_date.strftime("%d/%m/%Y")
+                        if emp.starting_date
+                        else None
+                    ),
+                }
+                for emp in employees
             ]
+
+        fh = FileHandelHelper()
+
+        file_ext = "xlsx" if payload.file_type == "excel" else payload.file_type
+        headers = {
+            "Content-Disposition": f'attachment; filename="employees.{file_ext}"'
+        }
+
+        match payload.file_type:
+            case "excel":
+                media_type = (
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+            case "csv":
+                media_type = "text/csv"
+
+            case "json":
+                media_type = "application/json"
+
+            case _:
+                return BaseResponse.fail(message="Định dạng file không được hỗ trợ")
+
+        from io import BytesIO
+
+        file_bytes = fh.export_file(
+            mapped_employees,
+            payload.file_type,
+            config={"pretty": True} if payload.file_type == "json" else {},
         )
 
-        for emp in employees:
-            writer.writerow(
-                [
-                    emp.id,
-                    emp.name or "",
-                    emp.email or "",
-                    emp.department or "",
-                    emp.position or "",
-                    emp.gender or "",
-                    str(emp.starting_date) if emp.starting_date else "",
-                ]
-            )
+        file_stream = BytesIO(file_bytes)
 
-        content = output.getvalue().encode("utf-8-sig")
-        return Response(
-            content=content,
-            media_type="text/csv; charset=utf-8",
-            headers={
-                "Content-Disposition": "attachment; filename=danh_sach_nhan_vien.csv"
-            },
-        )
+        return StreamingResponse(file_stream, media_type=media_type, headers=headers)

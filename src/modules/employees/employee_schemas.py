@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import Field, field_validator
@@ -67,6 +67,10 @@ class ReadSheetFileResponse(BaseSchema):
 
 class EmployeeBulkDeleteRequest(BaseSchema):
     ids: list[int] = Field(min_length=1, description="Danh sách ID nhân viên cần xóa")
+
+
+class ExportEmployeeRequest(BaseSchema):
+    file_type: Literal["json", "csv", "excel"] = Field(default="json")
 
 
 BulkUpsertResponse.model_rebuild()

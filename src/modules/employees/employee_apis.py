@@ -1,6 +1,7 @@
 from fastapi import Depends
 
 from src.shared.base import BaseRouter
+from src.shared.base.base_response import BaseResponse
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.schemas.pagination_schemas import PaginationQuery
 
@@ -9,6 +10,7 @@ from .employee_schemas import (
     EmployeeBulkDeleteRequest,
     EmployeeCreateRequest,
     EmployeeUpdateRequest,
+    ExportEmployeeRequest,
     ReadSheetFile,
 )
 from .employee_services import EmployeeServices
@@ -46,9 +48,12 @@ class EmployeeController:
     async def delete_employee(self, employee_id: int):
         return await self.service.delete_employee(employee_id)
 
-    @router.get_api("export")
-    async def export_employees(self):
-        return await self.service.export_employees()
+    @router.post_api("export")
+    async def export_employees(self, payload: ExportEmployeeRequest):
+        result = await self.service.export_employees(payload)
+        if result:
+            return result
+        return BaseResponse.no_content()
 
     @router.post_api("import")
     async def import_employee(self, payload: BulkUpsertEmployeeRequest):
