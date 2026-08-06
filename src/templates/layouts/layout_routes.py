@@ -1,7 +1,8 @@
 from fastapi import Depends, FastAPI, status
-from src.shared.middlewares.auth_middlewares import RequireAuth, AuthContext
 from fastapi.responses import HTMLResponse, RedirectResponse
+
 from src.shared.base import BaseRequest
+from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth
 
 
 def layouts_routes(app: FastAPI) -> FastAPI:

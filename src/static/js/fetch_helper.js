@@ -3,6 +3,10 @@ const getToken = (name) => {
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(";").shift();
 };
+const resolveUrl = (path = "") => {
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${fetchHelper.baseUrl}/${path}`;
+};
 async function returnValue(res){
   if(res.status == 204)
     return {status_code:204};
@@ -13,6 +17,26 @@ async function returnValue(res){
 }
 export const fetchHelper = {
   baseUrl: "",
+  async rawGet(path = "", payload = {}, options = { requireAuth: true, headers: {} }) {
+    try {
+      const queryString = new URLSearchParams(payload).toString();
+      const fullPath = queryString ? `${path}?${queryString}` : path;
+      const res = await fetch(resolveUrl(fullPath), {
+        method: "GET",
+        headers: {
+          ...(options.headers || { "Content-Type": contentType.json }),
+          ...(options.requireAuth
+            ? { Authorization: `Bearer ${getToken("access_token")}` }
+            : {}),
+        },
+        ...(options.fetchOptions || {}),
+      });
+      return res;
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      return null;
+    }
+  },
   async get(
     path = "",
     payload = {},
@@ -21,7 +45,7 @@ export const fetchHelper = {
     try {
       const queryString = new URLSearchParams(payload).toString();
       const fullPath = queryString ? `${path}?${queryString}` : path;
-      const res = await fetch(`${this.baseUrl}/${fullPath}`, {
+      const res = await fetch(resolveUrl(fullPath), {
         method: "GET",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
@@ -51,7 +75,7 @@ export const fetchHelper = {
         headers["Content-Type"] = contentType.json;
       }
 
-      const res = await fetch(`${this.baseUrl}/${path}`, {
+      const res = await fetch(resolveUrl(path), {
         method: "POST",
         headers: headers,
         body: isFormData ? payload : JSON.stringify(payload),
@@ -64,7 +88,7 @@ export const fetchHelper = {
   },
   async put(path = "", payload = {}, options = { requireAuth: false }) {
     try {
-      const res = await fetch(`${this.baseUrl}/${path}`, {
+      const res = await fetch(resolveUrl(path), {
         method: "PUT",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
@@ -83,7 +107,7 @@ export const fetchHelper = {
   },
   async patch(path = "", payload = {}, options = { requireAuth: false }) {
     try {
-      const res = await fetch(`${this.baseUrl}/${path}`, {
+      const res = await fetch(resolveUrl(path), {
         method: "PATCH",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
@@ -102,7 +126,7 @@ export const fetchHelper = {
   },
   async delete(path = "", payload = {}, options = { requireAuth: false }) {
     try {
-      const res = await fetch(`${this.baseUrl}/${path}`, {
+      const res = await fetch(resolveUrl(path), {
         method: "DELETE",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),

@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 76eda0f4361d
+Revision ID: 8a059d80d8e3
 Revises: 
-Create Date: 2026-06-26 17:13:12.351356
+Create Date: 2026-07-19 11:30:00.624822
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlmodel
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '76eda0f4361d'
+revision: str = '8a059d80d8e3'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,13 +26,15 @@ def upgrade() -> None:
     sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.BIGINT(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=False),
     sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=True),
     sa.Column('position', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=True),
     sa.Column('gender', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=True),
     sa.Column('department', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('starting_date', sa.Date(), nullable=True),
+    sa.Column('qr_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('meta_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('medias',
@@ -45,6 +47,7 @@ def upgrade() -> None:
     sa.Column('media_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('parent_id', sa.Integer(), nullable=True),
     sa.Column('is_folder', sa.Boolean(), nullable=False),
+    sa.Column('is_direct_delete', sa.Boolean(), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['parent_id'], ['medias.id'], ),
     sa.PrimaryKeyConstraint('id'),
@@ -53,6 +56,18 @@ def upgrade() -> None:
     op.create_index(op.f('ix_medias_name'), 'medias', ['name'], unique=False)
     op.create_index(op.f('ix_medias_parent_id'), 'medias', ['parent_id'], unique=False)
     op.create_index(op.f('ix_medias_prefix'), 'medias', ['prefix'], unique=False)
+    op.create_table('queue_job',
+    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(length=30), nullable=False),
+    sa.Column('status', sqlmodel.sql.sqltypes.AutoString(length=30), nullable=False),
+    sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('progress', sa.Integer(), nullable=False),
+    sa.Column('meta', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('logs', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('next_payload', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('settings',
     sa.Column('id', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
     sa.Column('value', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -69,6 +84,7 @@ def upgrade() -> None:
     sa.Column('end_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('url_image', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('url_map', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('location', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('media_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['media_id'], ['medias.id'], ),
@@ -118,6 +134,7 @@ def downgrade() -> None:
     op.drop_table('users')
     op.drop_table('events')
     op.drop_table('settings')
+    op.drop_table('queue_job')
     op.drop_index(op.f('ix_medias_prefix'), table_name='medias')
     op.drop_index(op.f('ix_medias_parent_id'), table_name='medias')
     op.drop_index(op.f('ix_medias_name'), table_name='medias')

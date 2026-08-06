@@ -1,13 +1,12 @@
-from src.shared.base import BaseRequest, BaseRouter
 from fastapi import Depends
-from typing import Optional, cast
-from src.shared.helpers.cbv import clean_cbv
-from src.shared.schemas.pagination_schemas import (
-    CursorPaginationRequest,
-    CursorPaginationResponse,
-)
+
 from src.modules.media_manager.media_services import MediaServices
+from src.shared.base import BaseRequest, BaseRouter
+from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import RequireAuth
+from src.shared.schemas.pagination_schemas import (
+    CursorPaginationQuery,
+)
 
 TAG_NAME = "admin/media"
 router = BaseRouter(
@@ -24,7 +23,7 @@ class MediaViews:
         self.service = service
 
     @router.get(name="media_manager")
-    async def media_manager(self, req: BaseRequest, folder_id: Optional[int] = None):
+    async def media_manager(self, req: BaseRequest, folder_id: int | None = None):
         return req.response_html(
             name=f"{base_path}index.j2",
             context={
@@ -37,11 +36,11 @@ class MediaViews:
     async def list_items_html(
         self,
         req: BaseRequest,
-        folder_id: Optional[int] = None,
+        cursor_request: CursorPaginationQuery,
+        folder_id: int | None = None,
         deleted_media: bool = False,
         picker: bool = False,
-        cursor_request: CursorPaginationRequest = Depends(),
-        type_filter: Optional[str] = None,
+        type_filter: str | None = None,
     ):
         cursor_request = await self.apply_sort_request(cursor_request)
         result = await self.service.list_items_by_folder_cursor_raw(
@@ -67,7 +66,7 @@ class MediaViews:
     async def trash_view(
         self,
         req: BaseRequest,
-        folder_id: Optional[int] = None,
+        folder_id: int | None = None,
     ):
         return req.response_html(
             name=f"{base_path}trash.j2",
@@ -78,6 +77,6 @@ class MediaViews:
         )
 
     async def apply_sort_request(
-        self, request: CursorPaginationRequest
-    ) -> CursorPaginationRequest:
+        self, request: CursorPaginationQuery
+    ) -> CursorPaginationQuery:
         return request

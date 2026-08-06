@@ -1,0 +1,144 @@
+{% set sort = pagination.sort_field or '' %}
+{% set desc = pagination.is_desc %}
+{% set base_url = url_for('employees') ~ '/table/html' %}
+
+{# Macro tạo query string chung cho cả sort và pagination #}
+{% macro qs(page=pagination.page, sf=sort, sd=desc) -%}
+{{ base_url }}?page={{ page }}&limit={{ pagination.limit }}&search={{ search }}&sort_field={{ sf }}&is_desc={{ sd | lower }}
+{%- endmacro %}
+
+{# Macro render header sort #}
+{% macro sort_th(label, field, extra_class='') %}
+{% set is_active = (sort == field) %}
+{% set next_desc = 'false' if (is_active and desc) else 'true' %}
+<th class="emp-th emp-th-sort {{ extra_class }} {{ 'emp-th-sort--active' if is_active }}"
+    hx-get="{{ qs(page=1, sf=field, sd=next_desc) }}"
+    hx-target="#emp-table-container"
+    hx-swap="innerHTML"
+    title="Sắp xếp theo {{ label }}">
+    <span class="emp-th-label">{{ label }}</span>
+    {% if is_active %}
+    <span class="material-symbols-outlined emp-sort-icon">{{ 'arrow_downward' if desc else 'arrow_upward' }}</span>
+    {% else %}
+    <span class="material-symbols-outlined emp-sort-icon emp-sort-icon--idle">unfold_more</span>
+    {% endif %}
+</th>
+{% endmacro %}
+
+{% if employees %}
+{% set page_ids = employees | map(attribute='id') | list %}
+<table class="emp-table">
+    <thead>
+        <tr>
+            <th class="emp-th emp-th-checkbox" style="width: 40px; text-align: center;">
+                <input type="checkbox"
+                       class="emp-checkbox"
+                       :checked="selectedIds.length > 0 && {{ page_ids | tojson }}.every(id => selectedIds.includes(id))"
+                       @change="toggleSelectAll({{ page_ids | tojson }})"
+                       title="Chọn tất cả trang này" />
+            </th>
+            {{ sort_th('ID', 'id', 'emp-th-id') }}
+            {{ sort_th('Tên', 'name') }}
+            {{ sort_th('Email', 'email') }}
+            {{ sort_th('Phòng ban', 'department') }}
+            {{ sort_th('Chức vụ', 'position') }}
+            {{ sort_th('Ngày vào', 'starting_date') }}
+            <th class="emp-th">Trạng thái</th>
+            <th class="emp-th emp-th-action">Hành động</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for emp in employees %}
+        <tr class="emp-tr" id="emp-row-{{ emp.id }}" :class="{ 'emp-tr--selected': selectedIds.includes({{ emp.id }}) }">
+            <td class="emp-td emp-td-checkbox" style="text-align: center;">
+                <input type="checkbox"
+                       class="emp-checkbox"
+                       :checked="selectedIds.includes({{ emp.id }})"
+                       @change="toggleSelect({{ emp.id }})" />
+            </td>
+            <td class="emp-td emp-td-id">{{ "%08d" | format(emp.id | int) }}</td>
+            <td class="emp-td emp-td-name">{{ emp.name }}</td>
+            <td class="emp-td emp-td-email">
+                <a href="mailto:{{ emp.email }}" class="emp-email-link">{{ emp.email or "—" }}</a>
+            </td>
+            <td class="emp-td">{{ emp.department or "—" }}</td>
+            <td class="emp-td">{{ emp.position or "—" }}</td>
+            <td class="emp-td">{{ (emp.starting_date | string).split('-') | reverse | join('-') if emp.starting_date else '—' }}</td>
+            <td class="emp-td">
+                {% if emp.deleted_at is none %}
+                <span class="emp-status emp-status-active">Hoạt động</span>
+                {% else %}
+                <span class="emp-status emp-status-inactive">Không hoạt động</span>
+                {% endif %}
+            </td>
+            <td class="emp-td emp-td-action">
+                <button type="button"
+                        class="emp-action-btn emp-action-edit"
+                        title="Chỉnh sửa"
+                        onclick='window.employeeFormModal?.open({ mode: "edit", employee: {{ (emp.model_dump(mode="json") if emp.model_dump is defined else emp) | tojson | forceescape }} })'>
+                    <span class="material-symbols-outlined">edit</span>
+                </button>
+                <button type="button"
+                        class="emp-action-btn emp-action-delete"
+                        title="Xoá"
+                        onclick='window.employeeDeleteModal?.open({ id: {{ emp.id }}, name: {{ (emp.name if emp.name is defined else "") | tojson | forceescape }} })'>
+                    <span class="material-symbols-outlined">delete</span>
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if total > pagination.limit %}
+<div class="emp-pagination">
+    {% set total_pages = (total / pagination.limit) | round(0, 'ceil') | int %}
+    {% set current_page = pagination.page %}
+
+    <button class="emp-page-btn"
+            {% if current_page <= 1 %}disabled{% endif %}
+            hx-get="{{ qs(page=1) }}"
+            hx-target="#emp-table-container"
+            hx-swap="innerHTML"
+            title="Trang đầu">
+        <span class="material-symbols-outlined">first_page</span>
+    </button>
+
+    <button class="emp-page-btn"
+            {% if current_page <= 1 %}disabled{% endif %}
+            hx-get="{{ qs(page=current_page - 1) }}"
+            hx-target="#emp-table-container"
+            hx-swap="innerHTML"
+            title="Trang trước">
+        <span class="material-symbols-outlined">chevron_left</span>
+    </button>
+
+    <span class="emp-page-info">{{ current_page }} / {{ total_pages }}</span>
+
+    <button class="emp-page-btn"
+            {% if current_page >= total_pages %}disabled{% endif %}
+            hx-get="{{ qs(page=current_page + 1) }}"
+            hx-target="#emp-table-container"
+            hx-swap="innerHTML"
+            title="Trang sau">
+        <span class="material-symbols-outlined">chevron_right</span>
+    </button>
+
+    <button class="emp-page-btn"
+            {% if current_page >= total_pages %}disabled{% endif %}
+            hx-get="{{ qs(page=total_pages) }}"
+            hx-target="#emp-table-container"
+            hx-swap="innerHTML"
+            title="Trang cuối">
+        <span class="material-symbols-outlined">last_page</span>
+    </button>
+</div>
+{% endif %}
+
+{% else %}
+<div class="emp-empty">
+    <span class="material-symbols-outlined emp-empty-icon">group_off</span>
+    <p class="emp-empty-text">Chưa có nhân viên nào</p>
+    <p class="emp-empty-sub">Nhấn "+ Thêm nhân viên" để bắt đầu</p>
+</div>
+{% endif %}

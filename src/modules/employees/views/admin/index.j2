@@ -1,0 +1,173 @@
+{% extends "templates/layouts/admin.j2" if not request.headers.get("hx-request") else
+"templates/layouts/admin_blank.j2"%}
+{% block admin_title %}Quản lý Nhân viên{% endblock %}
+{% block admin_body %}
+<div class="emp-container" x-data="{
+    selectedIds: [],
+    allIds: [],
+    toggleSelectAll(ids) {
+        if (this.selectedIds.length === ids.length) {
+            this.selectedIds = [];
+        } else {
+            this.selectedIds = [...ids];
+        }
+    },
+    toggleSelect(id) {
+        const idx = this.selectedIds.indexOf(id);
+        if (idx > -1) {
+            this.selectedIds.splice(idx, 1);
+        } else {
+            this.selectedIds.push(id);
+        }
+    },
+    clearSelection() {
+        this.selectedIds = [];
+    }
+}" @emp-deleted.window="clearSelection()">
+    <!-- Header -->
+    <div class="emp-header">
+        <h1 class="emp-title">Quản lý Nhân viên</h1>
+        <div class="emp-header-actions">
+            <button type="button" 
+                    class="emp-btn emp-btn-danger" 
+                    id="btn-bulk-delete"
+                    x-show="selectedIds.length > 0"
+                    x-transition
+                    @click="window.employeeDeleteModal?.open({ mode: 'bulk', ids: selectedIds })">
+                <span class="material-symbols-outlined">delete</span>
+                Xoá đã chọn (<span x-text="selectedIds.length"></span>)
+            </button>
+            <button type="button" class="emp-btn emp-btn-secondary" id="btn-import-employees"
+                onclick="window.employeeImportModal?.open()">
+                <span class="material-symbols-outlined">upload</span>
+                Import
+            </button>
+            <div class="emp-export-dropdown" x-data="{ open: false }" @click.outside="open = false" style="position: relative; display: inline-block;">
+                <button type="button" class="emp-btn emp-btn-secondary" id="btn-export-employees" @click="open = !open">
+                    <span class="material-symbols-outlined">download</span>
+                    Export
+                    <span class="material-symbols-outlined" style="font-size:16px; margin-left:2px;">expand_more</span>
+                </button>
+                <div x-show="open" x-cloak style="position: absolute; right: 0; top: calc(100% + 4px); z-index: 50; background: var(--card, #12122a); border: 1px solid var(--border, rgba(255,255,255,0.15)); border-radius: 10px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); min-width: 170px;">
+                    <button type="button" style="display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:0; background:transparent; color:var(--foreground,#fff); border-radius:6px; cursor:pointer; font-size:13px; text-align:left;"
+                            @click="open = false; window.employeeActions?.exportEmployees('excel')">
+                        <span class="material-symbols-outlined" style="font-size:18px; color:#10b981;">table_view</span>
+                        Xuất Excel (.xlsx)
+                    </button>
+                    <button type="button" style="display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:0; background:transparent; color:var(--foreground,#fff); border-radius:6px; cursor:pointer; font-size:13px; text-align:left;"
+                            @click="open = false; window.employeeActions?.exportEmployees('csv')">
+                        <span class="material-symbols-outlined" style="font-size:18px; color:#3b82f6;">csv</span>
+                        Xuất CSV (.csv)
+                    </button>
+                    <button type="button" style="display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:0; background:transparent; color:var(--foreground,#fff); border-radius:6px; cursor:pointer; font-size:13px; text-align:left;"
+                            @click="open = false; window.employeeActions?.exportEmployees('json')">
+                        <span class="material-symbols-outlined" style="font-size:18px; color:#f59e0b;">data_object</span>
+                        Xuất JSON (.json)
+                    </button>
+                </div>
+            </div>
+            <button type="button" class="emp-btn emp-btn-primary" id="btn-add-employee"
+                onclick="window.employeeFormModal?.open({ mode: 'create' })">
+                <span class="material-symbols-outlined">add</span>
+                Thêm nhân viên
+            </button>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="emp-search-wrapper" x-data="{
+             searchQuery: '',
+             history: [],
+             showDropdown: false,
+             init() {
+                 this.loadHistory();
+                 document.body.addEventListener('htmx:afterRequest', (evt) => {
+                     if (evt.detail.target.id === 'emp-table-container' && this.searchQuery.trim()) {
+                         this.saveToHistory(this.searchQuery.trim());
+                     }
+                 });
+             },
+             loadHistory() {
+                 try {
+                     this.history = JSON.parse(localStorage.getItem('emp_search_history') || '[]');
+                 } catch (e) {
+                     this.history = [];
+                 }
+             },
+             saveToHistory(query) {
+                 if (!query) return;
+                 let idx = this.history.indexOf(query);
+                 if (idx > -1) {
+                     this.history.splice(idx, 1);
+                 }
+                 this.history.unshift(query);
+                 if (this.history.length > 5) {
+                     this.history = this.history.slice(0, 5);
+                 }
+                 localStorage.setItem('emp_search_history', JSON.stringify(this.history));
+             },
+             selectHistory(query) {
+                 this.searchQuery = query;
+                 this.showDropdown = false;
+                 const input = document.getElementById('emp-search-input');
+                 if (input) {
+                     input.value = query;
+                     input.dispatchEvent(new Event('search-triggered', { bubbles: true }));
+                 }
+             },
+             deleteHistoryItem(item, e) {
+                 e.stopPropagation();
+                 this.history = this.history.filter(h => h !== item);
+                 localStorage.setItem('emp_search_history', JSON.stringify(this.history));
+             },
+             clearAllHistory(e) {
+                 e.stopPropagation();
+                 this.history = [];
+                 localStorage.removeItem('emp_search_history');
+             }
+         }" @click.outside="showDropdown = false">
+        <span class="material-symbols-outlined emp-search-icon">search</span>
+        <input type="text" class="emp-search-input" id="emp-search-input"
+            placeholder="Tìm kiếm nhân viên... (Nhấn Enter để tìm)" autocomplete="off" x-model="searchQuery"
+            @focus="showDropdown = true" @keydown.enter="saveToHistory(searchQuery.trim())"
+            hx-get="{{ url_for('employees_table') }}" hx-trigger="keyup[key=='Enter'], search-triggered"
+            hx-target="#emp-table-container" hx-swap="innerHTML" name="search" hx-include="#emp-search-input" />
+
+        <!-- Dropdown lịch sử -->
+        <div class="emp-search-dropdown" x-show="showDropdown && history.length > 0" x-transition>
+            <div class="emp-search-dropdown-header">
+                <span>Lịch sử tìm kiếm gần đây</span>
+                <button type="button" class="emp-clear-all-btn" @click="clearAllHistory($event)">Xoá tất cả</button>
+            </div>
+            <ul class="emp-search-dropdown-list">
+                <template x-for="item in history" :key="item">
+                    <li class="emp-search-dropdown-item" @click="selectHistory(item)">
+                        <div class="emp-search-item-content">
+                            <span class="material-symbols-outlined emp-history-icon">history</span>
+                            <span x-text="item"></span>
+                        </div>
+                        <button type="button" class="emp-delete-history-btn" @click="deleteHistoryItem(item, $event)">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="emp-table-wrapper">
+        <div id="emp-table-container">
+            {% include "modules/employees/views/admin/employee_table.j2" %}
+        </div>
+    </div>
+</div>
+
+{% include "modules/employees/views/admin/modals/employee_form_modal.j2" %}
+{% include "modules/employees/views/admin/modals/employee_import_modal.j2" %}
+{% include "modules/employees/views/admin/modals/employee_delete_modal.j2" %}
+
+<link rel="stylesheet" href="/static/css/employees.css">
+<script src="/static/js/employees.js"></script>
+
+{% endblock %}

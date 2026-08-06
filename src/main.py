@@ -1,19 +1,23 @@
 import os
-from fastapi.routing import APIRoute
-from granian.constants import Interfaces
-from granian.log import LogLevels
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 import granian
 from dotenv import load_dotenv
-from contextlib import asynccontextmanager
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
+from granian.constants import Interfaces
+from granian.log import LogLevels
+
+from src.shared.base.base_queue import queue_service
 from src.shared.middlewares.handel_exception import handle_exceptions
 
 load_dotenv()
 
 environment: str = os.getenv("env") or "dev"
+
+from src.shared.backgroundtasks import *
 
 
 @asynccontextmanager
@@ -21,13 +25,16 @@ async def lifespan(app: FastAPI):
     print("Server is running")
     from database.models.app_db import init_db
 
-    for route in app.routes:
-        if isinstance(route, APIRoute):
-            if "." in route.name:
-                route.name = route.name.split(".")[-1]
-
     await init_db()
+
+    await queue_service.start()
+    await queue_service.fill_job_from_db()
+
+    app.state.queue_service = queue_service
+
     yield
+
+    await queue_service.stop()
     print("Server is shutdown")
 
 
@@ -36,8 +43,8 @@ PROJECT_ROOT = SRC_DIR.parent
 
 
 def create_app() -> FastAPI:
-    from src.modules.app_routes import router as main_router
     from src import subscription_services as services
+    from src.modules.app_routes import router as main_router
     from src.shared.base import BaseRoute
     from src.shared.base.base_config_jinja import global_values
 
@@ -59,7 +66,10 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
+if environment == "dev":
+    log_level = LogLevels.debug
+else:
+    log_level = LogLevels.info
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
 
@@ -70,5 +80,5 @@ if __name__ == "__main__":
         port=port,
         interface=Interfaces.ASGI,
         reload=reload,
-        log_level=LogLevels.debug,
+        log_level=log_level,
     ).serve()

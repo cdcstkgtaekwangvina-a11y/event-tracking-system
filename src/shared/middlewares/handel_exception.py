@@ -6,12 +6,11 @@ from fastapi.responses import (
 )  # Thêm RedirectResponse
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
-import logging
-
 from fastapi.templating import Jinja2Templates
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from src.shared.base.base_logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def handle_exceptions(app: FastAPI, templates: Jinja2Templates) -> FastAPI:

@@ -1,11 +1,12 @@
 from fastapi import Depends
-from typing import Optional
+
 from src.shared.base import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.schemas.pagination_schemas import (
-    CursorPaginationRequest,
+    CursorPaginationQuery,
 )
-from .media_schemas import CreateMediaSchema, UpdateMedia, BulkDeleteSchema
+
+from .media_schemas import BulkDeleteSchema, CreateMediaSchema, UpdateMedia
 from .media_services import MediaServices
 
 TAG_NAME = "media"
@@ -20,10 +21,10 @@ class MediaController:
     @router.get_api()
     async def list_items(
         self,
-        parent_id: Optional[int] = None,
+        q: CursorPaginationQuery,
+        parent_id: int | None = None,
         deleted_media: bool = False,
-        q: CursorPaginationRequest = Depends(),
-        type_filter: Optional[str] = None,
+        type_filter: str | None = None,
     ):
         return await self.service.list_items_by_folder_cursor(
             parent_id, q, deleted_media=deleted_media, type_filter=type_filter

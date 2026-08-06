@@ -1,10 +1,12 @@
-from sqlmodel import SQLModel
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlmodel.ext.asyncio.session import AsyncSession
-from database.db_config import DatabaseConfig
-from typing import AsyncGenerator, Annotated
+from collections.abc import AsyncGenerator
+from typing import Annotated
+
 from fastapi import Depends
-from database import models
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from database.db_config import DatabaseConfig
 
 db_url: str = DatabaseConfig().db_url()
 

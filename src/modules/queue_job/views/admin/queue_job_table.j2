@@ -1,0 +1,149 @@
+{% set sort = pagination.sort_field or '' %}
+{% set desc = pagination.is_desc %}
+{% set base_url = url_for('queue_jobs') ~ '/table/html' %}
+
+{% macro qs(page=pagination.page, sf=sort, sd=desc) -%}
+{{ base_url }}?page={{ page }}&limit={{ pagination.limit }}&search={{ search }}&status={{ status_filter }}&sort_field={{ sf }}&is_desc={{ sd | lower }}
+{%- endmacro %}
+
+{% macro sort_th(label, field, extra_class='') %}
+{% set is_active = (sort == field) %}
+{% set next_desc = 'false' if (is_active and desc) else 'true' %}
+<th class="qj-th qj-th-sort {{ extra_class }} {{ 'qj-th-sort--active' if is_active }}"
+    hx-get="{{ qs(page=1, sf=field, sd=next_desc) }}"
+    hx-target="#qj-table-container"
+    hx-swap="innerHTML"
+    title="Sắp xếp theo {{ label }}">
+    <span class="qj-th-label">{{ label }}</span>
+    {% if is_active %}
+    <span class="material-symbols-outlined qj-sort-icon">{{ 'arrow_downward' if desc else 'arrow_upward' }}</span>
+    {% else %}
+    <span class="material-symbols-outlined qj-sort-icon qj-sort-icon--idle">unfold_more</span>
+    {% endif %}
+</th>
+{% endmacro %}
+
+{% if jobs %}
+<table class="qj-table">
+    <thead>
+        <tr>
+            {{ sort_th('Job ID', 'id') }}
+            {{ sort_th('Loại công việc', 'type') }}
+            {{ sort_th('Trạng thái', 'status') }}
+            <th class="qj-th">Tiến độ</th>
+            {{ sort_th('Thời gian tạo', 'created_at') }}
+            {{ sort_th('Hoàn thành', 'finished_at') }}
+            <th class="qj-th qj-th-action">Chi tiết</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in jobs %}
+        <tr class="qj-tr">
+            <td class="qj-td qj-td-id" title="{{ job.id }}">
+                <span class="qj-id-text">{{ (job.id | string)[:13] }}...</span>
+            </td>
+            <td class="qj-td">
+                <span class="qj-type-badge">{{ job.type }}</span>
+            </td>
+            <td class="qj-td">
+                {% if job.status == 'running' %}
+                <span class="qj-status qj-status-running">
+                    <span class="qj-status-dot"></span> Đang chạy
+                </span>
+                {% elif job.status == 'success' %}
+                <span class="qj-status qj-status-success">
+                    <span class="material-symbols-outlined qj-status-icon">check_circle</span> Thành công
+                </span>
+                {% elif job.status == 'failed' %}
+                <span class="qj-status qj-status-failed">
+                    <span class="material-symbols-outlined qj-status-icon">cancel</span> Thất bại
+                </span>
+                {% elif job.status == 'cancelled' %}
+                <span class="qj-status qj-status-cancelled">
+                    <span class="material-symbols-outlined qj-status-icon">block</span> Đã huỷ
+                </span>
+                {% else %}
+                <span class="qj-status qj-status-pending">
+                    <span class="qj-status-dot"></span> {{ job.status }}
+                </span>
+                {% endif %}
+            </td>
+            <td class="qj-td">
+                <div class="qj-progress-wrapper">
+                    <div class="qj-progress-bar">
+                        <div class="qj-progress-fill" style="width: {{ job.progress or 0 }}%;"></div>
+                    </div>
+                    <span class="qj-progress-text">{{ job.progress or 0 }}%</span>
+                </div>
+            </td>
+            <td class="qj-td qj-td-time">
+                {{ job.created_at.strftime('%d/%m/%Y %H:%M:%S') if job.created_at else '—' }}
+            </td>
+            <td class="qj-td qj-td-time">
+                {{ job.finished_at.strftime('%d/%m/%Y %H:%M:%S') if job.finished_at else '—' }}
+            </td>
+            <td class="qj-td qj-td-action">
+                <button type="button"
+                        class="qj-action-btn"
+                        title="Xem chi tiết"
+                        onclick='window.queueJobDetailModal?.open({{ (job.model_dump(mode="json") if job.model_dump is defined else job) | tojson | forceescape }})'>
+                    <span class="material-symbols-outlined">visibility</span>
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if total > pagination.limit %}
+<div class="qj-pagination">
+    {% set total_pages = (total / pagination.limit) | round(0, 'ceil') | int %}
+    {% set current_page = pagination.page %}
+
+    <button class="qj-page-btn"
+            {% if current_page <= 1 %}disabled{% endif %}
+            hx-get="{{ qs(page=1) }}"
+            hx-target="#qj-table-container"
+            hx-swap="innerHTML"
+            title="Trang đầu">
+        <span class="material-symbols-outlined">first_page</span>
+    </button>
+
+    <button class="qj-page-btn"
+            {% if current_page <= 1 %}disabled{% endif %}
+            hx-get="{{ qs(page=current_page - 1) }}"
+            hx-target="#qj-table-container"
+            hx-swap="innerHTML"
+            title="Trang trước">
+        <span class="material-symbols-outlined">chevron_left</span>
+    </button>
+
+    <span class="qj-page-info">{{ current_page }} / {{ total_pages }}</span>
+
+    <button class="qj-page-btn"
+            {% if current_page >= total_pages %}disabled{% endif %}
+            hx-get="{{ qs(page=current_page + 1) }}"
+            hx-target="#qj-table-container"
+            hx-swap="innerHTML"
+            title="Trang sau">
+        <span class="material-symbols-outlined">chevron_right</span>
+    </button>
+
+    <button class="qj-page-btn"
+            {% if current_page >= total_pages %}disabled{% endif %}
+            hx-get="{{ qs(page=total_pages) }}"
+            hx-target="#qj-table-container"
+            hx-swap="innerHTML"
+            title="Trang cuối">
+        <span class="material-symbols-outlined">last_page</span>
+    </button>
+</div>
+{% endif %}
+
+{% else %}
+<div class="qj-empty">
+    <span class="material-symbols-outlined qj-empty-icon">inbox</span>
+    <p class="qj-empty-title">Không tìm thấy công việc nào</p>
+    <p class="qj-empty-sub">Hãy thử thay đổi từ khoá tìm kiếm hoặc bộ lọc trạng thái</p>
+</div>
+{% endif %}
