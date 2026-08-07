@@ -25,6 +25,7 @@ class QueueServices:
         self.scheduler = AsyncIOScheduler()
         self.worker_task = None
         self._registry = {}
+        self._running_tasks: dict[str, asyncio.Task] = {}
 
     def register_class(self, cls):
         """Class Decorator để tự động khởi tạo class và đăng ký tất cả @queue_job"""
@@ -36,7 +37,7 @@ class QueueServices:
                 underlying_func = getattr(attr, "__func__", attr)
 
                 if hasattr(underlying_func, "_queue_key"):
-                    key = getattr(underlying_func, "_queue_key")
+                    key = underlying_func._queue_key
                     self._registry[key] = attr
                     logger.info(
                         f"📌 Đã đăng ký queue job: {key} -> {cls.__name__}.{attr_name}"
@@ -47,10 +48,22 @@ class QueueServices:
         logger.info("🤖 Background Job Queue Worker đã kích hoạt...")
         while True:
             try:
-                job_type, payload = await self.job_queue.get()
+                job_id, job_type, payload = await self.job_queue.get()
                 func = self._registry.get(job_type)
+
                 if func:
-                    await func(payload)
+                    task = asyncio.create_task(func(payload))
+                    self._running_tasks[job_id] = task
+
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        logger.warning(
+                            f"⚠️ Job {job_id} ({job_type}) đã bị hủy mid-way!"
+                        )
+                    finally:
+                        self._running_tasks.pop(job_id, None)
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -74,17 +87,30 @@ class QueueServices:
 
             for job in pending_jobs:
                 if job.next_payload:
-                    await self.enqueue_by_type(job.type, job.next_payload)
+                    await self.enqueue_by_type(job.type, job.id, str(job.id))
 
     def add_cron_job(self, func, cron_expression: str, **kwargs):
         trigger = CronTrigger.from_crontab(cron_expression)
         self.scheduler.add_job(func, trigger, **kwargs)
 
-    async def enqueue_by_type(self, job_type: str, payload: Any):
-        func = self._registry.get(job_type)
-        if not func:
+    async def enqueue_by_type(self, job_type: str, payload: Any, job_id: str):
+        if job_type not in self._registry:
             raise ValueError(f"Loại job '{job_type}' không tồn tại trong hệ thống!")
-        await self.job_queue.put((func, payload))
+
+        # Đẩy kèm job_id để quản lý
+        await self.job_queue.put((job_id, job_type, payload))
+
+    def cancel_job(self, job_id: str) -> bool:
+        """Hủy 1 job đang chạy theo job_id"""
+        task = self._running_tasks.get(job_id)
+
+        if task and not task.done():
+            task.cancel()
+            logger.info(f"🛑 Đã gửi lệnh hủy cho job: {job_id}")
+            return True
+
+        logger.warning(f"⚠️ Không thể hủy job {job_id}: Job không tồn tại hoặc đã xong.")
+        return False
 
     async def start(self):
         self.scheduler.start()
