@@ -13,9 +13,12 @@ from database.models.queue_jobs import JobStatus, QueueJob, QueueJobLogs
 from src.modules.employees.employee_schemas import BulkUpsertResponse
 from src.shared.base.base_client import BaseClient
 from src.shared.base.base_queue import queue_job, queue_service
+from src.shared.constants.cache_tags import CacheTags
 from src.shared.constants.queue_keys import QueueKeys
 from src.shared.helpers.file_handel import FileHandelHelper
+from src.shared.helpers.qr_helper import CreateQRSchema, create_qr_url
 from src.shared.helpers.random_helpers import get_now_vn
+from src.shared.services.redis_services import RedisServices
 
 MAX_DETAILED_ERRORS = 500
 
@@ -24,6 +27,7 @@ MAX_DETAILED_ERRORS = 500
 class EmployeeBackgroundTask:
     def __init__(self):
         self.BATCH_SIZE = 1000
+        self.redis = RedisServices()
 
     async def _download_and_parse_file(
         self, file_url: str, header_row: int | None = None
@@ -224,7 +228,10 @@ class EmployeeBackgroundTask:
                     for row_number, data in validated_chunk_data:
                         try:
                             async with session.begin_nested():
-                                emp = Employees(**data)
+                                qr_code_url = create_qr_url(
+                                    CreateQRSchema(data=str(data.get("id")))
+                                )
+                                emp = Employees(**data, qr_url=qr_code_url)
                                 if emp.id in existing_ids:
                                     await session.merge(emp)
                                 else:
@@ -308,6 +315,8 @@ class EmployeeBackgroundTask:
                             )
                         )
                         await session.exec(sync_seq_stmt)
+
+                await self.redis.invalidate_tags_async(CacheTags.EMPLOYEE)
                 await session.commit()
 
             except Exception as global_err:
@@ -315,6 +324,7 @@ class EmployeeBackgroundTask:
                 job.finished_at = get_now_vn()
                 cast(list, job_logs.errors).append({"global_error": str(global_err)})
                 job.logs = job_logs.model_dump()
+                await self.redis.invalidate_tags_async(CacheTags.EMPLOYEE)
 
                 await session.commit()
                 raise global_err

@@ -184,7 +184,6 @@ class EmployeeServices:
 
             await queue_service.enqueue_by_type(
                 QueueKeys.BULK_UPSERT_EMPLOYEES.value,
-                employees.model_dump(),
                 str(new_job.id),
             )
             return BaseResponse.ok(
