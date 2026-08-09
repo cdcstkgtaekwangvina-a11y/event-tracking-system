@@ -1,0 +1,897 @@
+{# ═══════════════════════════════════════════════════════════════════════
+     QR Scanner Component
+     Reusable component for scanning QR codes via camera or image upload.
+     
+     Usage:
+       include "templates/components/qr_scanner_modal.j2"
+     
+     JS API:
+       window.qrScanner.open()                     — Mở modal scanner
+       window.qrScanner.open({ onResult(data){} }) — Mở & nhận callback kết quả
+       
+     Events:
+       window.addEventListener('qr-scanned', (e) => { console.log(e.detail.data) })
+   ═══════════════════════════════════════════════════════════════════════ #}
+
+<script src="/static/js/vendors/jsQR.min.js"></script>
+
+<style>
+/* ── QR Scanner Modal ── */
+/* Accent color: #07A39E (teal) */
+.qrs-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.qrs-modal {
+    position: relative;
+    width: 95%;
+    max-width: 520px;
+    background: var(--card, #fff);
+    color: var(--foreground, #1a1a2e);
+    border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+    animation: qrsSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes qrsSlideUp {
+    from { opacity: 0; transform: translateY(30px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Header */
+.qrs-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+}
+.qrs-header h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--foreground, #1a1a2e);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.qrs-header h3 .material-symbols-outlined {
+    font-size: 22px;
+    color: #07A39E;
+}
+.qrs-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--muted, rgba(0, 0, 0, 0.05));
+    color: var(--foreground, #1a1a2e);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.qrs-close-btn:hover {
+    background: var(--muted, rgba(0, 0, 0, 0.1));
+}
+
+/* Tab Switcher */
+.qrs-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 12px 24px;
+    background: var(--muted, rgba(0, 0, 0, 0.02));
+}
+.qrs-tab-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--muted-foreground, #666);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.qrs-tab-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+.qrs-tab-btn:hover {
+    color: var(--foreground, #1a1a2e);
+    background: var(--muted, rgba(0, 0, 0, 0.04));
+}
+.qrs-tab-btn.active {
+    background: rgba(7, 163, 158, 0.12);
+    color: #07A39E;
+    font-weight: 600;
+}
+
+/* Body */
+.qrs-body {
+    padding: 20px 24px 24px;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Camera View */
+.qrs-camera-container {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    aspect-ratio: 1;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #000;
+    border: 2px solid rgba(7, 163, 158, 0.3);
+}
+.qrs-camera-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.qrs-camera-container canvas {
+    display: none;
+}
+
+/* Scan overlay animation */
+.qrs-scan-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.qrs-scan-overlay::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 65%;
+    height: 65%;
+    border: 2px solid rgba(7, 163, 158, 0.5);
+    border-radius: 16px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+}
+.qrs-scan-line {
+    position: absolute;
+    left: 17.5%;
+    width: 65%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #07A39E, transparent);
+    box-shadow: 0 0 12px rgba(7, 163, 158, 0.6);
+    animation: qrsScanLine 2s ease-in-out infinite;
+}
+@keyframes qrsScanLine {
+    0%, 100% { top: 20%; }
+    50% { top: 75%; }
+}
+
+/* Corner markers */
+.qrs-corner { position: absolute; width: 24px; height: 24px; }
+.qrs-corner::before, .qrs-corner::after { content: ''; position: absolute; background: #07A39E; border-radius: 2px; }
+.qrs-corner--tl { top: 17%; left: 17.5%; }
+.qrs-corner--tl::before { top: 0; left: 0; width: 3px; height: 18px; }
+.qrs-corner--tl::after  { top: 0; left: 0; width: 18px; height: 3px; }
+.qrs-corner--tr { top: 17%; right: 17.5%; }
+.qrs-corner--tr::before { top: 0; right: 0; width: 3px; height: 18px; }
+.qrs-corner--tr::after  { top: 0; right: 0; width: 18px; height: 3px; }
+.qrs-corner--bl { bottom: 17%; left: 17.5%; }
+.qrs-corner--bl::before { bottom: 0; left: 0; width: 3px; height: 18px; }
+.qrs-corner--bl::after  { bottom: 0; left: 0; width: 18px; height: 3px; }
+.qrs-corner--br { bottom: 17%; right: 17.5%; }
+.qrs-corner--br::before { bottom: 0; right: 0; width: 3px; height: 18px; }
+.qrs-corner--br::after  { bottom: 0; right: 0; width: 18px; height: 3px; }
+
+/* Camera status messages */
+.qrs-camera-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    height: 100%;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    text-align: center;
+    padding: 24px;
+}
+.qrs-camera-msg .material-symbols-outlined {
+    font-size: 48px;
+    color: rgba(7, 163, 158, 0.6);
+}
+.qrs-camera-msg .qrs-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(7, 163, 158, 0.2);
+    border-top-color: #07A39E;
+    border-radius: 50%;
+    animation: qrsSpin 0.8s linear infinite;
+}
+@keyframes qrsSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* Image Upload */
+.qrs-upload-zone {
+    width: 100%;
+    max-width: 400px;
+    min-height: 240px;
+    border: 2px dashed rgba(7, 163, 158, 0.3);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all 0.25s;
+    padding: 32px;
+    background: rgba(7, 163, 158, 0.03);
+}
+.qrs-upload-zone:hover, .qrs-upload-zone.dragover {
+    border-color: #07A39E;
+    background: rgba(7, 163, 158, 0.08);
+}
+.qrs-upload-zone .material-symbols-outlined {
+    font-size: 48px;
+    color: rgba(7, 163, 158, 0.5);
+}
+.qrs-upload-zone p {
+    margin: 0;
+    color: var(--muted-foreground, #666);
+    font-size: 14px;
+    text-align: center;
+}
+.qrs-upload-zone p strong {
+    color: #07A39E;
+    font-weight: 500;
+}
+.qrs-upload-zone input[type="file"] {
+    display: none;
+}
+
+/* Image preview */
+.qrs-image-preview {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 2px solid rgba(7, 163, 158, 0.2);
+}
+.qrs-image-preview img {
+    width: 100%;
+    display: block;
+    border-radius: 14px;
+}
+.qrs-image-preview-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    justify-content: center;
+}
+
+/* Result area */
+.qrs-result {
+    width: 100%;
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 12px;
+    background: rgba(7, 163, 158, 0.06);
+    border: 1px solid rgba(7, 163, 158, 0.2);
+}
+.qrs-result-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #07A39E;
+    margin-bottom: 8px;
+}
+.qrs-result-label .material-symbols-outlined {
+    font-size: 16px;
+}
+.qrs-result-data {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--foreground, #1a1a2e);
+    word-break: break-all;
+    line-height: 1.5;
+    background: var(--muted, rgba(0, 0, 0, 0.05));
+    padding: 10px 12px;
+    border-radius: 8px;
+    user-select: all;
+}
+.qrs-result-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+/* Buttons */
+.qrs-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.qrs-btn .material-symbols-outlined { font-size: 16px; }
+.qrs-btn-primary {
+    background: linear-gradient(135deg, #07A39E, #059691);
+    color: #fff;
+}
+.qrs-btn-primary:hover {
+    background: linear-gradient(135deg, #059691, #048a85);
+    box-shadow: 0 4px 14px rgba(7, 163, 158, 0.35);
+}
+.qrs-btn-ghost {
+    background: var(--muted, rgba(0, 0, 0, 0.05));
+    color: var(--foreground, #1a1a2e);
+}
+.qrs-btn-ghost:hover {
+    background: var(--muted, rgba(0, 0, 0, 0.1));
+}
+.qrs-btn-success {
+    background: rgba(7, 163, 158, 0.12);
+    color: #07A39E;
+}
+.qrs-btn-success:hover {
+    background: rgba(7, 163, 158, 0.2);
+}
+
+/* Error state */
+.qrs-error {
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.qrs-error .material-symbols-outlined { font-size: 18px; }
+
+/* Scanning indicator text */
+.qrs-scanning-text {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted-foreground, #666);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.qrs-scanning-text .qrs-dot-pulse {
+    display: inline-flex;
+    gap: 3px;
+}
+.qrs-scanning-text .qrs-dot-pulse span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #07A39E;
+    animation: qrsDotPulse 1.2s ease-in-out infinite;
+}
+.qrs-scanning-text .qrs-dot-pulse span:nth-child(2) { animation-delay: 0.15s; }
+.qrs-scanning-text .qrs-dot-pulse span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes qrsDotPulse {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1.2); }
+}
+</style>
+
+<div id="qrs-modal-root"
+     x-data="qrScannerModal"
+     x-show="isOpen"
+     x-cloak
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @keydown.escape.window="close()"
+     class="qrs-backdrop"
+     @click.self="close()">
+
+    <div class="qrs-modal" @click.stop>
+        <!-- Header -->
+        <div class="qrs-header">
+            <h3>
+                <span class="material-symbols-outlined">qr_code_scanner</span>
+                Quét mã QR
+            </h3>
+            <button type="button" class="qrs-close-btn" @click="close()">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <!-- Tab Switcher -->
+        <div class="qrs-tabs">
+            <button type="button"
+                    class="qrs-tab-btn"
+                    :class="{ active: tab === 'camera' }"
+                    @click="switchTab('camera')">
+                <span class="material-symbols-outlined">videocam</span>
+                Camera
+            </button>
+            <button type="button"
+                    class="qrs-tab-btn"
+                    :class="{ active: tab === 'image' }"
+                    @click="switchTab('image')">
+                <span class="material-symbols-outlined">image</span>
+                Tải ảnh lên
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="qrs-body">
+
+            <!-- ══════ Camera Tab ══════ -->
+            <template x-if="tab === 'camera'">
+                <div style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+
+                    <div class="qrs-camera-container" x-ref="cameraBox">
+                        <!-- Video & canvas always in DOM -->
+                        <video x-ref="video" autoplay playsinline muted
+                               style="width:100%;height:100%;object-fit:cover;"
+                               x-show="cameraState === 'active'"></video>
+                        <canvas x-ref="canvas" style="display:none;"></canvas>
+
+                        <!-- Scan overlay -->
+                        <div class="qrs-scan-overlay" x-show="cameraState === 'active'">
+                            <div class="qrs-scan-line"></div>
+                            <div class="qrs-corner qrs-corner--tl"></div>
+                            <div class="qrs-corner qrs-corner--tr"></div>
+                            <div class="qrs-corner qrs-corner--bl"></div>
+                            <div class="qrs-corner qrs-corner--br"></div>
+                        </div>
+
+                        <!-- Loading state -->
+                        <div class="qrs-camera-msg" x-show="cameraState === 'loading'">
+                            <div class="qrs-spinner"></div>
+                            <span>Đang kết nối camera...</span>
+                        </div>
+
+                        <!-- Error state -->
+                        <div class="qrs-camera-msg" x-show="cameraState === 'error'">
+                            <span class="material-symbols-outlined">videocam_off</span>
+                            <span x-text="cameraError"></span>
+                            <button class="qrs-btn qrs-btn-primary" @click="startCamera()" style="margin-top: 8px;">
+                                <span class="material-symbols-outlined">refresh</span>
+                                Thử lại
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scanning text -->
+                    <template x-if="cameraState === 'active' && !result">
+                        <div class="qrs-scanning-text">
+                            Đang quét
+                            <span class="qrs-dot-pulse"><span></span><span></span><span></span></span>
+                        </div>
+                    </template>
+
+                    <!-- Result in camera mode -->
+                    <template x-if="result">
+                        <div class="qrs-result">
+                            <div class="qrs-result-label">
+                                <span class="material-symbols-outlined">check_circle</span>
+                                Kết quả quét QR
+                            </div>
+                            <div class="qrs-result-data" x-text="result"></div>
+                            <div class="qrs-result-actions">
+                                <button class="qrs-btn qrs-btn-success" @click="copyResult()">
+                                    <span class="material-symbols-outlined">content_copy</span>
+                                    Sao chép
+                                </button>
+                                <button class="qrs-btn qrs-btn-ghost" @click="resetScan()">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                    Quét lại
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <!-- ══════ Image Tab ══════ -->
+            <template x-if="tab === 'image'">
+                <div style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+
+                    <!-- Upload zone (no image yet) -->
+                    <template x-if="!imagePreviewUrl">
+                        <div class="qrs-upload-zone"
+                             :class="{ dragover: isDragging }"
+                             @click="$refs.fileInput.click()"
+                             @dragover.prevent="isDragging = true"
+                             @dragleave.prevent="isDragging = false"
+                             @drop.prevent="handleDrop($event)">
+                            <span class="material-symbols-outlined">cloud_upload</span>
+                            <p>Kéo thả ảnh chứa mã QR vào đây<br>hoặc <strong>nhấn để chọn file</strong></p>
+                            <p style="font-size: 12px; opacity: 0.5;">Hỗ trợ: PNG, JPG, JPEG, BMP, GIF, WebP</p>
+                            <input type="file" x-ref="fileInput" accept="image/*" @change="handleFileSelect($event)">
+                        </div>
+                    </template>
+
+                    <!-- Image preview -->
+                    <template x-if="imagePreviewUrl">
+                        <div style="width:100%;display:flex;flex-direction:column;align-items:center;">
+                            <div class="qrs-image-preview">
+                                <img :src="imagePreviewUrl" alt="QR Image">
+                                <canvas x-ref="imgCanvas" style="display:none;"></canvas>
+                            </div>
+                            <div class="qrs-image-preview-actions">
+                                <button class="qrs-btn qrs-btn-ghost" @click="clearImage()">
+                                    <span class="material-symbols-outlined">delete</span>
+                                    Xoá ảnh
+                                </button>
+                                <button class="qrs-btn qrs-btn-primary" @click="$refs.fileInput2.click()">
+                                    <span class="material-symbols-outlined">swap_horiz</span>
+                                    Chọn ảnh khác
+                                </button>
+                                <input type="file" x-ref="fileInput2" accept="image/*" @change="handleFileSelect($event)" style="display:none;">
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Scanning indicator -->
+                    <template x-if="imageScanning">
+                        <div class="qrs-scanning-text" style="margin-top: 16px;">
+                            Đang phân tích ảnh
+                            <span class="qrs-dot-pulse"><span></span><span></span><span></span></span>
+                        </div>
+                    </template>
+
+                    <!-- Error -->
+                    <template x-if="imageError">
+                        <div class="qrs-error">
+                            <span class="material-symbols-outlined">error</span>
+                            <span x-text="imageError"></span>
+                        </div>
+                    </template>
+
+                    <!-- Result in image mode -->
+                    <template x-if="result">
+                        <div class="qrs-result">
+                            <div class="qrs-result-label">
+                                <span class="material-symbols-outlined">check_circle</span>
+                                Kết quả quét QR
+                            </div>
+                            <div class="qrs-result-data" x-text="result"></div>
+                            <div class="qrs-result-actions">
+                                <button class="qrs-btn qrs-btn-success" @click="copyResult()">
+                                    <span class="material-symbols-outlined">content_copy</span>
+                                    Sao chép
+                                </button>
+                                <button class="qrs-btn qrs-btn-ghost" @click="clearImage(); result = null; imageError = null;">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                    Quét ảnh khác
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+
+    Alpine.data('qrScannerModal', () => ({
+        isOpen: false,
+        tab: 'camera',          // 'camera' | 'image'
+        result: null,           // decoded QR data string
+
+        /* Camera state */
+        cameraState: 'loading', // 'loading' | 'active' | 'error'
+        cameraError: '',
+        _stream: null,
+        _animFrame: null,
+
+        /* Image state */
+        imagePreviewUrl: null,
+        imageScanning: false,
+        imageError: null,
+        isDragging: false,
+
+        /* Callback */
+        _onResult: null,
+
+        /* ───── Public API ───── */
+
+        /**
+         * Mở modal QR Scanner.
+         * @param {Object} opts
+         * @param {Function} opts.onResult - callback nhận kết quả: (dataString) => void
+         */
+        open(opts = {}) {
+            this.result = null;
+            this.imagePreviewUrl = null;
+            this.imageError = null;
+            this.imageScanning = false;
+            this._onResult = opts.onResult || null;
+            this.isOpen = true;
+            this.tab = 'camera';
+            this.$nextTick(() => this.startCamera());
+        },
+
+        close() {
+            this.stopCamera();
+            this.isOpen = false;
+            this.result = null;
+            this.imagePreviewUrl = null;
+            this._onResult = null;
+        },
+
+        /**
+         * Hàm scan-qr trả về Promise<string>.
+         * Sử dụng: const data = await window.qrScanner.scanQR();
+         */
+        scanQR() {
+            return new Promise((resolve) => {
+                this.open({
+                    onResult: (data) => {
+                        resolve(data);
+                    }
+                });
+            });
+        },
+
+        /* ───── Tab switching ───── */
+        switchTab(newTab) {
+            if (newTab === this.tab) return;
+            this.result = null;
+            this.imageError = null;
+            if (this.tab === 'camera') this.stopCamera();
+            this.tab = newTab;
+            if (newTab === 'camera') {
+                this.$nextTick(() => this.startCamera());
+            }
+        },
+
+        /* ───── Camera Methods ───── */
+        async startCamera() {
+            this.cameraState = 'loading';
+            this.cameraError = '';
+            this.result = null;
+
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 640 },
+                        height: { ideal: 640 }
+                    }
+                };
+                this._stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                const video = this.$refs.video;
+                video.srcObject = this._stream;
+                await video.play();
+                this.cameraState = 'active';
+
+                /* Start scanning loop */
+                this._scanFrame();
+
+            } catch (err) {
+                console.error('Camera error:', err);
+                this.cameraState = 'error';
+                if (err.name === 'NotAllowedError') {
+                    this.cameraError = 'Quyền truy cập camera bị từ chối. Vui lòng cấp quyền trong cài đặt trình duyệt.';
+                } else if (err.name === 'NotFoundError') {
+                    this.cameraError = 'Không tìm thấy camera trên thiết bị này.';
+                } else if (err.name === 'NotReadableError') {
+                    this.cameraError = 'Camera đang được sử dụng bởi ứng dụng khác.';
+                } else {
+                    this.cameraError = `Không thể kết nối camera: ${err.message}`;
+                }
+            }
+        },
+
+        stopCamera() {
+            if (this._animFrame) {
+                cancelAnimationFrame(this._animFrame);
+                this._animFrame = null;
+            }
+            if (this._stream) {
+                this._stream.getTracks().forEach(t => t.stop());
+                this._stream = null;
+            }
+        },
+
+        _scanFrame() {
+            if (!this.isOpen || this.tab !== 'camera' || this.result) return;
+
+            const video = this.$refs.video;
+            const canvas = this.$refs.canvas;
+            if (!video || !canvas || video.readyState < video.HAVE_ENOUGH_DATA) {
+                this._animFrame = requestAnimationFrame(() => this._scanFrame());
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert'
+            });
+
+            if (code && code.data) {
+                this._onQRDetected(code.data);
+                return;
+            }
+
+            this._animFrame = requestAnimationFrame(() => this._scanFrame());
+        },
+
+        /* ───── Image Methods ───── */
+        handleFileSelect(event) {
+            const file = event.target.files?.[0];
+            if (file) this._processImageFile(file);
+            event.target.value = '';
+        },
+
+        handleDrop(event) {
+            this.isDragging = false;
+            const file = event.dataTransfer.files?.[0];
+            if (file && file.type.startsWith('image/')) {
+                this._processImageFile(file);
+            } else {
+                this.imageError = 'Vui lòng chọn file ảnh hợp lệ (PNG, JPG, BMP, GIF, WebP).';
+            }
+        },
+
+        _processImageFile(file) {
+            this.result = null;
+            this.imageError = null;
+            this.imageScanning = true;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this.imagePreviewUrl = e.target.result;
+
+                const img = new Image();
+                img.onload = () => {
+                    this.$nextTick(() => {
+                        const canvas = this.$refs.imgCanvas || document.createElement('canvas');
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                        ctx.drawImage(img, 0, 0);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: 'attemptBoth'
+                        });
+
+                        this.imageScanning = false;
+
+                        if (code && code.data) {
+                            this._onQRDetected(code.data);
+                        } else {
+                            this.imageError = 'Không tìm thấy mã QR trong ảnh. Hãy thử ảnh khác hoặc ảnh rõ hơn.';
+                        }
+                    });
+                };
+                img.onerror = () => {
+                    this.imageScanning = false;
+                    this.imageError = 'Không thể đọc file ảnh này.';
+                };
+                img.src = e.target.result;
+            };
+            reader.onerror = () => {
+                this.imageScanning = false;
+                this.imageError = 'Lỗi đọc file.';
+            };
+            reader.readAsDataURL(file);
+        },
+
+        clearImage() {
+            this.imagePreviewUrl = null;
+            this.imageError = null;
+            this.result = null;
+        },
+
+        /* ───── Result Handling ───── */
+        _onQRDetected(data) {
+            this.result = data;
+
+            /* Dispatch global event */
+            window.dispatchEvent(new CustomEvent('qr-scanned', { detail: { data } }));
+
+            /* Invoke callback if provided */
+            if (typeof this._onResult === 'function') {
+                this._onResult(data);
+            }
+
+            /* Toast notification */
+            window.notify?.toast?.success?.('Quét QR thành công', data.length > 60 ? data.substring(0, 60) + '...' : data);
+        },
+
+        copyResult() {
+            if (!this.result) return;
+            navigator.clipboard.writeText(this.result).then(() => {
+                window.notify?.toast?.success?.('Đã sao chép', 'Dữ liệu QR đã được sao chép vào clipboard');
+            }).catch(() => {
+                /* Fallback for older browsers */
+                const ta = document.createElement('textarea');
+                ta.value = this.result;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                window.notify?.toast?.success?.('Đã sao chép');
+            });
+        },
+
+        resetScan() {
+            this.result = null;
+            if (this.tab === 'camera') {
+                this.$nextTick(() => this._scanFrame());
+            }
+        },
+    }));
+
+    /* ─── Global API ─── */
+    const getModalData = () => {
+        const el = document.getElementById('qrs-modal-root');
+        return el && window.Alpine ? window.Alpine.$data(el) : null;
+    };
+
+    window.qrScanner = {
+        open(opts) {
+            const data = getModalData();
+            if (data) data.open(opts);
+        },
+        close() {
+            const data = getModalData();
+            if (data) data.close();
+        },
+        /**
+         * Promise-based API: const result = await window.qrScanner.scanQR()
+         */
+        scanQR() {
+            const data = getModalData();
+            if (data) return data.scanQR();
+            return Promise.reject(new Error('QR Scanner component chưa sẵn sàng'));
+        },
+    };
+});
+</script>

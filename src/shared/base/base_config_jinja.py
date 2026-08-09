@@ -18,7 +18,7 @@ def global_values(templates: Jinja2Templates) -> Jinja2Templates:
             name="Khách mời", icon="group", id="employees", path="/admin/employees"
         ),
         PageSchema(
-            name="Queue Jobs", icon="queue", id="queue_jobs", path="/admin/queue-jobs"
+            name="Tác vụ", icon="assignment", id="queue_jobs", path="/admin/queue-jobs"
         ),
         PageSchema(
             name="Tài khoản",

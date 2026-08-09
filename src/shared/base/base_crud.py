@@ -240,6 +240,7 @@ class BaseCrud(Generic[T]):
             self.statement = self.statement.where(self.model.deleted_at == None)
 
         result = await self.session.exec(self.statement)
+        self.statement = select(self.model)
         return result.one()
 
     async def find_by_id(self, id: Any, soft_delete: bool = True) -> T | None:
@@ -290,6 +291,7 @@ class BaseCrud(Generic[T]):
         )
 
         if not update_data:
+            self.statement = select(self.model)
             return None
 
         # 2. Kiểm tra và tự động cập nhật trường updated_at nếu có
@@ -302,6 +304,7 @@ class BaseCrud(Generic[T]):
         elif condition is not None:
             where_clause = condition(self.model)
         else:
+            self.statement = select(self.model)
             return None
         stmt = update(self.model).where(where_clause)
 
@@ -316,6 +319,7 @@ class BaseCrud(Generic[T]):
         if autocommit:
             await self.session.commit()
 
+        self.statement = select(self.model)
         return db_obj
 
     async def delete(
@@ -331,6 +335,7 @@ class BaseCrud(Generic[T]):
         elif condition is not None:
             where_clause = condition(self.model)
         else:
+            self.statement = select(self.model)
             return False
 
         if soft_delete and self.is_has_soft_delete(self.model):
@@ -347,6 +352,7 @@ class BaseCrud(Generic[T]):
             await self.session.commit()
 
         # Trả về True nếu có ít nhất một dòng dữ liệu bị ảnh hưởng
+        self.statement = select(self.model)
         return result.rowcount > 0
 
     async def any_async(
@@ -484,6 +490,7 @@ class BaseCrud(Generic[T]):
                 self.dto_class.model_validate(row, from_attributes=True) for row in data
             ]
 
+        self.statement = select(self.model)
         return PaginationResponse(
             page=pagination.page,
             limit=pagination.limit,
@@ -677,6 +684,7 @@ class BaseCrud(Generic[T]):
             next_cursor = f"{sort_val}_{id_val}"
             has_more = len(data) >= limit
 
+        self.statement = select(self.model)
         return CursorPaginationResponse(
             data=list(data) if data else None,
             next_cursor=next_cursor,

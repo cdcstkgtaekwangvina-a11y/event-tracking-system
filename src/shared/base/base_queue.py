@@ -1,5 +1,4 @@
 import asyncio
-from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -48,11 +47,11 @@ class QueueServices:
         logger.info("🤖 Background Job Queue Worker đã kích hoạt...")
         while True:
             try:
-                job_id, job_type, payload = await self.job_queue.get()
+                job_id, job_type = await self.job_queue.get()
                 func = self._registry.get(job_type)
 
                 if func:
-                    task = asyncio.create_task(func(payload))
+                    task = asyncio.create_task(func(job_id))
                     self._running_tasks[job_id] = task
 
                     try:
@@ -87,18 +86,18 @@ class QueueServices:
 
             for job in pending_jobs:
                 if job.next_payload:
-                    await self.enqueue_by_type(job.type, job.id, str(job.id))
+                    await self.enqueue_by_type(job.type, str(job.id))
 
     def add_cron_job(self, func, cron_expression: str, **kwargs):
         trigger = CronTrigger.from_crontab(cron_expression)
         self.scheduler.add_job(func, trigger, **kwargs)
 
-    async def enqueue_by_type(self, job_type: str, payload: Any, job_id: str):
+    async def enqueue_by_type(self, job_type: str, job_id: str):
         if job_type not in self._registry:
             raise ValueError(f"Loại job '{job_type}' không tồn tại trong hệ thống!")
 
         # Đẩy kèm job_id để quản lý
-        await self.job_queue.put((job_id, job_type, payload))
+        await self.job_queue.put((job_id, job_type))
 
     def cancel_job(self, job_id: str) -> bool:
         """Hủy 1 job đang chạy theo job_id"""
