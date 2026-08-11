@@ -50,12 +50,13 @@
   --nc-overlay-bg:   rgba(0, 0, 0, 0.65);
 }
 
+
 @font-face {
   font-family: 'Material Symbols Outlined';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 700;
   font-display: block;
-  src: url('../assets/fonts/MaterialSymbolsOutlined.woff2') format('woff2'); 
+  src: url('/fonts/MaterialSymbolsOutlined.woff2') format('woff2');
 }
 
 .material-symbols-outlined {
