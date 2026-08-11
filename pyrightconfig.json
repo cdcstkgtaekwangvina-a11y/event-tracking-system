@@ -1,0 +1,5 @@
+{
+  "typeCheckingMode": "basic",
+  "extraPaths": ["."],
+  "pythonPath": "./envs/python.exe"
+}
