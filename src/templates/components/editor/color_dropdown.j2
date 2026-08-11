@@ -1,0 +1,51 @@
+<!-- Text Colors & Highlights -->
+<div class="dropdown-wrapper" @click.outside="activeDropdown === 'color' && (activeDropdown = null)">
+    <button type="button" class="btn dropdown-btn" @click="toggleDropdown('color')">
+        <span>🎨 Màu</span>
+        <span class="arrow">▼</span>
+    </button>
+    <div class="dropdown-menu color-dropdown" x-show="activeDropdown === 'color'" x-transition>
+        <div class="dropdown-section-title">Màu chữ</div>
+        <div class="color-grid">
+            <button type="button" class="color-swatch outline-swatch" style="background: #ffffff;" title="Mặc định"
+                @click="editor.chain().focus().unsetColor().run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #ef4444;" title="Đỏ"
+                @click="editor.chain().focus().setColor('#ef4444').run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #f97316;" title="Cam"
+                @click="editor.chain().focus().setColor('#f97316').run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #eab308;" title="Vàng"
+                @click="editor.chain().focus().setColor('#eab308').run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #22c55e;" title="Xanh lục"
+                @click="editor.chain().focus().setColor('#22c55e').run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #3b82f6;" title="Xanh lam"
+                @click="editor.chain().focus().setColor('#3b82f6').run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #a855f7;" title="Tím"
+                @click="editor.chain().focus().setColor('#a855f7').run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #ec4899;" title="Hồng"
+                @click="editor.chain().focus().setColor('#ec4899').run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #64748b;" title="Xám"
+                @click="editor.chain().focus().setColor('#64748b').run(); closeDropdown()"></button>
+        </div>
+
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-section-title">Màu nền highlight</div>
+        <div class="color-grid">
+            <button type="button" class="color-swatch outline-swatch" style="background: #ffffff;" title="Xóa nền"
+                @click="myEditor.chain().focus().unsetHighlight().run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #fef08a;" title="Nền vàng"
+                @click="myEditor.chain().focus().toggleHighlight({ color: '#fef08a' }).run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #bbf7d0;" title="Nền xanh lục"
+                @click="myEditor.chain().focus().toggleHighlight({ color: '#bbf7d0' }).run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #bfdbfe;" title="Nền xanh lam"
+                @click="myEditor.chain().focus().toggleHighlight({ color: '#bfdbfe' }).run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #e9d5ff;" title="Nền tím"
+                @click="myEditor.chain().focus().toggleHighlight({ color: '#e9d5ff' }).run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #fbcfe8;" title="Nền hồng"
+                @click="myEditor.chain().focus().toggleHighlight({ color: '#fbcfe8' }).run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #fed7aa;" title="Nền cam"
+                @click="myEditor.chain().focus().toggleHighlight({ color: '#fed7aa' }).run(); closeDropdown()"></button>
+            <button type="button" class="color-swatch" style="background: #fecaca;" title="Nền đỏ"
+                @click="myEditor.chain().focus().toggleHighlight({ color: '#fecaca' }).run(); closeDropdown()"></button>
+        </div>
+    </div>
+</div>

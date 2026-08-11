@@ -1,13 +1,17 @@
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 from .base_model import PrimaryModel, CreatedAtModel, UpdatedAtModel, DeletedAtModel
-from .events_employees import EventsEmployees
 from sqlalchemy import DateTime
-from typing import cast, Any, Optional, TYPE_CHECKING
+from typing import cast, Any, Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from database.models.media import Medias
+    from database.models.events_employees import EventsEmployees
 
 
 class BaseEvents(SQLModel):
     name: str = Field(max_length=300)
+    description: str | None = Field(default=None, nullable=True)
     start_at: datetime | None = Field(
         default=None, nullable=True, sa_type=cast(Any, DateTime(timezone=True))
     )
@@ -16,10 +20,7 @@ class BaseEvents(SQLModel):
     )
     url_image: str | None = Field(default=None)
     url_map: str | None = Field(default=None, nullable=True)
-
-
-if TYPE_CHECKING:
-    from database.models.files import Files
+    location: str | None = Field(default=None, max_length=500, nullable=True)
 
 
 class Events(
@@ -30,8 +31,10 @@ class Events(
     DeletedAtModel,
     table=True,
 ):
-    __tablename__ = "events"
+    __tablename__: str = "events"
     id: int | None = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="files.id")
-    employees: list["EventsEmployees"] = Relationship(back_populates="event")
-    file: Optional["Files"] = Relationship(back_populates="events")
+    media_id: Optional[int] = Field(default=None, foreign_key="medias.id")
+    employee_links: Optional[List[EventsEmployees]] = Relationship(
+        back_populates="event"
+    )
+    media: Optional["Medias"] = Relationship(back_populates="events")

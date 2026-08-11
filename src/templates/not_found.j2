@@ -1,6 +1,28 @@
-{% extends "templates/index.j2" %} 
+{% extends "templates/layouts/main.j2" %}
 {% block title %}Không tồn tại{% endblock %}
-{%block content %}
+{%block body %}
+{% include "templates/headers/index.j2" %}
+
 <h1>Trang không tồn tại</h1>
 <h2>404!</h2>
+<a class="home-button" href="{{ url_for('home') }}">Về trang chủ</a>
+{% include "templates/footers/index.j2" %}
+<style>
+    .home-button {
+        text-decoration: none;
+        color: var(--foreground);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        padding: 10px;
+    }
+
+    .home-button:hover {
+        transform: scale(1.01);
+        box-shadow: 0 5px 10px var(--border);
+    }
+</style>
 {% endblock %}

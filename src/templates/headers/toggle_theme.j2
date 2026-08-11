@@ -1,35 +1,47 @@
-<div class="toggle" x-data="{ 
-        currTheme: localStorage.getItem('theme') || theme.light,
+<div style="{{ toggle_style if toggle_style else 'width: 100%; display: flex; justify-content: center; align-items: center;' }}"
+    x-data="{ 
+        currTheme: localStorage.getItem('theme') || 'light',
         toggle() {
-            this.currTheme = this.currTheme === theme.light ? theme.dark : theme.light;
+            const light = window.theme?.light || 'light';
+            const dark = window.theme?.dark || 'dark';
+            this.currTheme = this.currTheme === light ? dark : light;
             document.documentElement.setAttribute('data-theme', this.currTheme);
             localStorage.setItem('theme', this.currTheme);
         }
-    }" 
-    x-init="document.documentElement.setAttribute('data-theme', currTheme)">
+    }" x-init="document.documentElement.setAttribute('data-theme', currTheme)">
 
-    <button @click="toggle()" class="toggle-btn">
-        <template x-if="currTheme === theme.dark">
-            {% include "/static/public/icons/light.svg" %}
+    <button @click="toggle()" class="toggle-btn"
+        :style="!customStyle ? 'box-shadow: 1px 1px 0px 1px var(--border); border-radius: 25%;' : customStyle">
+
+        <template x-if="currTheme === 'dark'">
+            <span class="material-symbols-outlined">light_mode</span>
         </template>
-        <template x-if="currTheme === theme.light">
-            {% include "/static/public/icons/dark.svg" %}
+        <template x-if="currTheme === 'light'">
+            <span class="material-symbols-outlined">dark_mode</span>
         </template>
+
+        <span class="menu-text" x-text="currTheme === 'dark' ? darkModeText : lightModeText"
+            x-show="isSidebar || $store.screen.isMobile" x-transition.opacity.duration.200ms>
+        </span>
     </button>
 </div>
 
 <style>
-.toggle-btn {
-  border: 1px solid var(--border);
-  box-shadow: 1px 1px 0px 1px var(--border);
-  cursor: pointer;
-  color: var(--foreground);
-  border-radius: 25%;
-  padding: 8px 10px;
-  background-color: var(--background);
-  transition: all 0.2s ease;
-}
-.toggle-btn:hover {
-  background-color: var(--border);
-}
+    .toggle-btn {
+        border: 1px solid var(--border);
+        box-shadow: 1px 1px 0px 1px var(--border);
+        cursor: pointer;
+        color: var(--foreground);
+        padding: 8px 10px;
+        background-color: {{ toggle_bg | default('var(--background)')}};
+        transition: all 0.2s ease;
+        font-family: inherit;
+        font-size: inherit;
+        font-weight: inherit;
+        line-height: inherit;
+    }
+
+    .toggle-btn:hover {
+        background-color: {{ toggle_bg_hover | default('var(--border)')}};
+    }
 </style>

@@ -1,0 +1,70 @@
+{% if events %}
+<div class="events-grid">
+    {% set gradients = ['purple-blue', 'pink-red', 'green-teal', 'blue-dark', 'purple-pink', 'green-forest'] %}
+    {% for event in events %}
+    {% set grad_class = gradients[loop.index0 % 6] %}
+    <div class="event-card">
+        <div class="card-header {{ grad_class }}">
+            <span class="material-symbols-outlined icon-large">calendar_today</span>
+        </div>
+        <div class="card-body">
+            <h3 class="event-title">{{ event.name }}</h3>
+            <p class="event-desc" title="{{ event.description }}">{{ event.description }}</p>
+
+            <div class="event-info">
+                <div class="info-item">
+                    <span class="material-symbols-outlined">calendar_today</span>
+                    <span>{{ event.start_at.strftime('%d/%m/%Y') if event.start_at else '' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="material-symbols-outlined">schedule</span>
+                    <span>
+                        {{ event.start_at.strftime('%H:%M') if event.start_at else '00:00' }} -
+                        {{ event.end_at.strftime('%H:%M') if event.end_at else '00:00' }}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="material-symbols-outlined">location_on</span>
+                    <span>{{ event.location or 'Chưa xác định' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="material-symbols-outlined">group</span>
+                    <span class="registrant-count-text" id="reg-count-{{ event.id }}">{{ event.employee_count }} người
+                        đã đăng ký</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    <button class="page-btn" {% if page> 1 %}
+        hx-get="/api/events/cards-html?page={{ page - 1 }}&search={{ search }}"
+        hx-target="#events-container"
+        hx-swap="innerHTML"
+        {% else %}
+        disabled
+        {% endif %}>
+        <span class="material-symbols-outlined">chevron_left</span>
+    </button>
+
+    <span class="page-info">Trang <b>{{ page }}</b> / {{ total_pages }}</span>
+
+    <button class="page-btn" {% if page < total_pages %}
+        hx-get="/api/events/cards-html?page={{ page + 1 }}&search={{ search }}" hx-target="#events-container"
+        hx-swap="innerHTML" {% else %} disabled {% endif %}>
+        <span class="material-symbols-outlined">chevron_right</span>
+    </button>
+</div>
+{% endif %}
+
+{% else %}
+<div class="no-events">
+    <span class="material-symbols-outlined icon-huge">event_busy</span>
+    <h3>Không tìm thấy sự kiện nào</h3>
+    <p>Hãy thử tìm kiếm với từ khóa khác.</p>
+</div>
+{% endif %}

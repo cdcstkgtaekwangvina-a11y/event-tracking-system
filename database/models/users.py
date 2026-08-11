@@ -1,7 +1,13 @@
+from datetime import datetime
 from uuid import UUID, uuid8
-from sqlmodel import Field, SQLModel
-from src.modules.user.role_constants import ROLE
+from sqlmodel import Field, SQLModel, Relationship
 from .base_model import PrimaryModel, CreatedAtModel, UpdatedAtModel
+from sqlalchemy import DateTime
+from typing import cast, Any, Optional, TYPE_CHECKING
+from src.modules.user.role_constants import ROLE
+
+if TYPE_CHECKING:
+    from database.models.media import Medias
 
 
 class BaseUsers(SQLModel):
@@ -9,8 +15,8 @@ class BaseUsers(SQLModel):
     username: str = Field(max_length=350, unique=True)
     email: str = Field(nullable=False, max_length=300, unique=True)
     role: str = Field(max_length=20, nullable=False, default=ROLE.COMMON)
-    avatar: str | None = Field(default=None, nullable=True)
     is_active: bool = Field(default=True, nullable=False)
+    avatar_url: str | None = Field(default=None, nullable=True)
 
 
 class Users(
@@ -20,9 +26,16 @@ class Users(
     BaseUsers,
     table=True,
 ):
-    __tablename__ = "users"
-    id: UUID = Field(default=uuid8(), primary_key=True)
-    password: str | None = Field(default=None, max_length=500, nullable=True)
+    __tablename__: str = "users"
+    id: UUID = Field(default_factory=uuid8, primary_key=True)
+    password: str | None = Field(default=None, nullable=True)
+    otp_code: str | None = Field(default=None, max_length=10, nullable=True)
+    token_version: int = Field(default=0, nullable=False)
+    expired_at: datetime | None = Field(
+        default=None, sa_type=cast(Any, DateTime(timezone=True)), nullable=True
+    )
     google_sub: str | None = Field(
         default=None, max_length=500, nullable=True, unique=True, index=True
     )
+    media_id: Optional[int] = Field(default=None, foreign_key="medias.id")
+    media: Optional["Medias"] = Relationship(back_populates="users")

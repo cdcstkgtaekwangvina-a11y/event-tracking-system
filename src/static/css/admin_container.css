@@ -1,0 +1,9 @@
+.admin-main-content {
+    background-color: var(--background);
+    color: var(--foreground);
+    flex: 1;
+    margin-left: 230px;
+    min-width: 0;
+    box-sizing: border-box;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

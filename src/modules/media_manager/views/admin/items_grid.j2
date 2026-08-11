@@ -1,0 +1,956 @@
+﻿{% set picker_mode = picker_mode|default(false) %}
+{% if data and data|length > 0 %}
+<div x-init="window.mediaActions?.setHasData?.(true)" style="display: contents;">
+    {# ====== LIST VIEW ====== #}
+    <div class="media-list" x-show="viewMode === 'list'" x-cloak id="media-list-view" data-page="list"
+        @view-mode-changed.window="$el.scrollTop = 0">
+        <table class="media-table">
+            {% if not cursor_request.cursor %}
+            <thead>
+                <tr>
+                    {% if not picker_mode %}
+                    <th class="col-select"><input type="checkbox" id="select-all-list" class="row-checkbox"
+                            @change="window.mediaActions?.toggleSelectAll($event, 'list')"></th>
+                    {% endif %}
+                    <th class="col-name">T&#234;n &#8597;</th>
+                    <th class="col-size">K&#237;ch th&#432;&#7899;c</th>
+                    <th class="col-date">Ch&#7881;nh s&#7917;a l&#7847;n cu&#7889;i &#8597;</th>
+                    {% if not picker_mode %}
+                    <th class="col-actions">H&#224;nh &#273;&#7897;ng</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            {% endif %}
+            <tbody>
+                {% for item in data %}
+                <tr class="media-row" data-id="{{ item.id }}" data-type="{{ 'folder' if item.is_folder else 'file' }}"
+                    data-media-name="{{ item.name|e }}" data-media-url="{{ item.url|e if item.url else '' }}"
+                    data-media-kind="{{ 'folder' if item.is_folder else 'file' }}"
+                    data-media-format="{{ item.media_metadata.format|e if item.media_metadata and item.media_metadata.format else '' }}"
+                    data-media-type="{{ item.media_metadata.type|e if item.media_metadata and item.media_metadata.type else '' }}"
+                    data-media-size="{{ item.media_metadata.sizes if item.media_metadata and item.media_metadata.sizes else '' }}"
+                    {% if picker_mode %}
+                    :class="{ 'selected': mediaPicker.selected && mediaPicker.selected.id === {{ item.id }} }"
+                    @click="window.editorMediaPicker?.handleItemClick($event)" {% else %}
+                    :class="{ 'selected': $store.mediaSelection.isSelected({{ item.id }}) }" draggable="true" {% if not
+                    item.is_folder %}
+                    @dblclick="window.mediaActions?.forceDownload('{{ item.url }}', '{{ item.name }}')" {% endif %}
+                    @dragstart="event.dataTransfer.setData('text/plain', '{{ item.id }}'); event.dataTransfer.effectAllowed = 'move';"
+                    {% if item.is_folder %} @dragover.prevent="event.currentTarget.classList.add('drag-over')"
+                    @dragleave="event.currentTarget.classList.remove('drag-over')" @drop="
+                    event.preventDefault();
+                    event.currentTarget.classList.remove('drag-over');
+                    const draggedId = event.dataTransfer.getData('text/plain');
+                    if (draggedId && draggedId !== '{{ item.id }}') {
+                        window.mediaActions?.moveToFolder(draggedId, '{{ item.id }}');
+                    }
+                " @click="if ($event.target.tagName !== 'INPUT') { window.mediaActions?.goToFolder?.('{{ item.id }}') }"
+                    {% endif %} {% endif %}>
+                    {% if not picker_mode %}
+                    <td class="col-select">
+                        <input type="checkbox" class="row-checkbox"
+                            :checked="$store.mediaSelection.isSelected({{ item.id }})"
+                            @change="window.mediaActions?.toggleSelectItem($event, {{ item.id }})" @click.stop>
+                    </td>
+                    {% endif %}
+                    <td class="col-name">
+                        <div class="media-name-cell">
+                            {% if item.is_folder %}
+                            <span class="material-symbols-outlined media-icon media-icon--folder">folder</span>
+                            {% elif item.media_metadata and item.media_metadata.type == 'image' %}
+                            <span class="material-symbols-outlined media-icon media-icon--image">image</span>
+                            {% elif item.media_metadata and item.media_metadata.type == 'video' %}
+                            <span class="material-symbols-outlined media-icon media-icon--video">videocam</span>
+                            {% elif item.media_metadata and item.media_metadata.type == 'audio' %}
+                            <span class="material-symbols-outlined media-icon media-icon--audio">audio_file</span>
+                            {% elif item.media_metadata and item.media_metadata.format in ['pdf'] %}
+                            <span class="media-icon-badge media-icon-badge--pdf">PDF</span>
+                            {% elif item.media_format in ['xlsx', 'xls'] %}
+                            <span class="media-icon-badge media-icon-badge--xlsx">XLSX</span>
+                            {% elif item.media_format in ['docx', 'doc'] %}
+                            <span class="media-icon-badge media-icon-badge--docx">DOCX</span>
+                            {% elif item.media_format in ['pptx', 'ppt'] %}
+                            <span class="media-icon-badge media-icon-badge--pptx">PPTX</span>
+                            {% else %}
+                            <span class="material-symbols-outlined media-icon media-icon--file">description</span>
+                            {% endif %}
+                            <span class="media-name-text">{{ item.name }}</span>
+                        </div>
+                    </td>
+                    <td class="col-size">
+                        {% if item.is_folder %}<span class="text-muted">-</span>
+                        {% elif item.media_metadata and item.media_metadata.sizes %}{% set bytes =
+                        item.media_metadata.sizes
+                        %}
+                        {% if bytes >= 1073741824 %}{{ "%.1f"|format(bytes / 1073741824) }} GB
+                        {% elif bytes >= 1048576 %}{{ "%.1f"|format(bytes / 1048576) }} MB
+                        {% elif bytes >= 1024 %}{{ "%.1f"|format(bytes / 1024) }} KB
+                        {% else %}{{ bytes }} B{% endif %}
+                        {% else %}<span class="text-muted">-</span>{% endif %}
+                    </td>
+                    <td class="col-date">
+                        {% if item.updated_at %}
+                        {% if item.updated_at is string %}
+                        {{ item.updated_at[0:10] }}
+                        {% else %}
+                        {{ item.updated_at.strftime('%Y-%m-%d') }}
+                        {% endif %}
+                        {% elif item.created_at %}
+                        {% if item.created_at is string %}
+                        {{ item.created_at[0:10] }}
+                        {% else %}
+                        {{ item.created_at.strftime('%Y-%m-%d') }}
+                        {% endif %}
+                        {% else %}
+                        <span class="text-muted">&#8212;</span>
+                        {% endif %}
+                    </td>
+                    {% if not picker_mode %}
+                    <td class="col-actions">
+                        <div class="action-buttons">
+                            {% if not deleted_media %}
+                            <button type="button" class="action-btn" title="S&#7917;a"
+                                @click.stop="window.mediaActions?.edit('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                                <span class="material-symbols-outlined">edit</span>
+                            </button>
+                            <button type="button" class="action-btn" title="Di chuy&#7875;n"
+                                @click.stop="window.mediaActions?.move('{{ item.id }}')">
+                                <span class="material-symbols-outlined">drive_file_move</span>
+                            </button>
+                            {% endif %}
+                            {% if not item.is_folder and item.url %}
+                            <button type="button" class="action-btn" title="T&#7843;i xu&#7889;ng"
+                                @click.stop="window.mediaActions?.forceDownload('{{ item.url }}', '{{ item.name }}')">
+                                <span class="material-symbols-outlined">download</span>
+                            </button>
+                            {% endif %}
+                            {% if deleted_media %}
+                            <button type="button" class="action-btn action-btn--primary" title="Kh&#244;i ph&#7909;c"
+                                @click.stop="window.mediaActions?.restore('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                                <span class="material-symbols-outlined">restore</span>
+                            </button>
+                            {% endif %}
+                            <button type="button" class="action-btn action-btn--danger"
+                                title="{% if deleted_media %}X&#243;a v&#297;nh vi&#7877;n{% else %}X&#243;a{% endif %}"
+                                @click.stop="window.mediaActions?.deleteItem('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                                <span class="material-symbols-outlined">delete</span>
+                            </button>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# ====== GRID VIEW ====== #}
+    {% if not cursor_request.cursor %}
+    <div class="media-grid-wrapper" x-show="viewMode === 'grid'" @view-mode-changed.window="$el.scrollTop = 0"
+        id="media-grid-view">
+        <div class="media-grid">
+            {% endif %}
+            {% for item in data %}
+            <div class="media-grid-card" data-id="{{ item.id }}"
+                data-type="{{ 'folder' if item.is_folder else 'file' }}" data-media-name="{{ item.name|e }}"
+                data-media-url="{{ item.url|e if item.url else '' }}"
+                data-media-kind="{{ 'folder' if item.is_folder else 'file' }}"
+                data-media-format="{{ item.media_metadata.format|e if item.media_metadata and item.media_metadata.format else '' }}"
+                data-media-type="{{ item.media_metadata.type|e if item.media_metadata and item.media_metadata.type else '' }}"
+                data-media-size="{{ item.media_metadata.sizes if item.media_metadata and item.media_metadata.sizes else '' }}"
+                {% if picker_mode %}
+                :class="{ 'selected': mediaPicker.selected && mediaPicker.selected.id === {{ item.id }} }"
+                @click="window.editorMediaPicker?.handleItemClick($event)" {% else %}
+                :class="{ 'selected': $store.mediaSelection.isSelected({{ item.id }}) }" {% if not deleted_media %}
+                draggable="true" {% if not item.is_folder %}
+                @dblclick="window.mediaActions?.forceDownload('{{ item.url }}', '{{ item.name }}')" {% endif %}
+                @dragstart="event.dataTransfer.setData('text/plain', '{{ item.id }}'); event.dataTransfer.effectAllowed = 'move';"
+                {% if item.is_folder %} @dragover.prevent="event.currentTarget.classList.add('drag-over')"
+                @dragleave="event.currentTarget.classList.remove('drag-over')" @drop="
+                event.preventDefault();
+                event.currentTarget.classList.remove('drag-over');
+                const draggedId = event.dataTransfer.getData('text/plain');
+                if (draggedId && draggedId !== '{{ item.id }}') {
+                    window.mediaActions?.moveToFolder(draggedId, '{{ item.id }}');
+                }
+            " @click="if ($event.target.tagName !== 'INPUT') { window.mediaActions?.goToFolder?.('{{ item.id }}') }" {%
+                else %} @click="if ($event.target.tagName === 'INPUT') { $event.stopPropagation() }" {% endif %} {% else
+                %} @click="if ($event.target.tagName === 'INPUT') { $event.stopPropagation() }" {% endif %}>
+                {% endif %}
+
+                {# Checkbox - top-left, positioned relative to card (NOT card-preview) #}
+                <input type="checkbox" class="grid-checkbox" :checked="$store.mediaSelection.isSelected({{ item.id }})"
+                    @change="window.mediaActions?.toggleSelectItem($event, {{ item.id }})" @click.stop>
+
+                {# More options dropdown - uses position:fixed to avoid layout reflow #}
+                <div class="card-more-menu" @click.stop x-data="{
+                    open: false,
+                    ddStyle: '',
+                    toggle(event) {
+                        if (!this.open) {
+                            const r = event.currentTarget.getBoundingClientRect();
+                            this.ddStyle = 'top:' + (r.bottom + 4) + 'px; right:' + (window.innerWidth - r.right) + 'px';
+                        }
+                        this.open = !this.open;
+                    }
+                }" @click.outside="open = false">
+                    <button class="card-more-btn" @click.stop="toggle($event)" title="T&#249;y ch&#7885;n">
+                        <span class="material-symbols-outlined">more_vert</span>
+                    </button>
+                    <div class="card-dropdown" x-show="open" x-transition.opacity.duration.100ms :style="ddStyle"
+                        @click.stop>
+                        {% if not deleted_media %}
+                        <button class="card-dropdown-item"
+                            @click.stop="open=false; window.mediaActions?.edit('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                            <span class="material-symbols-outlined">edit</span>
+                            <span>&#272;&#7893;i t&#234;n</span>
+                        </button>
+                        <button class="card-dropdown-item"
+                            @click.stop="open=false; window.mediaActions?.move('{{ item.id }}')">
+                            <span class="material-symbols-outlined">drive_file_move</span>
+                            <span>Di chuy&#7875;n</span>
+                        </button>
+                        {% if not item.is_folder and item.url %}
+                        <button type="button" class="card-dropdown-item"
+                            @click.stop="open=false; window.mediaActions?.forceDownload('{{ item.url }}', '{{ item.name }}')">
+                            <span class="material-symbols-outlined">download</span>
+                            <span>T&#7843;i xu&#7889;ng</span>
+                        </button>
+                        {% endif %}
+                        <div class="card-dropdown-divider"></div>
+                        <button class="card-dropdown-item card-dropdown-item--danger"
+                            @click.stop="open=false; window.mediaActions?.deleteItem('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                            <span class="material-symbols-outlined">delete</span>
+                            <span>X&#243;a</span>
+                        </button>
+                        {% else %}
+                        <button class="card-dropdown-item"
+                            @click.stop="open=false; window.mediaActions?.restore('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                            <span class="material-symbols-outlined">restore</span>
+                            <span>Kh&#244;i ph&#7909;c</span>
+                        </button>
+                        <button class="card-dropdown-item card-dropdown-item--danger"
+                            @click.stop="open=false; window.mediaActions?.deleteItem('{{ item.id }}', '{{ 'folder' if item.is_folder else 'file' }}')">
+                            <span class="material-symbols-outlined">delete_forever</span>
+                            <span>X&#243;a v&#297;nh vi&#7877;n</span>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Card preview - icon/thumbnail only, overflow:hidden safe #}
+                <div class="card-preview">
+                    {% if item.is_folder %}
+                    <span class="material-symbols-outlined card-icon card-icon--folder">folder</span>
+                    {% elif item.media_metadata and item.media_metadata.type == 'image' and item.url %}
+                    <img src="{{ item.url }}" alt="{{ item.name }}" class="card-thumbnail" loading="lazy" />
+                    {% elif item.media_metadata and item.media_metadata.type == 'video' %}
+                    <span class="material-symbols-outlined card-icon card-icon--video">videocam</span>
+                    {% elif item.media_metadata and item.media_metadata.type == 'audio' %}
+                    <span class="material-symbols-outlined card-icon card-icon--audio">audio_file</span>
+                    {% elif item.media_metadata and item.media_metadata.format in ['pdf'] %}
+                    <span class="media-icon-badge media-icon-badge--pdf card-badge">PDF</span>
+                    {% elif item.media_metadata and item.media_metadata.format in ['xlsx', 'xls'] %}
+                    <span class="media-icon-badge media-icon-badge--xlsx card-badge">XLSX</span>
+                    {% elif item.media_metadata and item.media_metadata.format in ['docx', 'doc',
+                    'vnd.openxmlformats-officedocument.wordprocessingml.document', 'msword'] %}
+                    <span class="media-icon-badge media-icon-badge--docx card-badge">DOCX</span>
+                    {% elif item.media_metadata and item.media_metadata.format in ['pptx', 'ppt'] %}
+                    <span class="media-icon-badge media-icon-badge--pptx card-badge">PPTX</span>
+                    {% else %}
+                    <span class="material-symbols-outlined card-icon card-icon--file">description</span>
+                    {% endif %}
+                </div>
+
+                {# Card info area #}
+                <div class="card-info">
+                    <span class="card-name" title="{{ item.name }}">{{ item.name }}</span>
+                    <span class="card-meta">
+                        {% if item.is_folder %}Thu m&#7909;c
+                        {% elif item.media_metadata and item.media_metadata.sizes %}{% set bytes =
+                        item.media_metadata.sizes
+                        %}
+                        {% if bytes >= 1073741824 %}{{ "%.1f"|format(bytes / 1073741824) }} GB
+                        {% elif bytes >= 1048576 %}{{ "%.1f"|format(bytes / 1048576) }} MB
+                        {% elif bytes >= 1024 %}{{ "%.1f"|format(bytes / 1024) }} KB
+                        {% else %}{{ bytes }} B{% endif %}
+                        {% else %}&#8212;{% endif %}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+            {# ====== CURSOR PAGINATION: Load More ====== #}
+            {% if has_more and next_cursor %}
+            {% set load_more_params = query_params.copy() if query_params else {} %}
+            {% set _ = load_more_params.update({'cursor': next_cursor, 'limit': 20}) %}
+            {% if folder_id %}
+            {% set _ = load_more_params.update({'folder_id': folder_id}) %}
+            {% endif %}
+            {% if type_filter %}
+            {% set _ = load_more_params.update({'type_filter': type_filter}) %}
+            {% endif %}
+            {% if deleted_media %}
+            {% set _ = load_more_params.update({'deleted_media': 'true'}) %}
+            {% endif %}
+            {% if picker_mode %}
+            {% set _ = load_more_params.update({'picker': 'true'}) %}
+            {% endif %}
+            <div id="media-load-more" class="media-load-more"
+                hx-get="{{ url_for('media_manager') }}/items/html?{{ load_more_params|urlencode }}"
+                hx-trigger="revealed" hx-swap="outerHTML">
+                <div class="load-more-spinner">
+                    <div class="spinner-sm"></div>
+                    <span>&#272;ang t&#7843;i th&#234;m...</span>
+                </div>
+            </div>
+            {% endif %}
+            {% if not cursor_request.cursor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+{% else %}
+{# ====== EMPTY STATE ====== #}
+<div class="media-empty" x-init="window.mediaActions?.setHasData?.(false)">
+    <span class="material-symbols-outlined media-empty-icon">folder_off</span>
+    <h3>Ch&#432;a c&#243; file n&#224;o</h3>
+    <p>T&#7843;i l&#234;n file ho&#7863;c t&#7841;o th&#432; m&#7909;c m&#7899;i &#273;&#7875; b&#7855;t &#273;&#7847;u.
+    </p>
+</div>
+{% endif %}
+
+
+<style>
+    /* ===== DRAG AND DROP ===== */
+    .drag-over {
+        background-color: var(--primary-light, rgba(0, 120, 215, 0.1)) !important;
+        outline: 2px dashed var(--primary) !important;
+        outline-offset: -2px;
+    }
+
+    /* ===== LIST VIEW ===== */
+    .media-list {
+        grid-column: 1 / -1;
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--background);
+        border-radius: 12px;
+        border: 1.5px solid var(--border);
+        overflow: hidden;
+    }
+
+    .media-list~.media-list {
+        margin-top: -16px;
+        border-top: none;
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+    }
+
+    .media-list:has(~ .media-list) {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        border-bottom-width: 1px;
+    }
+
+    .media-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .media-table thead {
+        border-bottom: 1.5px solid var(--border);
+    }
+
+    .media-table th {
+        text-align: left;
+        padding: 12px 16px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 13px;
+        white-space: nowrap;
+        user-select: none;
+    }
+
+    .media-table td {
+        padding: 10px 16px;
+        color: var(--foreground);
+        vertical-align: middle;
+    }
+
+    .media-row {
+        border-bottom: 1px solid var(--border);
+        transition: background-color 0.12s ease;
+        cursor: pointer;
+    }
+
+    .media-row:hover {
+        background-color: var(--sidebar-bg);
+    }
+
+    .media-row:last-child {
+        border-bottom: none;
+    }
+
+    /* Column widths */
+    .col-name {
+        width: 38%;
+        min-width: 200px;
+    }
+
+    .col-size {
+        width: 10%;
+        min-width: 80px;
+    }
+
+    .col-owner {
+        width: 14%;
+        min-width: 100px;
+    }
+
+    .col-date {
+        width: 16%;
+        min-width: 110px;
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+
+    .col-actions {
+        width: 16%;
+        min-width: 80px;
+        text-align: right;
+    }
+
+    .media-table th.col-actions {
+        text-align: right;
+    }
+
+    /* Name cell */
+    .media-name-cell {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .media-name-text {
+        font-weight: 500;
+        color: var(--foreground);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 280px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    .media-name-text[data-editing="true"] {
+        overflow: visible;
+        width: 100%;
+        max-width: none;
+    }
+
+    /* Owner link (blue like design) */
+    .owner-link {
+        color: #5b9aef;
+        font-size: 13px;
+    }
+
+    /* Icon styles */
+    .media-icon {
+        font-size: 22px;
+        flex-shrink: 0;
+    }
+
+    .media-icon--folder {
+        color: #5b9aef;
+    }
+
+    .media-icon--image {
+        color: #8b5cf6;
+    }
+
+    .media-icon--video {
+        color: #ef4444;
+    }
+
+    .media-icon--audio {
+        color: #F96854;
+    }
+
+    .media-icon--file {
+        color: var(--text-secondary);
+    }
+
+    /* Badge icons for document types */
+    .media-icon-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 24px;
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        flex-shrink: 0;
+    }
+
+    .media-icon-badge--pdf {
+        background: #7f1d1d;
+        color: #fca5a5;
+    }
+
+    .media-icon-badge--xlsx {
+        background: #14532d;
+        color: #86efac;
+    }
+
+    .media-icon-badge--docx {
+        background: #1e3a5f;
+        color: #93c5fd;
+    }
+
+    .media-icon-badge--pptx {
+        background: #78350f;
+        color: #fcd34d;
+    }
+
+    .text-muted {
+        color: var(--text-secondary);
+    }
+
+    /* Action buttons */
+    .action-buttons {
+        display: flex;
+        gap: 4px;
+        justify-content: flex-end;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+
+    .media-row:hover .action-buttons {
+        opacity: 1;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-decoration: none;
+    }
+
+    .action-btn .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    .action-btn:hover {
+        background: var(--border);
+        color: var(--foreground);
+    }
+
+    .action-btn--danger:hover {
+        background: rgba(220, 38, 38, 0.15);
+        color: #ef4444;
+    }
+
+    /* ===== SELECTION ===== */
+    .col-select {
+        width: 40px;
+        min-width: 40px;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .row-checkbox {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--primary);
+        cursor: pointer;
+    }
+
+    .media-row.selected {
+        background-color: rgba(0, 120, 215, 0.06);
+    }
+
+    .media-grid-card.selected {
+        background-color: rgba(0, 120, 215, 0.08);
+        border-color: var(--primary) !important;
+    }
+
+    /* ===== GRID VIEW WRAPPER ===== */
+    .media-grid-wrapper {
+        grid-column: 1 / -1;
+        /* FIX: box-sizing so padding doesn't cause overflow */
+        box-sizing: border-box;
+        width: 100%;
+        position: relative;
+        background: var(--background);
+        border-radius: 12px;
+        border: 1.5px solid var(--border);
+        padding: 14px;
+        /* Allow dropdown to escape the wrapper boundary */
+        overflow: visible;
+    }
+
+    /* ===== GRID VIEW ===== */
+    .media-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 10px;
+    }
+
+    /* ===== GRID CARD ===== */
+    .media-grid-card {
+        display: flex;
+        flex-direction: column;
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        /* FIX: overflow must be visible so dropdown is not clipped */
+        overflow: visible;
+        cursor: pointer;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        background: var(--background);
+        /* Required for absolute positioning of checkbox & more-menu */
+        position: relative;
+    }
+
+    .media-grid-card:hover {
+        border-color: var(--text-secondary);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Card preview - safe to use overflow:hidden since controls are outside */
+    .card-preview {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 110px;
+        background: var(--sidebar-bg);
+        border-radius: 8px 8px 0 0;
+        /* overflow:hidden is fine now - no controls inside */
+        overflow: hidden;
+        position: relative;
+    }
+
+    /* Grid checkbox - positioned relative to .media-grid-card */
+    .grid-checkbox {
+        position: absolute;
+        top: 9px;
+        left: 9px;
+        z-index: 20;
+        width: 16px;
+        height: 16px;
+        accent-color: var(--primary);
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+
+    .media-grid-card:hover .grid-checkbox,
+    .media-grid-card.selected .grid-checkbox {
+        opacity: 1;
+    }
+
+    /* More menu - positioned relative to .media-grid-card */
+    .card-more-menu {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        z-index: 20;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+
+    .media-grid-card:hover .card-more-menu,
+    .media-grid-card.selected .card-more-menu {
+        opacity: 1;
+    }
+
+    .card-more-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border: none;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        padding: 0;
+    }
+
+    .card-more-btn:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .card-more-btn .material-symbols-outlined {
+        font-size: 17px;
+    }
+
+    /* Dropdown - position:fixed computed by JS to avoid any layout reflow */
+    .card-dropdown {
+        position: fixed;
+        min-width: 160px;
+        background: var(--background);
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        padding: 4px;
+        z-index: 9999;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--foreground);
+        font-size: 13px;
+        cursor: pointer;
+        text-align: left;
+        text-decoration: none;
+        transition: background-color 0.12s ease;
+    }
+
+    .card-dropdown-item .material-symbols-outlined {
+        font-size: 16px;
+        color: var(--text-secondary);
+    }
+
+    .card-dropdown-item:hover {
+        background-color: var(--border);
+    }
+
+    .card-dropdown-item--danger {
+        color: #ef4444;
+    }
+
+    .card-dropdown-item--danger .material-symbols-outlined {
+        color: #ef4444;
+    }
+
+    .card-dropdown-item--danger:hover {
+        background-color: rgba(220, 38, 38, 0.1);
+    }
+
+    .card-dropdown-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 4px 0;
+    }
+
+    /* Card thumbnail */
+    .card-thumbnail {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Card icon */
+    .card-icon {
+        font-size: 44px;
+    }
+
+    .card-icon--folder {
+        color: #5b9aef;
+    }
+
+    .card-icon--video {
+        color: #ef4444;
+    }
+
+    .card-icon--audio {
+        color: #F96854;
+    }
+
+    .card-icon--file {
+        color: var(--text-secondary);
+    }
+
+    /* Card badge */
+    .card-badge {
+        width: 52px;
+        height: 34px;
+        font-size: 12px;
+        font-weight: 800;
+        border-radius: 8px;
+        letter-spacing: 0.5px;
+    }
+
+    .card-info {
+        display: flex;
+        flex-direction: column;
+        padding: 9px 11px;
+        gap: 2px;
+        border-top: 1px solid var(--border);
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .card-name {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--foreground);
+        display: block;
+        min-height: 20px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .card-name[data-editing="true"] {
+        overflow: visible;
+        white-space: normal;
+    }
+
+    /* Style for inline rename input box */
+    .inline-rename-input {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 2px 6px !important;
+        font-size: inherit !important;
+        border: 1px solid var(--primary) !important;
+        border-radius: 4px !important;
+        background: var(--bg-secondary) !important;
+        color: var(--text-primary) !important;
+        outline: none !important;
+        height: auto !important;
+        line-height: normal !important;
+    }
+
+    .card-meta {
+        font-size: 11px;
+        color: var(--text-secondary);
+    }
+
+    /* ===== LOAD MORE / INFINITE SCROLL ===== */
+    .media-load-more {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+        margin-top: 10px;
+    }
+
+    .media-selection-box {
+        position: absolute;
+        border: 1px solid rgba(91, 154, 239, 0.95);
+        background: rgba(91, 154, 239, 0.18);
+        border-radius: 8px;
+        pointer-events: none;
+        z-index: 30;
+    }
+
+    .load-more-spinner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+
+    .spinner-sm {
+        width: 18px;
+        height: 18px;
+        border: 2.5px solid var(--border);
+        border-top-color: var(--foreground);
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .media-empty {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: var(--text-secondary);
+        text-align: center;
+        border: 1.5px dashed var(--border);
+        border-radius: 12px;
+        background: var(--sidebar-bg);
+    }
+
+    .media-empty-icon {
+        font-size: 56px;
+        margin-bottom: 12px;
+        opacity: 0.4;
+    }
+
+    .media-empty h3 {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--foreground);
+        margin-bottom: 4px;
+    }
+
+    .media-empty p {
+        font-size: 14px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .media-grid {
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 8px;
+        }
+
+        .card-preview {
+            height: 90px;
+        }
+
+        .col-owner,
+        .col-actions {
+            display: none;
+        }
+    }
+</style>
+
+<script>
+    if (window.Alpine) {
+        const header = document.querySelector('.media-header');
+        if (header) {
+            const data = Alpine.$data(header);
+            const newFolderId = "{{ folder_id if folder_id else 'null' }}";
+            if (newFolderId != 'null' && data.folder_id !== newFolderId) {
+                data.folder_id = newFolderId;
+                if (data.folder_id) {
+                    data.getCurrentMedia();
+                } else {
+                    data.current_media = null;
+                }
+            }
+        };
+    }
+</script>

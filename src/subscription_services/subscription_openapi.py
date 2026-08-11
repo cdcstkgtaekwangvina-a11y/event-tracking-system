@@ -1,13 +1,18 @@
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 from fastapi.openapi.utils import get_openapi
 from scalar_fastapi import get_scalar_api_reference, Layout, Theme
 from fastapi.responses import HTMLResponse
 
 
-def add_openapi(app: FastAPI):
+def add_openapi(app: FastAPI) -> FastAPI:
     if app.openapi_schema:
-        return app.openapi_schema
-
+        return app
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            route.summary = route.path
+            if route.tags:
+                route.tags = list(dict.fromkeys(route.tags))
     openapi_schema = get_openapi(
         title="Check-in app api",
         version="1.0.0",

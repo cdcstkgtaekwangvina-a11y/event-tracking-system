@@ -1,29 +1,128 @@
 {% extends "templates/index.j2" %}
 {% block title %}Đăng nhập{% endblock %}
 {% block body %}
-<div class="login">
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('loginHandler', () => ({
+            email_or_username: '',
+            password: '',
+            isLoading: false,
+            errors: {
+                email_or_username: '',
+                password: ''
+            },
+            darkModeText: null, lightModeText: null, customStyle: null, isSidebar: false,
+
+            validateEmail() {
+                const pattern = /^[a-zA-Z][a-zA-Z0-9_.\-@]{2,19}$/;
+                if (!this.email_or_username) {
+                    this.errors.email_or_username = "Vui lòng nhập tên đăng nhập hoặc email";
+                } else if (!pattern.test(this.email_or_username)) {
+                    this.errors.email_or_username = "Định dạng không hợp lệ (3-20 ký tự, bắt đầu bằng chữ)";
+                } else {
+                    this.errors.email_or_username = "";
+                }
+            },
+
+            validatePassword() {
+                const v = this.password.trim();
+                this.errors.password = "";
+                if (v.length < 8) {
+                    this.errors.password = "Mật khẩu phải có ít nhất 8 ký tự";
+                } else if (!/[A-Z]/.test(v)) {
+                    this.errors.password = "Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa";
+                } else if (!/[a-z]/.test(v)) {
+                    this.errors.password = "Mật khẩu phải chứa ít nhất 1 chữ cái viết thường";
+                } else if (!/\d/.test(v)) {
+                    this.errors.password = "Mật khẩu phải chứa ít nhất 1 chữ số";
+                } else if (!/[@$!%*?&]/.test(v)) {
+                    this.errors.password = "Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (@$!%*?&)";
+                }
+            },
+
+            hasErrors() {
+                return this.errors.email_or_username !== '' ||
+                    this.errors.password !== '' ||
+                    this.email_or_username === '' ||
+                    this.password === '';
+            },
+
+            checkInput() {
+                this.validateEmail();
+                this.validatePassword();
+                return this.hasErrors();
+            },
+
+            async loginAsync() {
+                if (this.isLoading) return;
+                this.isLoading = true;
+
+                const loadingId = notify.toast.loading('Đang đăng nhập...', 'Vui lòng chờ');
+                const res = await fetchHelper.post('auth/login', {
+                    email_or_username: this.email_or_username,
+                    password: this.password
+                });
+                this.isLoading = false;
+
+                notify.toast.dismiss(loadingId);
+
+                // ── Thành công ────────────────────────────────────
+                if (res.status_code === 204) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const redirect = urlParams.get('redirect') || '/';
+
+                    notify.toast.success('Đăng nhập thành công!', 'Đang chuyển hướng...');
+                    await new Promise(r => setTimeout(r, 1200));
+                    window.location.href = redirect;
+                    return;
+                }
+
+                // ── Lỗi phía server (5xx) ─────────────────────────
+                if ((res.status_code) >= 500) {
+                    notify.toast.error(
+                        'Lỗi hệ thống',
+                        'Máy chủ đang gặp sự cố, vui lòng thử lại sau',
+                        8000
+                    );
+                    return;
+                }
+
+                // ── Các lỗi khác (4xx) ────────────────────────────
+                notify.toast.error(
+                    'Đăng nhập thất bại',
+                    res.message || 'Đã có lỗi xảy ra, vui lòng thử lại'
+                );
+            }
+        }));
+    });
+</script>
+<div class="login" x-data="loginHandler">
     <div class="buttons">
         <div class="home-btn">
             <a href="{{ url_for('home')}}" style="text-decoration: none;">
-                {% include "static/public/icons/home.svg"%}
+                <span class="material-symbols-outlined">home</span>
             </a>
         </div>
+        {% with toggle_style = "display: flex; align-items: center;" %}
         {% include "templates/headers/toggle_theme.j2" %}
+        {% endwith %}
     </div>
-    <div class="login-form">
+    <div class="login-form" x-data="{isHide : true, isDisable : true}">
         <div class="login-info">
             <div class="login-logo">
-                {% include "static/public/icons/login.svg"%}
+                <span class="material-symbols-outlined">login</span>
             </div>
             <h2>Hệ thống Event tracking system</h2>
             <p>Đăng nhập để tiếp tục</p>
+
         </div>
-        <div class="form-input" x-data="{ isHide : true}">
+        <div class="form-input">
             <div class="input-items">
                 <label for="username_email">Tên đăng nhập hoặc email</label>
                 <input x-ref="username_email" name="username_email" type="text"
                     placeholder="Nhập tên đăng nhập hoặc email" @keydown.space.prevent
-                    @keydown.enter.prevent="$refs.password.focus()" />
+                    @keydown.enter.prevent="$refs.password.focus()" x-model="email_or_username"
+                    @input="isDisable = checkInput()" />
             </div>
 
             <div class="password-input">
@@ -31,14 +130,19 @@
                     <label for="password">Mật khẩu</label>
                     <input x-ref="password" name="password" :type="isHide ? 'password' : 'text'"
                         placeholder="Nhập mật khẩu" @keydown.space.prevent
-                        @keydown.enter.prevent="$refs.username_email.focus()" />
+                        @keydown.enter.prevent="$refs.username_email.focus()" x-model="password"
+                        @input="isDisable = checkInput()" />
                 </div>
                 <button class="toggle-password" @click="isHide = !isHide" type="button">
-                    {% include "static/public/icons/visibility.svg"%}
+                    <span class="material-symbols-outlined">visibility</span>
                 </button>
             </div>
         </div>
-        <button class="login-btn">Đăng nhập</button>
+        <button :class="isDisable || isLoading ? 'login-btn-disabled' : 'login-btn'" type="button"
+            :disabled="isDisable || isLoading" @click="await loginAsync()">
+            <span x-show="!isLoading">Đăng nhập</span>
+            <span x-show="isLoading">Đang xử lý...</span>
+        </button>
         <a class="forgot-password"
             href="{{ url_for('forgot_password_view') }}?redirect={{ redirect|string|urlencode }}">Quên mật khẩu</a>
     </div>
@@ -127,6 +231,23 @@
         transform: scale(1.01);
     }
 
+    .login-btn-disabled {
+        background-color: var(--text-secondary);
+        cursor: not-allowed;
+        padding: 15px;
+        border-radius: 10px;
+        color: var(--background);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        width: 100%;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        font-weight: bold;
+        font-size: large;
+    }
+
     .buttons {
         position: absolute;
         display: flex;
@@ -202,7 +323,7 @@
     }
 
     .toggle-password {
-        background-color: var(--input);
+        background-color: transparent;
         border: none;
         position: absolute;
         right: 10px;

@@ -26,6 +26,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 from sqlmodel import SQLModel
 from database import models
+
 target_metadata = SQLModel.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -52,7 +53,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        compare_type=True
+        compare_type=True,
     )
 
     with context.begin_transaction():
@@ -62,9 +63,7 @@ def run_migrations_offline() -> None:
 def do_run_migrations(connection):
     """Hàm chạy migration đồng bộ, được gọi bởi run_sync"""
     context.configure(
-        connection=connection, 
-        target_metadata=target_metadata,
-        compare_type=True  
+        connection=connection, target_metadata=target_metadata, compare_type=True
     )
 
     with context.begin_transaction():

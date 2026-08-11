@@ -1,0 +1,398 @@
+<div x-data="{
+    isSidebar: localStorage.getItem('isSidebar') == 'false' ? false : true,
+    lightModeText: 'Chế độ sáng', 
+    darkModeText: 'Chế độ tối', 
+    expandedStyle: 'box-shadow: none; border-radius: 10px; width: 90%; display: flex; align-items: center; gap: 5px; border: 0px;',
+    customStyle: null,
+    currentPath: window.location.pathname,
+    openDropdown: false,
+    isActivePage(pageId, currentPath){
+        const adminPages = {{ ADMIN_PAGES_DICT}}
+        const currentPage = adminPages.find(x => x.id === pageId)
+        const cleanPath = currentPath.split('?')[0];
+        if (!cleanPath.startsWith('/admin')) return false;
+
+        const targetPage = adminPages.find((x) => x.id === pageId);
+        if (!targetPage) return false;
+
+        if (pageId === 'dashboard') {
+            if (cleanPath === '/admin' || cleanPath === '/admin/') return true;
+            
+            const isKnownPath = adminPages
+            .filter(p => p.id !== 'dashboard')
+            .some(p => cleanPath.startsWith(p.path));
+            
+            return !isKnownPath; 
+        }
+        return cleanPath.startsWith(targetPage.path);
+        
+    },
+    async log_out(){
+        const approved = await notify.modal.confirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?',{confirmText: 'Đăng xuất', cancelText: 'Ở lại', confirmClass: 'nc-modal__btn--danger', icon: 'error'});
+        if (approved) {
+            const response = await fetchHelper.post('auth/logout', {});
+            if (response.status_code === 204) {
+                notify.toast.success('Đăng xuất thành công', 'Đang chuyển hướng...');
+                setTimeout(() => {
+                    window.location.href = '{{ url_for('home') }}';
+                }, 500);
+            } else {
+                notify.toast.error('Đăng xuất thất bại', 'Đã có lỗi xảy ra, vui lòng thử lại');
+            }
+        }
+    },
+    init() {
+    this.customStyle = this.isSidebar ? this.expandedStyle : 'box-shadow: none; border: 0; border-radius: 25%;';
+    this.updateMainMargin();
+    document.addEventListener('htmx:after:history:push', () => { 
+            this.currentPath = window.location.pathname; 
+        });
+        document.addEventListener('htmx:after:history:replace', () => { 
+            this.currentPath = window.location.pathname; 
+        });
+        window.addEventListener('popstate', () => { 
+            this.currentPath = window.location.pathname; 
+        });
+    },
+    updateMainMargin() {
+        const main = document.getElementById('admin-main-content');
+        if (!main) return;
+        if (this.$store.screen && this.$store.screen.isMobile) {
+            main.style.marginLeft = '0px';
+        } else {
+            main.style.marginLeft = this.isSidebar ? '230px' : '60px';
+        }
+    },
+    toggle_sidebar(){
+    this.isSidebar = !this.isSidebar;
+    this.customStyle = this.isSidebar ? this.expandedStyle : 'box-shadow: none; border: 0; border-radius: 25%;';
+    localStorage.setItem('isSidebar', this.isSidebar);
+    this.updateMainMargin();
+    }
+    }">
+    <div x-show="!isSidebar && $store.screen.isMobile" x-transition.opacity.duration.200ms class="navbar">
+        <button class="toggle-sidebar" @click="toggle_sidebar">
+            <span class="material-symbols-outlined">menu</span>
+        </button>
+    </div>
+
+    <div class="sidebar" :class="{
+            'sidebar-expanded': isSidebar && !$store.screen.isMobile,
+            'sidebar-collapsed': !isSidebar && !$store.screen.isMobile,
+            'sidebar-mobile-open': isSidebar && $store.screen.isMobile,
+            'sidebar-mobile-closed': !isSidebar && $store.screen.isMobile
+         }">
+
+        <div class="header-sidebar">
+            <a href="{{ url_for('home') }}" class="logo-wrapper" x-show="isSidebar || $store.screen.isMobile"
+                x-transition.opacity.duration.150ms>
+                <img style="width: 90px;" src="{{ url_for('static', path='public/app_logo.png') }}" alt="logo">
+            </a>
+
+            <button class="toggle-sidebar flex-center" @click="toggle_sidebar">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+        </div>
+
+        <div class="sidebar-body">
+            {% for page in ADMIN_PAGES %}
+            <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
+                hx-push-url="true" :data-active="isActivePage('{{ page.id }}', currentPath)">
+
+                <span class="material-symbols-outlined">
+                    {{ page.icon }}
+                </span>
+
+                <span class="menu-text" x-show="isSidebar || $store.screen.isMobile"
+                    x-transition.opacity.duration.200ms>
+                    {{ page.name }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="sidebar-footer">
+            {% with toggle_bg = 'var(--sidebar-bg)'%}
+            {% include "templates/headers/toggle_theme.j2" %}
+            {% endwith%}
+            <div class="dropdown-container">
+                <div class="dropdown border" x-show="openDropdown" x-transition.opacity.duration.300ms
+                    @click.outside="openDropdown = false">
+                    <a href="{{ url_for('me') }}" class="dropdown-button"
+                        style="text-decoration: none; color: var(--foreground);">
+                        <span class="material-symbols-outlined">account_circle</span>
+                        <span>Tài khoản</span></a>
+                    <button class="dropdown-button logout" @click="await log_out()">
+                        <span class="material-symbols-outlined">logout</span>
+                        <span>Đăng xuất</span></button>
+                </div>
+                <button class="avatar" :class="{'border': openDropdown}" @click="openDropdown = !openDropdown"
+                    :style="`width: 90%; ${$store.screen.isMobile ? 'align-items: start;' : 'align-items: center;'}`">
+                    {% if auth.user.avatar_url or auth.user.file_url%}
+                    <img class="avatar-img"
+                        src="{{ auth.user.file_url if auth.user.file_url else auth.user.avatar_url }}"
+                        alt="{{ auth.user.name }}">
+                    {% else %}
+                    <span class="material-symbols-outlined">account_circle</span>
+                    {% endif %}
+                    <span x-show="isSidebar === true " x-data="{name: '{{ auth.user.name if auth.user.name else auth.user.email }}', 
+                        displayName(){
+                            const nameLength = this.name?.length || 0;
+                            if($store.screen.isMobile){
+                                return `${this.name?.substring(0, 30)}${nameLength > 30 ? '...' : ''}`
+                            }
+                            return `${this.name?.substring(0, 15)}${nameLength > 15 ? '...' : ''}`
+                        }}" style="font-weight: bold;" x-text="displayName()">
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+    /* KHUNG HOẠT HÌNH GỐC CỦA SIDEBAR */
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background-color: var(--sidebar-bg);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-shadow: 2px 0 5px var(--border);
+        z-index: 50;
+        overflow-x: hidden;
+        box-sizing: border-box;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+            transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+
+    .sidebar-expanded {
+        width: 230px;
+        transform: translateX(0);
+    }
+
+    .sidebar-collapsed {
+        width: 60px;
+        transform: translateX(0);
+    }
+
+    .sidebar-mobile-open {
+        width: 100%;
+        transform: translateX(0);
+    }
+
+    .sidebar-mobile-closed {
+        width: 100%;
+        transform: translateX(-100%);
+    }
+
+    .header-sidebar {
+        height: 60px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 15px;
+        box-sizing: border-box;
+        border-bottom: solid 1px var(--border);
+    }
+
+    .logo-wrapper {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .toggle-sidebar {
+        width: 30px;
+        height: 30px;
+        color: var(--foreground);
+        background-color: transparent;
+        border: 0;
+        margin: 0;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    /* BODY VÀ MENU ITEMS */
+    .sidebar-body {
+        width: 100%;
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .sidebar-body-item {
+        width: 90%;
+        height: 44px;
+        padding: 0 12px;
+        border-radius: 10px;
+        box-sizing: border-box;
+        color: var(--foreground);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s;
+    }
+
+    .sidebar-body-item:hover {
+        background-color: var(--border);
+    }
+
+    .sidebar-body-item[data-active="true"] {
+        background-color: var(--foreground);
+        color: var(--background);
+    }
+
+    .icon-wrapper {
+        width: 24px;
+        height: 24px;
+        flex-shrink: 0;
+    }
+
+    .menu-text {
+        white-space: nowrap;
+    }
+
+    /* FOOTER SIDEBAR */
+    .sidebar-footer {
+        position: absolute;
+        bottom: 0;
+        box-sizing: border-box;
+        border-top: solid 1px var(--border);
+        background-color: var(--sidebar-bg);
+        width: 100%;
+        padding: 10px 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+    }
+
+    /* TOP NAVBAR MOBILE */
+    .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50px;
+        background-color: var(--background);
+        border-bottom: 1px solid var(--border);
+        padding: 0 15px;
+        display: flex;
+        align-items: center;
+        z-index: 40;
+    }
+
+    .flex-center {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dropdown-container {
+        position: relative;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: start;
+        align-items: center;
+        outline: 0;
+        border: 0;
+    }
+
+    .dropdown {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        position: absolute;
+        bottom: 100%;
+        right: 0;
+        margin-bottom: 5px;
+        border-radius: 10px;
+        padding: 10px;
+        z-index: 999999 !important;
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        background-color: var(--background);
+        gap: 5px;
+    }
+
+    .dropdown-button {
+        display: flex;
+        justify-content: start;
+        align-items: center;
+        padding: 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        background-color: var(--background);
+        box-sizing: border-box;
+        white-space: nowrap;
+        outline: 0;
+        border: 0;
+        width: 100%;
+    }
+
+    .dropdown-button:hover {
+        outline: 1px solid var(--border);
+        box-shadow: 0 5px 10px var(--border);
+        box-sizing: border-box;
+    }
+
+    .avatar {
+        display: flex;
+        gap: 5px;
+        padding: 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        color: var(--foreground);
+        background-color: transparent;
+        outline: 0;
+        border: 0;
+    }
+
+    .avatar:hover {
+        outline: 1px solid var(--border);
+        box-shadow: 0 5px 10px var(--border);
+        box-sizing: border-box;
+    }
+
+    .avatar.border {
+        outline: 1px solid var(--border);
+        box-shadow: 0 5px 10px var(--border);
+        box-sizing: border-box;
+    }
+
+    .avatar-img {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        outline: solid 1px var(--foreground);
+        border-radius: 50%;
+    }
+
+    .border {
+        outline: 1px solid var(--border);
+        box-shadow: 0 5px 10px var(--border);
+        box-sizing: border-box;
+    }
+
+    .logout {
+        color: red;
+    }
+
+    .logout:hover {
+        color: var(--logout);
+        background-color: var(--logout-bg);
+    }
+</style>

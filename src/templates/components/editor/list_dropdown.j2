@@ -1,0 +1,40 @@
+<!-- Custom Lists Dropdown -->
+<div class="dropdown-wrapper" @click.outside="activeDropdown === 'list' && (activeDropdown = null)">
+    <button type="button" class="btn dropdown-btn" @click="toggleDropdown('list')">
+        <span>📋 Danh sách</span>
+        <span class="arrow">▼</span>
+    </button>
+    <div class="dropdown-menu list-dropdown" x-show="activeDropdown === 'list'" x-transition>
+        <div class="dropdown-section-title">Thứ tự tự động (Ordered List)</div>
+        <button type="button" class="dropdown-item" @click="toggleOrderedList('decimal'); closeDropdown()">
+            <span>🔢 Dạng Số (1, 2, 3...)</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="toggleOrderedList('upper-alpha'); closeDropdown()">
+            <span>🔤 Chữ in hoa (A, B, C...)</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="toggleOrderedList('lower-alpha'); closeDropdown()">
+            <span>🔤 Chữ thường (a, b, c...)</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="toggleOrderedList('upper-roman'); closeDropdown()">
+            <span>🏛️ La Mã hoa (I, II, III...)</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="toggleOrderedList('lower-roman'); closeDropdown()">
+            <span>🏛️ La Mã thường (i, ii, iii...)</span>
+        </button>
+
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-section-title">Ký tự đặc biệt (Bullet List)</div>
+        <button type="button" class="dropdown-item" @click="toggleBulletList('disc'); closeDropdown()">
+            <span>⚫ Dấu chấm tròn (Disc)</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="toggleBulletList('circle'); closeDropdown()">
+            <span>⚪ Chấm tròn rỗng (Circle)</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="toggleBulletList('square'); closeDropdown()">
+            <span>⬛ Dấu ô vuông (Square)</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="toggleBulletList('\'- \''); closeDropdown()">
+            <span>➖ Dấu gạch ngang (Dash)</span>
+        </button>
+    </div>
+</div>

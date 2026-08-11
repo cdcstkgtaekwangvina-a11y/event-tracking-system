@@ -1,0 +1,1598 @@
+<link rel="stylesheet" href="/static/css/editor/editor.css">
+
+<div class="editor-wrapper" x-data="editorApp()" x-init="initEditor($el)"
+    @tiptap-selection-change.window="$event.detail.version = Date.now()">
+    <!-- Drag Handle Gutter Icon -->
+    <div class="drag-handle" x-show="dragHandle.visible" :style="`top: ${dragHandle.top}px; left: ${dragHandle.left}px`"
+        @mousedown="dragHandle.onMouseDown($event)" @mouseup="dragHandle.onMouseUp($event)" draggable="true"
+        @dragstart="dragHandle.onDragStart($event)" @dragend="dragHandle.onDragEnd($event)"
+        title="Kéo để di chuyển khối">
+        ⠿
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <!-- Undo/Redo -->
+        <div class="btn-group">
+            <button type="button" class="btn" title="Hoàn tác"
+                @click="myEditor.chain().focus().undo().run()">↩️</button>
+            <button type="button" class="btn" title="Làm lại" @click="myEditor.chain().focus().redo().run()">↪️</button>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Basic Styling -->
+        <div class="btn-group">
+            <button type="button" class="btn" :class="isActive('bold') && 'active'" title="In đậm"
+                @click="myEditor.chain().focus().toggleBold().run()"><b>B</b></button>
+            <button type="button" class="btn" :class="isActive('italic') && 'active'" title="In nghiêng"
+                @click="myEditor.chain().focus().toggleItalic().run()"><i>I</i></button>
+            <button type="button" class="btn" :class="isActive('underline') && 'active'" title="Gạch chân"
+                @click="myEditor.chain().focus().toggleUnderline().run()"><u>U</u></button>
+            <button type="button" class="btn" :class="isActive('strike') && 'active'" title="Gạch ngang chữ"
+                @click="myEditor.chain().focus().toggleStrike().run()"><del>S</del></button>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Header Levels Dropdown -->
+        {% include "templates/components/editor/heading_dropdown.j2" %}
+        <div class="divider"></div>
+
+        <!-- Alignment Dropdown -->
+        {% include "templates/components/editor/align_dropdown.j2" %}
+        <div class="divider"></div>
+
+        <!-- Custom Lists Dropdown -->
+        {% include "templates/components/editor/list_dropdown.j2" %}
+        <div class="divider"></div>
+
+        <!-- Table Selector and Operations -->
+        {% include "templates/components/editor/table_dropdown.j2" %}
+        <div class="divider"></div>
+
+        <!-- Text Colors & Highlights -->
+        {% include "templates/components/editor/color_dropdown.j2" %}
+        <div class="divider"></div>
+
+        <!-- Link Dialog -->
+        {% include "templates/components/editor/link_popover.j2" %}
+        <div class="divider"></div>
+
+        <!-- Emoji Picker -->
+        {% include "templates/components/editor/emoji_popover.j2" %}
+        <div class="divider"></div>
+
+        <!-- Horizontal line -->
+        <button type="button" class="btn" title="Kẻ ngang phân trang"
+            @click="myEditor.chain().focus().setHorizontalRule().run()">➖ Ngang</button>
+
+        <div style="flex-grow: 1;"></div>
+
+        <!-- Media Upload -->
+        <button type="button" class="btn-media" title="Thêm Media từ tệp của bạn" @click="openMediaPicker()">
+            📂 Thêm Media
+        </button>
+    </div>
+
+    <!-- Editor Content Area -->
+    <div class="editor-container">
+        <div id="editor"></div>
+    </div>
+
+    <!-- Media Picker Modal -->
+    <div class="media-picker-modal" x-show="mediaPicker.open" x-cloak
+        @keydown.escape.window="mediaPicker.open && closeMediaPicker()">
+        <div class="media-picker-backdrop" @click="closeMediaPicker()"></div>
+        <div class="media-picker-dialog" @click.stop>
+            <div class="media-picker-header">
+                <div>
+                    <h3>Chọn media</h3>
+                    <p
+                        x-text="mediaPicker.folderId ? 'Đang xem thư mục con' : 'Chọn ảnh, video hoặc file để chèn vào bài viết'">
+                    </p>
+                </div>
+                <div class="media-picker-header-actions">
+                    <button type="button" class="media-picker-nav-btn" @click="goBackInPicker()"
+                        :disabled="mediaPicker.loading || !mediaPicker.folderStack.length">
+                        Quay lại
+                    </button>
+                    <button type="button" class="media-picker-nav-btn" @click="goToPickerRoot()"
+                        :disabled="mediaPicker.loading">
+                        Trang đầu
+                    </button>
+                    <button type="button" class="media-picker-nav-btn material-symbols-outlined"
+                        @click="viewMode = viewMode === 'grid' ? 'list' : 'grid'; window.dispatchEvent(new CustomEvent('view-mode-changed', { detail: { mode: viewMode } }))">
+                        <span x-text="viewMode === 'grid' ? 'view_list' : 'grid_view'"></span>
+                    </button>
+                    <button type="button" class="media-picker-close-btn" @click="closeMediaPicker()">×</button>
+                </div>
+            </div>
+            <div class="media-picker-toolbar">
+                <div class="media-picker-search">
+                    <span class="material-symbols-outlined">search</span>
+                    <input type="text" placeholder="Tìm kiếm file và thư mục..." x-model="mediaPicker.search"
+                        @keydown.enter.prevent="loadMediaPicker(mediaPicker.folderId)">
+                </div>
+                <div class="media-picker-toolbar-actions">
+                    <input type="file" x-ref="pickerFileInput" class="media-picker-hidden-input"
+                        @change="onPickerFileSelected($event)">
+                    <button type="button" class="media-picker-nav-btn media-picker-upload-btn"
+                        :disabled="mediaPicker.uploading" @click="triggerPickerUpload()">
+                        <span class="material-symbols-outlined" x-show="!mediaPicker.uploading">upload</span>
+                        <span class="spinner-inline" x-show="mediaPicker.uploading"></span>
+                        <span x-text="mediaPicker.uploading ? 'Đang tải' : 'Tải lên'"></span>
+                    </button>
+                    <div class="media-picker-dropdown" @click.outside="mediaPicker.filterOpen = false">
+                        <button type="button" class="media-picker-nav-btn"
+                            @click="mediaPicker.filterOpen = !mediaPicker.filterOpen">
+                            <span
+                                x-text="mediaPicker.filterValue === 'all' ? 'Tất cả' : mediaPicker.filterValue === 'image' ? 'Hình ảnh' : mediaPicker.filterValue === 'video' ? 'Video' : mediaPicker.filterValue === 'audio' ? 'Âm thanh' : mediaPicker.filterValue === 'document' ? 'Tài liệu' : mediaPicker.filterValue === 'folder' ? 'Thư mục' : 'Khác'"></span>
+                            <span class="material-symbols-outlined">expand_more</span>
+                        </button>
+                        <div class="media-picker-menu" x-show="mediaPicker.filterOpen" x-transition.opacity>
+                            <button type="button"
+                                @click="mediaPicker.filterValue = 'all'; mediaPicker.filterOpen = false; loadMediaPicker(mediaPicker.folderId)">Tất
+                                cả</button>
+                            <button type="button"
+                                @click="mediaPicker.filterValue = 'image'; mediaPicker.filterOpen = false; loadMediaPicker(mediaPicker.folderId)">Hình
+                                ảnh</button>
+                            <button type="button"
+                                @click="mediaPicker.filterValue = 'video'; mediaPicker.filterOpen = false; loadMediaPicker(mediaPicker.folderId)">Video</button>
+                            <button type="button"
+                                @click="mediaPicker.filterValue = 'audio'; mediaPicker.filterOpen = false; loadMediaPicker(mediaPicker.folderId)">Âm
+                                thanh</button>
+                            <button type="button"
+                                @click="mediaPicker.filterValue = 'document'; mediaPicker.filterOpen = false; loadMediaPicker(mediaPicker.folderId)">Tài
+                                liệu</button>
+                            <button type="button"
+                                @click="mediaPicker.filterValue = 'folder'; mediaPicker.filterOpen = false; loadMediaPicker(mediaPicker.folderId)">Thư
+                                mục</button>
+                            <button type="button"
+                                @click="mediaPicker.filterValue = 'other'; mediaPicker.filterOpen = false; loadMediaPicker(mediaPicker.folderId)">Khác</button>
+                        </div>
+                    </div>
+                    <div class="media-picker-dropdown" @click.outside="mediaPicker.sortOpen = false">
+                        <button type="button" class="media-picker-nav-btn"
+                            @click="mediaPicker.sortOpen = !mediaPicker.sortOpen">
+                            <span
+                                x-text="mediaPicker.sortValue === 'name' ? 'Tên' : mediaPicker.sortValue === 'created_at' ? 'Ngày tạo' : mediaPicker.sortValue === 'updated_at' ? 'Ngày sửa đổi' : 'Tên'"></span>
+                            <span x-text="mediaPicker.sortDir === 'desc' ? '↓' : '↑'"></span>
+                        </button>
+                        <div class="media-picker-menu" x-show="mediaPicker.sortOpen" x-transition.opacity>
+                            <button type="button"
+                                @click="mediaPicker.sortValue = 'name'; mediaPicker.sortOpen = false; loadMediaPicker(mediaPicker.folderId)">Tên</button>
+                            <button type="button"
+                                @click="mediaPicker.sortValue = 'created_at'; mediaPicker.sortOpen = false; loadMediaPicker(mediaPicker.folderId)">Ngày
+                                tạo</button>
+                            <button type="button"
+                                @click="mediaPicker.sortValue = 'updated_at'; mediaPicker.sortOpen = false; loadMediaPicker(mediaPicker.folderId)">Ngày
+                                sửa đổi</button>
+                            <div class="media-picker-menu-divider"></div>
+                            <button type="button"
+                                @click="mediaPicker.sortDir = mediaPicker.sortDir === 'asc' ? 'desc' : 'asc'; mediaPicker.sortOpen = false; loadMediaPicker(mediaPicker.folderId)">
+                                <span x-text="mediaPicker.sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="media-picker-body">
+                <div class="media-picker-main">
+                    <div class="media-picker-status" x-show="mediaPicker.loading">
+                        <div class="spinner-sm"></div>
+                        <span>Đang tải media...</span>
+                    </div>
+                    <div class="media-body media-picker-items" id="editor-media-picker-items"
+                        :class="{ 'is-loading': mediaPicker.loading }">
+                        <div class="media-loading" x-show="mediaPicker.loading">
+                            <div class="spinner-sm"></div>
+                            <span>Đang tải dữ liệu...</span>
+                        </div>
+                    </div>
+                </div>
+                <aside class="media-picker-sidebar">
+                    <template x-if="mediaPicker.selected">
+                        <div class="media-picker-detail">
+                            <div class="media-picker-preview">
+                                <template x-if="mediaPicker.selected.kind === 'folder'">
+                                    <span class="material-symbols-outlined media-picker-folder-icon">folder</span>
+                                </template>
+                                <template
+                                    x-if="mediaPicker.selected.kind === 'file' && mediaPicker.selected.type === 'image' && mediaPicker.selected.url">
+                                    <img :src="mediaPicker.selected.url" :alt="mediaPicker.selected.name" />
+                                </template>
+                                <template
+                                    x-if="mediaPicker.selected.kind === 'file' && mediaPicker.selected.type === 'video' && mediaPicker.selected.url">
+                                    <video :src="mediaPicker.selected.url" controls></video>
+                                </template>
+                                <template
+                                    x-if="mediaPicker.selected.kind === 'file' && mediaPicker.selected.type === 'audio' && mediaPicker.selected.url">
+                                    <audio :src="mediaPicker.selected.url" controls></audio>
+                                </template>
+                                <template
+                                    x-if="mediaPicker.selected.kind === 'file' && (!mediaPicker.selected.type || (mediaPicker.selected.type !== 'image' && mediaPicker.selected.type !== 'video' && mediaPicker.selected.type !== 'audio'))">
+                                    <span class="material-symbols-outlined media-picker-file-icon">description</span>
+                                </template>
+                            </div>
+                            <div class="media-picker-fields">
+                                <div class="media-picker-field">
+                                    <span class="label">Tên</span>
+                                    <span class="value" x-text="mediaPicker.selected.name"></span>
+                                </div>
+                                <div class="media-picker-field">
+                                    <span class="label">URL</span>
+                                    <div class="media-picker-url-row">
+                                        <span class="value media-picker-url"
+                                            x-text="mediaPicker.selected.url || '—'"></span>
+                                        <button type="button" class="media-picker-copy-btn"
+                                            x-show="mediaPicker.selected.url" @click="copyMediaUrl()">
+                                            Copy
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="media-picker-field">
+                                    <span class="label">Kích thước</span>
+                                    <span class="value" x-text="mediaPicker.selected.sizeLabel || '—'"></span>
+                                </div>
+                                <div class="media-picker-field">
+                                    <span class="label">Loại</span>
+                                    <span class="value"
+                                        x-text="mediaPicker.selected.kind === 'folder' ? 'Thư mục' : (mediaPicker.selected.type === 'audio' ? 'Âm thanh' : (mediaPicker.selected.type || 'File khác'))"></span>
+                                </div>
+                                <div class="media-picker-field">
+                                    <span class="label">Định dạng</span>
+                                    <span class="value" x-text="mediaPicker.selected.format || '—'"></span>
+                                </div>
+                            </div>
+                            <div class="media-picker-actions">
+                                <button type="button" class="media-picker-primary" :disabled="!canInsertSelectedMedia()"
+                                    @click="insertSelectedMedia()">
+                                    Xác nhận chèn
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!mediaPicker.selected">
+                        <div class="media-picker-empty">
+                            <span class="material-symbols-outlined">photo_library</span>
+                            <p>Chọn một file để xem thông tin ở đây.</p>
+                        </div>
+                    </template>
+                </aside>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Menu (appears on empty lines) -->
+    <div class="floating-menu" x-show="floatingMenu.visible"
+        :style="`top: ${floatingMenu.top}px; left: ${floatingMenu.left}px`"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 transform translate-y-1"
+        x-transition:enter-end="opacity-100 transform translate-y-0" @mousedown.prevent>
+        <button type="button" class="fm-btn" title="Tiêu đề 1"
+            @click="myEditor.chain().focus().toggleHeading({ level: 1 }).run()">📌 H1</button>
+        <button type="button" class="fm-btn" title="Tiêu đề 2"
+            @click="myEditor.chain().focus().toggleHeading({ level: 2 }).run()">📎 H2</button>
+        <button type="button" class="fm-btn" title="Tiêu đề 3"
+            @click="myEditor.chain().focus().toggleHeading({ level: 3 }).run()">🔖 H3</button>
+        <div class="fm-divider"></div>
+        <button type="button" class="fm-btn" title="Danh sách chấm"
+            @click="myEditor.chain().focus().toggleBulletList().run()">• DS chấm</button>
+        <button type="button" class="fm-btn" title="Danh sách số"
+            @click="myEditor.chain().focus().toggleOrderedList().run()">1. DS số</button>
+        <div class="fm-divider"></div>
+        <button type="button" class="fm-btn" title="Bảng 3x3"
+            @click="myEditor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()">📊
+            Bảng</button>
+        <button type="button" class="fm-btn" title="Đường kẻ ngang"
+            @click="myEditor.chain().focus().setHorizontalRule().run()">➖ Ngang</button>
+    </div>
+
+    <!-- Media floating toolbar -->
+    <div class="media-floating-menu" x-show="mediaToolbar.visible" x-cloak
+        :style="`top: ${mediaToolbar.top}px; left: ${mediaToolbar.left}px`">
+        <button type="button" class="fm-btn" title="Căn trái" @click="setSelectedMediaAlign('left')">
+            <span class="material-symbols-outlined">format_align_left</span>
+        </button>
+        <button type="button" class="fm-btn" title="Căn giữa" @click="setSelectedMediaAlign('center')">
+            <span class="material-symbols-outlined">format_align_center</span>
+        </button>
+        <button type="button" class="fm-btn" title="Căn phải" @click="setSelectedMediaAlign('right')">
+            <span class="material-symbols-outlined">format_align_right</span>
+        </button>
+        <template x-if="mediaToolbar.type !== 'audio'">
+            <div style="display: contents;">
+                <div class="fm-divider"></div>
+                <button type="button" class="fm-btn" title="Thu nhỏ" @click="resizeSelectedMedia(-40)">
+                    <span class="material-symbols-outlined">zoom_in_map</span>
+                </button>
+                <button type="button" class="fm-btn" title="Phóng to" @click="resizeSelectedMedia(40)">
+                    <span class="material-symbols-outlined">zoom_out_map</span>
+                </button>
+            </div>
+        </template>
+    </div>
+</div>
+
+<script>
+    // Defining the Alpine.js editorApp logic synchronously to prevent race conditions during Alpine's DOM initialization
+    window.editorApp = function () {
+        return {
+            activeDropdown: null,
+            emojiActiveTab: 'smileys',
+            url: '',
+            newTab: true,
+            viewMode: localStorage.getItem('mediaViewMode') || 'grid',
+            mediaPicker: {
+                open: false,
+                loading: false,
+                uploading: false,
+                folderId: '',
+                folderStack: [],
+                selected: null,
+                search: '',
+                filterValue: 'all',
+                filterOpen: false,
+                sortValue: 'updated_at',
+                sortOpen: false,
+                sortDir: 'desc',
+                maxUploadSizeBytes: null,
+            },
+            floatingMenu: {
+                visible: false,
+                top: 0,
+                left: 0,
+            },
+            mediaToolbar: {
+                visible: false,
+                top: 0,
+                left: 0,
+                type: null,
+            },
+            init() {
+                this.$watch('viewMode', (val) => localStorage.setItem('mediaViewMode', val));
+                window.editorMediaPicker = this;
+            },
+            tableGrid: {
+                hoveredRow: 0,
+                hoveredCol: 0,
+                reset() {
+                    this.hoveredRow = 0;
+                    this.hoveredCol = 0;
+                },
+                hover(r, c) {
+                    this.hoveredRow = r;
+                    this.hoveredCol = c;
+                },
+                click(r, c) {
+                    if (window.myEditor) {
+                        window.myEditor.chain().focus().insertTable({ rows: r, cols: c, withHeaderRow: true }).run();
+                    }
+                }
+            },
+            formatBytes(bytes) {
+                const value = Number(bytes);
+                if (!Number.isFinite(value) || value <= 0) return '—';
+                if (value >= 1073741824) return `${(value / 1073741824).toFixed(1)} GB`;
+                if (value >= 1048576) return `${(value / 1048576).toFixed(1)} MB`;
+                if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+                return `${value} B`;
+            },
+            async ensureUploadLimit() {
+                if (this.mediaPicker.maxUploadSizeBytes !== null) return this.mediaPicker.maxUploadSizeBytes;
+                try {
+                    const res = await window.fetchHelper.get('setting/max_file_sizes');
+                    const candidate = res?.data?.value?.max_size_file;
+                    const raw = typeof candidate === 'object' ? Object.values(candidate)[0] : candidate;
+                    const size = Number(raw);
+                    this.mediaPicker.maxUploadSizeBytes = Number.isFinite(size) && size > 0 ? size : 50 * 1024 * 1024;
+                } catch (error) {
+                    console.error(error);
+                    this.mediaPicker.maxUploadSizeBytes = 50 * 1024 * 1024;
+                }
+                return this.mediaPicker.maxUploadSizeBytes;
+            },
+            async copyMediaUrl() {
+                const url = this.mediaPicker.selected?.url;
+                if (!url) return;
+                try {
+                    await navigator.clipboard.writeText(url);
+                    window.notify?.toast?.success?.('Thành công', 'Đã sao chép URL');
+                } catch (error) {
+                    console.error(error);
+                    window.notify?.toast?.error?.('Lỗi', 'Không thể sao chép URL');
+                }
+            },
+            syncPickerSelectionClasses() {
+                const container = document.getElementById('editor-media-picker-items');
+                if (!container) return;
+                const selectedId = this.mediaPicker.selected?.id;
+                container.querySelectorAll('.media-row, .media-grid-card').forEach((el) => {
+                    el.classList.toggle('selected', !!selectedId && parseInt(el.dataset.id) === selectedId);
+                });
+            },
+            async loadMediaPicker(folderId = '', pushHistory = false) {
+                const container = document.getElementById('editor-media-picker-items');
+                if (!container) return;
+
+                if (pushHistory && this.mediaPicker.folderId) {
+                    this.mediaPicker.folderStack.push(this.mediaPicker.folderId);
+                }
+
+                this.mediaPicker.loading = true;
+                this.mediaPicker.folderId = folderId || '';
+                this.mediaPicker.selected = null;
+
+                const params = new URLSearchParams();
+                params.set('picker', 'true');
+                params.set('limit', '60');
+                if (this.mediaPicker.folderId) {
+                    params.set('folder_id', this.mediaPicker.folderId);
+                }
+                if (this.mediaPicker.search) {
+                    params.set('search', this.mediaPicker.search);
+                }
+                if (this.mediaPicker.filterValue && this.mediaPicker.filterValue !== 'all') {
+                    params.set('type_filter', this.mediaPicker.filterValue);
+                }
+                if (this.mediaPicker.sortValue) {
+                    params.set('sort_field', this.mediaPicker.sortValue);
+                    params.set('is_desc', this.mediaPicker.sortDir === 'desc' ? 'true' : 'false');
+                }
+
+                const url = "{{ url_for('media_manager') }}/items/html?" + params.toString();
+                container.innerHTML = '<div class="media-loading"><div class="spinner-sm"></div><span>Đang tải dữ liệu...</span></div>';
+                try {
+                    await htmx.ajax('GET', url, { target: '#editor-media-picker-items', swap: 'innerHTML' });
+                } finally {
+                    this.mediaPicker.loading = false;
+                    this.syncPickerSelectionClasses();
+                }
+            },
+            openMediaPicker() {
+                this.mediaPicker.open = true;
+                this.mediaPicker.folderId = '';
+                this.mediaPicker.folderStack = [];
+                this.mediaPicker.selected = null;
+                this.mediaPicker.search = '';
+                this.mediaPicker.filterValue = 'all';
+                this.mediaPicker.sortValue = 'updated_at';
+                this.mediaPicker.sortDir = 'desc';
+                this.loadMediaPicker('');
+            },
+            closeMediaPicker() {
+                this.mediaPicker.open = false;
+            },
+            goToPickerRoot() {
+                this.mediaPicker.folderStack = [];
+                this.loadMediaPicker('');
+            },
+            goBackInPicker() {
+                const previousFolderId = this.mediaPicker.folderStack.pop();
+                this.loadMediaPicker(previousFolderId || '');
+            },
+            handleItemClick(event) {
+                const itemEl = event.currentTarget.closest('.media-row, .media-grid-card');
+                if (!itemEl) return;
+
+                const kind = itemEl.dataset.mediaKind || itemEl.dataset.type || 'file';
+                const folderId = itemEl.dataset.id;
+                if (kind === 'folder') {
+                    this.loadMediaPicker(folderId, true);
+                    return;
+                }
+
+                this.mediaPicker.selected = {
+                    id: parseInt(itemEl.dataset.id),
+                    name: itemEl.dataset.mediaName || '',
+                    url: itemEl.dataset.mediaUrl || '',
+                    kind,
+                    type: itemEl.dataset.mediaType || '',
+                    format: itemEl.dataset.mediaFormat || '',
+                    size: itemEl.dataset.mediaSize || '',
+                    sizeLabel: this.formatBytes(itemEl.dataset.mediaSize),
+                };
+                this.syncPickerSelectionClasses();
+            },
+            canInsertSelectedMedia() {
+                return !!(this.mediaPicker.selected && this.mediaPicker.selected.kind !== 'folder' && this.mediaPicker.selected.url);
+            },
+            insertSelectedMedia() {
+                const selected = this.mediaPicker.selected;
+                if (!selected || !selected.url || selected.kind === 'folder' || !window.myEditor) return;
+
+                const name = selected.name || selected.url.split('/').pop() || 'media';
+                const url = selected.url;
+                if (selected.type === 'image') {
+                    window.myEditor.chain().focus().setImage({ src: url, alt: name, title: name, align: 'center', width: '100%' }).run();
+                } else if (selected.type === 'video') {
+                    window.myEditor.chain().focus().insertContent({
+                        type: 'video',
+                        attrs: { src: url, controls: true, title: name, align: 'center', width: '100%' }
+                    }).run();
+                } else if (selected.type === 'audio') {
+                    window.myEditor.chain().focus().insertContent({
+                        type: 'audio',
+                        attrs: { src: url, title: name, align: 'center' }
+                    }).run();
+                } else {
+                    window.myEditor.chain().focus().insertContent({
+                        type: 'text',
+                        text: name,
+                        marks: [{ type: 'link', attrs: { href: url, target: '_blank' } }]
+                    }).run();
+                }
+                this.closeMediaPicker();
+            },
+            setSelectedMediaAlign(align) {
+                if (!window.myEditor) return;
+                const node = window.myEditor.state.selection?.node;
+                const typeName = node?.type?.name;
+                if (!['image', 'video', 'audio'].includes(typeName)) return;
+                window.myEditor.chain().focus().updateAttributes(typeName, { align }).run();
+            },
+            resizeSelectedMedia(delta) {
+                if (!window.myEditor) return;
+                const node = window.myEditor.state.selection?.node;
+                const typeName = node?.type?.name;
+                if (!['image', 'video'].includes(typeName)) return;
+                const currentWidth = parseInt(String(node.attrs.width || '').replace(/px$/, ''), 10);
+                const nextWidth = Math.max(160, (Number.isFinite(currentWidth) ? currentWidth : 480) + delta);
+                window.myEditor.chain().focus().updateAttributes(typeName, { width: `${nextWidth}px` }).run();
+            },
+            triggerPickerUpload() {
+                this.$refs.pickerFileInput?.click();
+            },
+            async onPickerFileSelected(event) {
+                const file = event.target?.files?.[0];
+                if (!file) return;
+                await this.uploadPickerFile(file);
+                event.target.value = '';
+            },
+            async uploadPickerFile(file) {
+                if (!file) return;
+                if (this.mediaPicker.uploading) return;
+                const maxBytes = await this.ensureUploadLimit();
+                if (file.size > maxBytes) {
+                    window.notify?.toast?.error?.('Lỗi', `File vượt quá giới hạn ${this.formatBytes(maxBytes)}`);
+                    return;
+                }
+
+                this.mediaPicker.uploading = true;
+                const loadingId = window.notify?.toast?.loading?.('Đang xử lý', 'Đang tải file lên...');
+                try {
+                    const formData = new FormData();
+                    formData.append('name', file.name);
+                    formData.append('is_folder', 'false');
+                    formData.append('file', file);
+                    if (this.mediaPicker.folderId) {
+                        formData.append('folder_id', this.mediaPicker.folderId);
+                    }
+
+                    const res = await window.fetchHelper.post('media', formData);
+                    if (loadingId) window.notify?.toast?.dismiss?.(loadingId);
+
+                    if (res?.status_code === 201) {
+                        window.notify?.toast?.success?.('Thành công', 'Đã tải file lên');
+                        await this.loadMediaPicker(this.mediaPicker.folderId);
+                    } else {
+                        window.notify?.toast?.error?.('Lỗi', res?.message || 'Tải file thất bại');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    if (loadingId) window.notify?.toast?.dismiss?.(loadingId);
+                    window.notify?.toast?.error?.('Lỗi', 'Có lỗi xảy ra khi tải file');
+                } finally {
+                    this.mediaPicker.uploading = false;
+                }
+            },
+            dragHandle: {
+                visible: false,
+                top: 0,
+                left: 8,
+                activeBlock: null,
+                draggedPos: null,
+                init(editorEl, handleEl) {
+                    editorEl.addEventListener('mousemove', (e) => {
+                        const tiptap = editorEl.querySelector('.tiptap');
+                        if (!tiptap) return;
+
+                        // Identify the closest top-level direct child under .tiptap
+                        let target = e.target;
+                        while (target && target !== tiptap) {
+                            if (target.parentElement === tiptap) {
+                                break;
+                            }
+                            target = target.parentElement;
+                        }
+
+                        if (target && target !== tiptap && target.nodeType === 1) {
+                            const rect = target.getBoundingClientRect();
+                            const wrapperRect = editorEl.getBoundingClientRect();
+
+                            // Align vertically next to active block and lock position left
+                            this.top = rect.top - wrapperRect.top + (rect.height - 24) / 2;
+                            this.activeBlock = target;
+                            this.visible = true;
+                        }
+                    });
+
+                    editorEl.addEventListener('mouseleave', () => {
+                        setTimeout(() => {
+                            if (!handleEl.matches(':hover')) {
+                                this.visible = false;
+                            }
+                        }, 250);
+                    });
+                },
+                onMouseDown(e) {
+                    if (this.activeBlock) {
+                        this.activeBlock.setAttribute('draggable', 'true');
+                    }
+                },
+                onMouseUp(e) {
+                    if (this.activeBlock) {
+                        this.activeBlock.removeAttribute('draggable');
+                    }
+                },
+                onDragStart(e) {
+                    if (this.activeBlock && window.myEditor) {
+                        try {
+                            const pos = window.myEditor.view.posAtDOM(this.activeBlock, 0);
+                            window.draggedPos = pos;
+                        } catch (err) {
+                            window.draggedPos = null;
+                        }
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/x-tiptap-block', 'true');
+                        e.dataTransfer.setData('text/html', this.activeBlock.outerHTML);
+                    }
+                },
+                onDragEnd(e) {
+                    if (this.activeBlock) {
+                        this.activeBlock.removeAttribute('draggable');
+                    }
+                    this.visible = false;
+                }
+            },
+            initEditor(el) {
+                // Instantiated on layout creation via ESM script below
+            },
+            toggleDropdown(name) {
+                this.activeDropdown = this.activeDropdown === name ? null : name;
+            },
+            closeDropdown() {
+                this.activeDropdown = null;
+            },
+            isActive(type, attrs = {}) {
+                return window.myEditor ? window.myEditor.isActive(type, attrs) : false;
+            },
+            getCurrentHeadingLabel() {
+                if (!window.myEditor) return 'Định dạng';
+                if (this.isActive('heading', { level: 1 })) return 'Tiêu đề 1';
+                if (this.isActive('heading', { level: 2 })) return 'Tiêu đề 2';
+                if (this.isActive('heading', { level: 3 })) return 'Tiêu đề 3';
+                if (this.isActive('heading', { level: 4 })) return 'Tiêu đề 4';
+                return 'Đoạn văn (P)';
+            },
+            getCurrentAlignLabel() {
+                if (!window.myEditor) return 'Căn lề';
+                if (this.isActive({ textAlign: 'center' })) return 'Căn giữa';
+                if (this.isActive({ textAlign: 'right' })) return 'Căn phải';
+                if (this.isActive({ textAlign: 'justify' })) return 'Căn đều';
+                return 'Căn trái';
+            },
+            toggleOrderedList(type) {
+                if (window.myEditor) {
+                    if (!window.myEditor.isActive('orderedList')) {
+                        window.myEditor.chain().focus().toggleOrderedList().run();
+                    }
+                    window.myEditor.chain().focus().updateAttributes('orderedList', { listStyleType: type }).run();
+                }
+            },
+            toggleBulletList(type) {
+                if (window.myEditor) {
+                    if (!window.myEditor.isActive('bulletList')) {
+                        window.myEditor.chain().focus().toggleBulletList().run();
+                    }
+                    window.myEditor.chain().focus().updateAttributes('bulletList', { listStyleType: type }).run();
+                }
+            },
+            saveLink(url, newTab) {
+                if (window.myEditor) {
+                    if (url) {
+                        window.myEditor.chain().focus().extendMarkRange('link').setLink({ href: url, target: newTab ? '_blank' : null }).run();
+                    } else {
+                        window.myEditor.chain().focus().extendMarkRange('link').unsetLink().run();
+                    }
+                }
+            }
+        };
+    };
+
+</script>
+
+<script type="module">
+    import {
+        Editor, Node, StarterKit, Image, TableKit, Underline, Highlight, TextStyle, Color,
+        TextAlign, Link, Dropcursor, OrderedList, BulletList, Placeholder
+    } from '/static/js/vendors/tiptap.js';
+
+    // Extend OrderedList and BulletList to support custom styling types
+    const CustomOrderedList = OrderedList.extend({
+        addAttributes() {
+            return {
+                ...this.parent?.(),
+                listStyleType: {
+                    default: 'decimal',
+                    parseHTML: element => element.style.listStyleType || 'decimal',
+                    renderHTML: attributes => {
+                        if (!attributes.listStyleType) return {};
+                        return { style: `list-style-type: ${attributes.listStyleType}` };
+                    },
+                },
+            };
+        },
+    });
+
+    const CustomBulletList = BulletList.extend({
+        addAttributes() {
+            return {
+                ...this.parent?.(),
+                listStyleType: {
+                    default: 'disc',
+                    parseHTML: element => element.style.listStyleType || 'disc',
+                    renderHTML: attributes => {
+                        if (!attributes.listStyleType) return {};
+                        return { style: `list-style-type: ${attributes.listStyleType}` };
+                    },
+                },
+            };
+        },
+    });
+
+    const createResizableMediaNodeView = (typeName) => {
+        return ({ node, editor, getPos }) => {
+            let currentNode = node;
+            let currentWidth = node.attrs.width || '100%';
+            let currentAlign = node.attrs.align || 'center';
+            let resizeState = null;
+
+            const wrapper = document.createElement('figure');
+            wrapper.className = `media-resizable media-resizable--${typeName}`;
+            wrapper.contentEditable = 'false';
+            wrapper.draggable = true;
+            wrapper.style.position = 'relative';
+            wrapper.style.overflow = 'visible';
+
+            const mediaEl = document.createElement(typeName === 'image' ? 'img' : 'video');
+            mediaEl.className = 'media-resizable__media';
+            if (typeName === 'video') {
+                mediaEl.controls = true;
+            }
+
+            const chrome = document.createElement('div');
+            chrome.className = 'media-resizable__chrome';
+            const handleMap = [
+                'nw', 'n', 'ne',
+                'w', 'e',
+                'sw', 's', 'se'
+            ];
+            handleMap.forEach((position) => {
+                const handleEl = document.createElement('span');
+                handleEl.className = `media-resizable__corner media-resizable__corner--${position}`;
+                handleEl.dataset.handle = position;
+                chrome.appendChild(handleEl);
+            });
+
+            wrapper.append(mediaEl, chrome);
+
+            const readWidthPx = () => {
+                const parsed = parseInt(String(currentWidth || '').replace(/px$/, ''), 10);
+                if (Number.isFinite(parsed) && parsed > 0) return parsed;
+                const fallback = wrapper.parentElement?.clientWidth ? Math.floor(wrapper.parentElement.clientWidth * 0.6) : 480;
+                return fallback;
+            };
+
+            const getBoxRect = () => wrapper.getBoundingClientRect();
+
+            const resizeFromHandle = (handle, deltaX, deltaY, baseWidth, aspectRatio) => {
+                const horizontal = handle.includes('e') ? deltaX : handle.includes('w') ? -deltaX : 0;
+                const vertical = handle.includes('s') ? deltaY : handle.includes('n') ? -deltaY : 0;
+                const verticalAsWidth = Number.isFinite(aspectRatio) && aspectRatio > 0 ? vertical * aspectRatio : vertical;
+
+                let nextWidth = baseWidth;
+                if (horizontal !== 0 && verticalAsWidth !== 0) {
+                    nextWidth = baseWidth + (Math.abs(horizontal) >= Math.abs(verticalAsWidth) ? horizontal : verticalAsWidth);
+                } else if (horizontal !== 0) {
+                    nextWidth = baseWidth + horizontal;
+                } else if (verticalAsWidth !== 0) {
+                    nextWidth = baseWidth + verticalAsWidth;
+                }
+
+                return Math.max(160, Math.round(nextWidth));
+            };
+
+            const applyState = () => {
+                currentWidth = currentNode.attrs.width || '100%';
+                currentAlign = currentNode.attrs.align || 'center';
+                const widthValue = String(currentWidth);
+                wrapper.dataset.align = currentAlign;
+                wrapper.style.width = widthValue;
+                wrapper.style.maxWidth = '100%';
+                wrapper.style.display = 'block';
+                wrapper.style.marginLeft = currentAlign === 'left' ? '0' : 'auto';
+                wrapper.style.marginRight = currentAlign === 'right' ? '0' : 'auto';
+                if (typeName === 'image') {
+                    mediaEl.src = currentNode.attrs.src || '';
+                    mediaEl.alt = currentNode.attrs.alt || '';
+                    mediaEl.title = currentNode.attrs.title || '';
+                } else {
+                    mediaEl.src = currentNode.attrs.src || '';
+                    mediaEl.title = currentNode.attrs.title || '';
+                }
+                mediaEl.style.width = '100%';
+                mediaEl.style.height = 'auto';
+            };
+
+            const commitWidth = (widthPx) => {
+                const pos = typeof getPos === 'function' ? getPos() : null;
+                if (pos === null || pos === undefined) return;
+                const tr = editor.view.state.tr.setNodeMarkup(pos, undefined, {
+                    ...currentNode.attrs,
+                    width: `${widthPx}px`,
+                });
+                editor.view.dispatch(tr);
+            };
+
+            const onPointerMove = (event) => {
+                if (!resizeState) return;
+                event.preventDefault();
+                const nextWidth = resizeFromHandle(
+                    resizeState.handle,
+                    event.clientX - resizeState.startX,
+                    event.clientY - resizeState.startY,
+                    resizeState.startWidth,
+                    resizeState.aspectRatio,
+                );
+                wrapper.style.width = `${nextWidth}px`;
+                resizeState.currentWidth = nextWidth;
+            };
+
+            const onPointerUp = (event) => {
+                document.removeEventListener('pointermove', onPointerMove);
+                document.removeEventListener('pointerup', onPointerUp);
+                if (!resizeState) return;
+                const nextWidth = resizeFromHandle(
+                    resizeState.handle,
+                    event.clientX - resizeState.startX,
+                    event.clientY - resizeState.startY,
+                    resizeState.startWidth,
+                    resizeState.aspectRatio,
+                );
+                resizeState = null;
+                commitWidth(nextWidth);
+            };
+
+            chrome.querySelectorAll('[data-handle]').forEach((handleEl) => {
+                handleEl.addEventListener('pointerdown', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rect = getBoxRect();
+                    resizeState = {
+                        handle: handleEl.dataset.handle,
+                        startX: event.clientX,
+                        startY: event.clientY,
+                        startWidth: rect.width || readWidthPx(),
+                        aspectRatio: rect.height > 0 ? rect.width / rect.height : 1,
+                        currentWidth: rect.width || readWidthPx(),
+                    };
+                    wrapper.style.width = `${resizeState.startWidth}px`;
+                    document.addEventListener('pointermove', onPointerMove);
+                    document.addEventListener('pointerup', onPointerUp, { once: true });
+                });
+            });
+
+            applyState();
+
+            return {
+                dom: wrapper,
+                contentDOM: null,
+                update(updatedNode) {
+                    if (updatedNode.type.name !== currentNode.type.name) return false;
+                    currentNode = updatedNode;
+                    applyState();
+                    return true;
+                },
+                ignoreMutation() {
+                    return true;
+                },
+                destroy() {
+                    document.removeEventListener('pointermove', onPointerMove);
+                    resizeState = null;
+                },
+            };
+        };
+    };
+
+    const ResizableImage = Image.extend({
+        addAttributes() {
+            return {
+                ...this.parent?.(),
+                width: {
+                    default: '100%',
+                    parseHTML: element => element.getAttribute('width') || element.style.width || '100%',
+                    renderHTML: attributes => attributes.width ? { width: attributes.width, style: `width: ${attributes.width}; max-width: 100%;` } : { style: 'max-width: 100%;' },
+                },
+                align: {
+                    default: 'center',
+                    parseHTML: element => element.getAttribute('data-align') || 'center',
+                    renderHTML: attributes => attributes.align ? { 'data-align': attributes.align } : {},
+                },
+            };
+        },
+        addNodeView() {
+            return createResizableMediaNodeView('image');
+        },
+    });
+
+    const Video = Node.create({
+        name: 'video',
+        group: 'block',
+        atom: true,
+        draggable: true,
+        selectable: true,
+        addAttributes() {
+            return {
+                src: { default: null },
+                controls: { default: true },
+                title: { default: null },
+                width: {
+                    default: '100%',
+                    parseHTML: element => element.getAttribute('width') || element.style.width || '100%',
+                    renderHTML: attributes => attributes.width ? { width: attributes.width, style: `width: ${attributes.width}; max-width: 100%;` } : { style: 'max-width: 100%;' },
+                },
+                align: {
+                    default: 'center',
+                    parseHTML: element => element.getAttribute('data-align') || 'center',
+                    renderHTML: attributes => attributes.align ? { 'data-align': attributes.align } : {},
+                },
+            };
+        },
+        parseHTML() {
+            return [{ tag: 'video[src]' }];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['video', { ...HTMLAttributes, controls: 'controls' }];
+        },
+        addNodeView() {
+            return createResizableMediaNodeView('video');
+        },
+    });
+
+    const Audio = Node.create({
+        name: 'audio',
+        group: 'block',
+        atom: true,
+        draggable: true,
+        selectable: true,
+        addAttributes() {
+            return {
+                src: { default: null },
+                title: { default: null },
+                align: {
+                    default: 'center',
+                    parseHTML: element => element.getAttribute('data-align') || 'center',
+                    renderHTML: attributes => attributes.align ? { 'data-align': attributes.align } : {},
+                },
+            };
+        },
+        parseHTML() {
+            return [{ tag: 'audio[src]' }];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['audio', {
+                ...HTMLAttributes,
+                controls: 'controls',
+                class: 'media-audio__media',
+                'data-align': HTMLAttributes.align || 'center',
+            }];
+        },
+    });
+
+    // Instantiate TipTap
+    const editor = new Editor({
+        element: document.querySelector('#editor'),
+        editorProps: {
+            handleDrop(view, event, slice, moved) {
+                if (event.dataTransfer.getData('text/x-tiptap-block')) {
+                    const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                    if (coordinates) {
+                        const fromInsidePos = window.draggedPos;
+                        if (fromInsidePos !== null && fromInsidePos !== undefined) {
+                            try {
+                                const $fromPos = view.state.doc.resolve(fromInsidePos);
+                                const fromPos = $fromPos.before(1);
+                                const node = view.state.doc.nodeAt(fromPos);
+
+                                if (node) {
+                                    const $targetPos = view.state.doc.resolve(coordinates.pos);
+                                    const targetBlockPos = $targetPos.before(1);
+
+                                    // Same block — no-op
+                                    if (fromPos === targetBlockPos) {
+                                        event.preventDefault();
+                                        return true;
+                                    }
+
+                                    const tr = view.state.tr;
+                                    // Delete source node first
+                                    tr.delete(fromPos, fromPos + node.nodeSize);
+                                    // Use tr.mapping.map() to get the correct position after delete
+                                    let mappedInsertPos;
+                                    if (targetBlockPos > fromPos) {
+                                        // Moving down: insert after target block
+                                        mappedInsertPos = tr.mapping.map($targetPos.after(1));
+                                    } else {
+                                        // Moving up: insert before target block
+                                        mappedInsertPos = tr.mapping.map(targetBlockPos);
+                                    }
+                                    tr.insert(mappedInsertPos, node);
+                                    view.dispatch(tr);
+
+                                    event.preventDefault();
+                                    return true;
+                                }
+                            } catch (err) {
+                                console.error('Error during block move:', err);
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+        },
+        extensions: [
+            StarterKit.configure({
+                orderedList: false,
+                bulletList: false,
+                dropcursor: false,
+                link: false,
+            }),
+            CustomOrderedList,
+            CustomBulletList,
+            ResizableImage,
+            Video,
+            Audio,
+            TableKit.configure({
+                table: { resizable: true },
+            }),
+            //Underline,
+            Highlight.configure({
+                multicolor: true,
+            }),
+            TextStyle,
+            Color,
+            TextAlign.configure({
+                types: ['heading', 'paragraph'],
+            }),
+            Link.configure({
+                openOnClick: false,
+                HTMLAttributes: {
+                    class: 'editor-link',
+                }
+            }),
+            Dropcursor.configure({
+                color: '#3b82f6',
+                width: 2,
+            }),
+            Placeholder.configure({
+                emptyEditorClass: 'is-editor-empty',
+                placeholder: 'Nhập nội dung tại đây 1223...',
+            }),
+        ],
+
+        onSelectionUpdate({ editor }) {
+            const event = new CustomEvent('tiptap-selection-change', { detail: { editor } });
+            window.dispatchEvent(event);
+            updateFloatingMenu(editor);
+        },
+        onUpdate({ editor }) {
+            const event = new CustomEvent('tiptap-selection-change', { detail: { editor } });
+            window.dispatchEvent(event);
+            updateFloatingMenu(editor);
+        }
+    });
+
+    function getContent() {
+        editor.getJSON()
+    }
+
+    function importContent(content) {
+        const jsonObject = typeof content === 'string' ? JSON.parse(content) : content;
+
+        editor.commands.setContent(jsonObject, { contentType: 'json' });
+    }
+
+    window.myEditor = editor;
+    window.myEditor.getContent = getContent;
+    window.myEditor.importContent = importContent;
+
+    // Floating menu: show on empty paragraphs
+    function updateFloatingMenu(ed) {
+        const wrapper = document.querySelector('.editor-wrapper');
+        if (!wrapper || !window.Alpine) return;
+        const alpineData = window.Alpine.$data(wrapper);
+        if (!alpineData) return;
+
+        const { state } = ed;
+        const { $from } = state.selection;
+        const selectedNode = state.selection.node;
+        const isMediaNode = selectedNode && ['image', 'video', 'audio'].includes(selectedNode.type.name);
+
+        if (isMediaNode) {
+            try {
+                const coords = ed.view.coordsAtPos($from.pos);
+                const wrapperRect = wrapper.getBoundingClientRect();
+                alpineData.mediaToolbar.top = coords.bottom - wrapperRect.top + 12;
+                alpineData.mediaToolbar.left = Math.max(8, coords.left - wrapperRect.left);
+                alpineData.mediaToolbar.type = selectedNode.type.name;
+                alpineData.mediaToolbar.visible = true;
+            } catch (e) {
+                alpineData.mediaToolbar.visible = false;
+            }
+            alpineData.floatingMenu.visible = false;
+            return;
+        }
+
+        const isEmptyParagraph = $from.parent.isTextblock
+            && $from.parent.content.size === 0
+            && $from.parent.type.name === 'paragraph';
+
+        if (isEmptyParagraph && state.selection.empty) {
+            try {
+                const coords = ed.view.coordsAtPos($from.pos);
+                const wrapperRect = wrapper.getBoundingClientRect();
+                alpineData.floatingMenu.top = coords.top - wrapperRect.top + 24;
+                alpineData.floatingMenu.left = coords.left - wrapperRect.left;
+                alpineData.floatingMenu.visible = true;
+            } catch (e) {
+                alpineData.floatingMenu.visible = false;
+            }
+        } else {
+            alpineData.floatingMenu.visible = false;
+        }
+        alpineData.mediaToolbar.visible = false;
+    }
+
+    // Set Alpine editor references after loading
+    document.addEventListener('alpine:init', () => {
+        // Alpine bound reactive properties
+    });
+
+    // Access alpine component variables to wire drag handle
+    setTimeout(() => {
+        const editorWrapper = document.querySelector('.editor-wrapper');
+        const dragHandleEl = document.querySelector('.drag-handle');
+        if (editorWrapper && dragHandleEl && window.Alpine) {
+            const alpineData = window.Alpine.$data(editorWrapper);
+            if (alpineData && alpineData.dragHandle) {
+                alpineData.dragHandle.init(editorWrapper, dragHandleEl);
+            }
+        }
+    }, 100);
+</script>
+
+<style>
+    .media-picker-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 2500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .media-picker-modal[x-cloak] {
+        display: none !important;
+    }
+
+    .media-picker-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    .media-picker-dialog {
+        position: relative;
+        z-index: 1;
+        width: min(1400px, calc(100vw - 32px));
+        height: min(860px, calc(100vh - 32px));
+        background: var(--background);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    .media-picker-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .media-picker-header h3 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .media-picker-header p {
+        margin: 4px 0 0;
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+
+    .media-picker-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .media-picker-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--border);
+        background: var(--sidebar-bg);
+    }
+
+    .media-picker-search {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+        height: 42px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--background);
+    }
+
+    .media-picker-search input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: var(--foreground);
+        font-size: 14px;
+    }
+
+    .media-picker-search .material-symbols-outlined {
+        color: var(--text-secondary);
+        font-size: 20px;
+    }
+
+    .media-picker-search-btn {
+        border: 0;
+        background: var(--foreground);
+        color: var(--background);
+        border-radius: 10px;
+        height: 30px;
+        padding: 0 12px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .media-picker-toolbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+    }
+
+    .media-picker-hidden-input {
+        display: none;
+    }
+
+    .media-picker-dropdown {
+        position: relative;
+    }
+
+    .media-picker-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 20;
+        min-width: 180px;
+        padding: 6px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--background);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .media-picker-menu button {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border: 0;
+        background: transparent;
+        color: var(--foreground);
+        padding: 9px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .media-picker-menu button:hover {
+        background: var(--border);
+    }
+
+    .media-picker-menu-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 6px 0;
+    }
+
+    .media-picker-nav-btn,
+    .media-picker-primary,
+    .media-picker-close-btn {
+        border: 1px solid var(--border);
+        background: var(--sidebar-bg);
+        color: var(--foreground);
+        border-radius: 10px;
+        height: 38px;
+        padding: 0 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        line-height: 1;
+        box-sizing: border-box;
+    }
+
+    .media-picker-close-btn {
+        width: 38px;
+        padding: 0;
+        font-size: 22px;
+        line-height: 1;
+    }
+
+    .media-picker-upload-btn {
+        min-width: 106px;
+    }
+
+    .media-picker-body {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        overflow: hidden;
+    }
+
+    .media-picker-main {
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--background);
+        overflow: hidden;
+    }
+
+    .media-picker-items {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+        width: 100%;
+        margin: 0;
+        padding: 12px;
+        border: 0;
+        border-radius: 0;
+        background: var(--background);
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .media-picker-items .media-list,
+    .media-picker-items .media-grid-wrapper {
+        border-radius: 12px;
+    }
+
+    .media-picker-items .media-grid-wrapper {
+        height: 100%;
+    }
+
+    .media-picker-status {
+        position: absolute;
+        inset: 12px;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.22);
+        backdrop-filter: blur(3px);
+        color: var(--foreground);
+        pointer-events: none;
+    }
+
+    .media-picker-status .spinner-sm,
+    .media-loading .spinner-sm {
+        width: 28px;
+        height: 28px;
+        border-width: 3px;
+        animation: media-spin 0.8s linear infinite;
+    }
+
+    .media-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        min-height: 220px;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+
+    .spinner-inline {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-top-color: currentColor;
+        border-radius: 999px;
+        animation: media-spin 0.8s linear infinite;
+    }
+
+    .media-picker-sidebar {
+        border-left: 1px solid var(--border);
+        background: var(--sidebar-bg);
+        overflow: auto;
+        padding: 18px;
+    }
+
+    .media-picker-detail,
+    .media-picker-empty {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .media-picker-empty {
+        align-items: center;
+        justify-content: center;
+        min-height: 100%;
+        text-align: center;
+        color: var(--text-secondary);
+    }
+
+    .media-picker-empty .material-symbols-outlined,
+    .media-picker-folder-icon,
+    .media-picker-file-icon {
+        font-size: 56px;
+        color: #7484ff;
+    }
+
+    .media-picker-preview {
+        height: 220px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--background);
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .media-picker-preview img,
+    .media-picker-preview video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+    }
+
+    .media-picker-preview audio {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .media-picker-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .media-picker-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .media-picker-field .label {
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+
+    .media-picker-field .value {
+        font-size: 13px;
+        color: var(--foreground);
+        word-break: break-word;
+    }
+
+    .media-picker-url-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .media-picker-url {
+        user-select: all;
+        flex: 1;
+    }
+
+    .media-picker-copy-btn {
+        border: 1px solid var(--border);
+        background: var(--background);
+        color: var(--foreground);
+        border-radius: 8px;
+        height: 28px;
+        padding: 0 10px;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .media-picker-actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .media-picker-primary {
+        background: var(--foreground);
+        color: var(--background);
+        border-color: transparent;
+        width: 100%;
+        font-weight: 600;
+    }
+
+    .media-picker-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .media-picker-modal .grid-checkbox,
+    .media-picker-modal .card-more-menu {
+        display: none !important;
+    }
+
+    .media-picker-modal .media-row,
+    .media-picker-modal .media-grid-card {
+        cursor: pointer;
+    }
+
+    .media-picker-modal .selected {
+        outline: 2px solid rgba(91, 154, 239, 0.55);
+        outline-offset: -2px;
+    }
+
+    @keyframes media-spin {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>

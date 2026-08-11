@@ -1,0 +1,25 @@
+<!-- Alignment Dropdown -->
+<div class="dropdown-wrapper" @click.outside="activeDropdown === 'align' && (activeDropdown = null)">
+    <button type="button" class="btn dropdown-btn" @click="toggleDropdown('align')">
+        <span x-text="getCurrentAlignLabel()">Căn lề</span>
+        <span class="arrow">▼</span>
+    </button>
+    <div class="dropdown-menu" x-show="activeDropdown === 'align'" x-transition>
+        <button type="button" class="dropdown-item" :class="isActive({ textAlign: 'left' }) && 'selected'"
+            @click="myEditor.chain().focus().setTextAlign('left').run(); closeDropdown()">
+            <span>⬅️ Căn trái</span>
+        </button>
+        <button type="button" class="dropdown-item" :class="isActive({ textAlign: 'center' }) && 'selected'"
+            @click="myEditor.chain().focus().setTextAlign('center').run(); closeDropdown()">
+            <span>↔️ Căn giữa</span>
+        </button>
+        <button type="button" class="dropdown-item" :class="isActive({ textAlign: 'right' }) && 'selected'"
+            @click="myEditor.chain().focus().setTextAlign('right').run(); closeDropdown()">
+            <span>➡️ Căn phải</span>
+        </button>
+        <button type="button" class="dropdown-item" :class="isActive({ textAlign: 'justify' }) && 'selected'"
+            @click="myEditor.chain().focus().setTextAlign('justify').run(); closeDropdown()">
+            <span>↕️ Căn đều</span>
+        </button>
+    </div>
+</div>

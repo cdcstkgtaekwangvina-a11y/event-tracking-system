@@ -1,5 +1,279 @@
-{% extends "templates/index.j2" %} 
-{% block title %}Danh sách sự kiện{% endblock %}
-{%block content %}
-<h1>Chào mừng bạn đến với Module Sự Kiện</h1>
+{% extends "templates/layouts/admin.j2" if not request.headers.get("hx-request") else "templates/layouts/admin_blank.j2" %}
+
+{% block admin_title %}Quản lý sự kiện{% endblock %}
+
+{% block admin_body %}
+{# 
+=== ĐOẠN CODE CŨ (Bản gốc chứa TipTap Editor placeholder, comment lại để giữ tham khảo) ===
+<div class="event-header">
+    <h1>Quản lý sự kiện</h1>
+</div>
+{% include "templates/components/editor/editor.j2" %}
+=======================================================================================
+#}
+<div class="admin-events-container" x-data="adminEventsApp()" @open-edit-modal.window="openEditModal($event.detail)">
+    
+    <!-- Header Section -->
+    <div class="admin-events-header">
+        <h1 class="admin-title-text">Quản lý Sự kiện</h1>
+        <button type="button" class="btn-create-event" @click="openCreateModal()">
+            <span class="material-symbols-outlined">add</span>
+            Tạo sự kiện mới
+        </button>
+    </div>
+
+    <!-- Search Section -->
+    <div class="admin-search-wrapper">
+        <span class="material-symbols-outlined admin-search-icon">search</span>
+        <input type="text" name="search" placeholder="Tìm kiếm sự kiện theo tên hoặc địa điểm..." 
+            x-model="search"
+            @input.debounce.300ms="$dispatch('search-changed')" 
+            class="admin-search-input" />
+    </div>
+
+    <!-- Event Cards Grid Container -->
+    <div id="admin-events-container" 
+        hx-get="/api/events/admin-cards-html" 
+        hx-trigger="load, search-changed from:body, refresh-events from:body"
+        hx-include="[name='search']" 
+        hx-swap="innerHTML">
+        <div class="admin-no-events">
+            <div class="spinner-sm"></div>
+            <p>Đang tải danh sách sự kiện...</p>
+        </div>
+    </div>
+
+    <!-- Create/Edit Event Modal -->
+    <div class="admin-modal-overlay" x-show="modalOpen" x-cloak style="display: none;">
+        <div class="admin-modal-container" @click.outside="closeModal()">
+            
+            <!-- Modal Header -->
+            <div class="admin-modal-header">
+                <h3 class="admin-modal-title" x-text="isEdit ? 'Cập nhật sự kiện' : 'Tạo sự kiện mới'"></h3>
+                <button type="button" class="admin-modal-close" @click="closeModal()">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <!-- Modal Body (Form) -->
+            <form @submit.prevent="saveEvent()">
+                <div class="admin-modal-body">
+                    <!-- Event Name -->
+                    <div class="admin-form-group">
+                        <label for="event-name">Tên sự kiện <span style="color: red;">*</span></label>
+                        <input type="text" id="event-name" x-model="form.name" required class="admin-form-input" placeholder="Ví dụ: Team Building Q2" />
+                    </div>
+
+                    <!-- Description -->
+                    <div class="admin-form-group">
+                        <label for="event-desc">Mô tả</label>
+                        <textarea id="event-desc" x-model="form.description" class="admin-form-textarea" placeholder="Nhập mô tả sự kiện..."></textarea>
+                    </div>
+
+                    <!-- Location -->
+                    <div class="admin-form-group">
+                        <label for="event-location">Địa điểm <span style="color: red;">*</span></label>
+                        <input type="text" id="event-location" x-model="form.location" required class="admin-form-input" placeholder="Ví dụ: Hội trường A / Online" />
+                    </div>
+
+                    <!-- Start & End Date Time -->
+                    <div class="admin-form-row">
+                        <div class="admin-form-group">
+                            <label for="event-start">Thời gian bắt đầu</label>
+                            <input type="datetime-local" id="event-start" x-model="form.start_at" class="admin-form-input" />
+                        </div>
+                        <div class="admin-form-group">
+                            <label for="event-end">Thời gian kết thúc</label>
+                            <input type="datetime-local" id="event-end" x-model="form.end_at" class="admin-form-input" />
+                        </div>
+                    </div>
+
+                    <!-- Image URL -->
+                    <div class="admin-form-group">
+                        <label for="event-image">URL hình ảnh</label>
+                        <input type="url" id="event-image" x-model="form.url_image" class="admin-form-input" placeholder="https://example.com/image.png" />
+                    </div>
+
+                    <!-- Map URL -->
+                    <div class="admin-form-group">
+                        <label for="event-map">URL bản đồ</label>
+                        <input type="url" id="event-map" x-model="form.url_map" class="admin-form-input" placeholder="https://maps.google.com/..." />
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="admin-modal-footer">
+                    <!-- Delete Button (Only on edit) -->
+                    <template x-if="isEdit">
+                        <button type="button" class="btn-modal-danger" @click="deleteEvent()" :disabled="isLoading" style="margin-right: auto;">
+                            Xóa sự kiện
+                        </button>
+                    </template>
+
+                    <button type="button" class="btn-modal-secondary" @click="closeModal()" :disabled="isLoading">
+                        Hủy
+                    </button>
+                    <button type="submit" class="btn-modal-primary" :disabled="isLoading">
+                        <div class="spinner-sm" x-show="isLoading" style="display: none; border-top-color: var(--background);"></div>
+                        <span x-text="isEdit ? 'Lưu thay đổi' : 'Tạo mới'"></span>
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function adminEventsApp() {
+        return {
+            search: '',
+            modalOpen: false,
+            isEdit: false,
+            isLoading: false,
+            currentEventId: null,
+            form: {
+                name: '',
+                description: '',
+                location: '',
+                start_at: '',
+                end_at: '',
+                url_image: '',
+                url_map: ''
+            },
+
+            resetForm() {
+                this.form = {
+                    name: '',
+                    description: '',
+                    location: '',
+                    start_at: '',
+                    end_at: '',
+                    url_image: '',
+                    url_map: ''
+                };
+                this.currentEventId = null;
+            },
+
+            formatDateTimeForInput(isoString) {
+                if (!isoString) return '';
+                const date = new Date(isoString);
+                if (isNaN(date.getTime())) return '';
+                const pad = (n) => n.toString().padStart(2, '0');
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+            },
+
+            openCreateModal() {
+                this.resetForm();
+                this.isEdit = false;
+                this.modalOpen = true;
+            },
+
+            openEditModal(data) {
+                this.isEdit = true;
+                this.currentEventId = data.id;
+                this.form = {
+                    name: data.name || '',
+                    description: data.description || '',
+                    location: data.location || '',
+                    start_at: this.formatDateTimeForInput(data.start_at),
+                    end_at: this.formatDateTimeForInput(data.end_at),
+                    url_image: data.url_image || '',
+                    url_map: data.url_map || ''
+                };
+                this.modalOpen = true;
+            },
+
+            closeModal() {
+                if (this.isLoading) return;
+                this.modalOpen = false;
+                this.resetForm();
+            },
+
+            async saveEvent() {
+                this.isLoading = true;
+                const url = this.isEdit ? `/api/events/${this.currentEventId}` : '/api/events/';
+                const method = this.isEdit ? 'PUT' : 'POST';
+
+                // Format datetime fields back to ISO strings or keep as null if empty
+                const payload = {
+                    ...this.form,
+                    start_at: this.form.start_at ? new Date(this.form.start_at).toISOString() : null,
+                    end_at: this.form.end_at ? new Date(this.form.end_at).toISOString() : null,
+                    url_image: this.form.url_image || null,
+                    url_map: this.form.url_map || null
+                };
+
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const resData = await response.json();
+
+                    if (response.ok) {
+                        notify.toast.success(this.isEdit ? 'Cập nhật thành công' : 'Tạo sự kiện thành công');
+                        this.modalOpen = false;
+                        this.resetForm();
+                        
+                        // CODE CŨ: window.dispatchEvent(new CustomEvent('refresh-events'));
+                        // -> Không sử dụng vì phát sự kiện trực tiếp trên window sẽ không "sủi bọt" (bubble) xuống body được.
+                        // CODE MỚI: Phát sự kiện trực tiếp trên document.body kèm { bubbles: true } để hx-trigger="refresh-events from:body" có thể bắt được.
+                        document.body.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }));
+                    } else {
+                        notify.toast.error('Có lỗi xảy ra', resData.message || resData.detail || 'Vui lòng kiểm tra lại dữ liệu');
+                    }
+                } catch (error) {
+                    console.error('Error saving event:', error);
+                    notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            async deleteEvent() {
+                if (!this.currentEventId) return;
+
+                const confirmed = await notify.modal.confirm(
+                    'Xóa sự kiện?',
+                    `Bạn có chắc chắn muốn xóa sự kiện "${this.form.name}" không? Hành động này không thể hoàn tác.`
+                );
+
+                if (!confirmed) return;
+
+                this.isLoading = true;
+                try {
+                    const response = await fetch(`/api/events/${this.currentEventId}`, {
+                        method: 'DELETE'
+                    });
+
+                    const resData = await response.json();
+
+                    if (response.ok) {
+                        notify.toast.success('Xóa sự kiện thành công');
+                        this.modalOpen = false;
+                        this.resetForm();
+                        
+                        // CODE CŨ: window.dispatchEvent(new CustomEvent('refresh-events'));
+                        // -> Không sử dụng vì phát sự kiện trực tiếp trên window sẽ không "sủi bọt" (bubble) xuống body được.
+                        // CODE MỚI: Phát sự kiện trực tiếp trên document.body kèm { bubbles: true } để hx-trigger="refresh-events from:body" có thể bắt được.
+                        document.body.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }));
+                    } else {
+                        notify.toast.error('Xóa thất bại', resData.message || resData.detail || 'Không thể xóa sự kiện');
+                    }
+                } catch (error) {
+                    console.error('Error deleting event:', error);
+                    notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+                } finally {
+                    this.isLoading = false;
+                }
+            }
+        };
+    }
+</script>
 {% endblock %}
