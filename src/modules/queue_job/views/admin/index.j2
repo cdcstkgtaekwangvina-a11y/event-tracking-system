@@ -1,0 +1,90 @@
+{% extends "templates/layouts/admin.j2" if not request.headers.get("hx-request") else "templates/layouts/admin_blank.j2" %}
+{% block admin_title %}Quản lý Queue Jobs{% endblock %}
+
+{% block admin_body %}
+<div class="qj-container">
+    <!-- Header -->
+    <div class="qj-header">
+        <div>
+            <h1 class="qj-title">Quản lý Queue Jobs</h1>
+            <p class="qj-sub">Theo dõi các tiến trình xử lý ngầm (Import nhân viên, xử lý hàng loạt...)</p>
+        </div>
+        <div class="qj-header-actions">
+            <button type="button" class="qj-btn qj-btn-secondary" 
+                    hx-get="{{ url_for('queue_jobs_table') }}" 
+                    hx-target="#qj-table-container" 
+                    hx-swap="innerHTML">
+                <span class="material-symbols-outlined">refresh</span>
+                Làm mới
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters & Search Bar -->
+    <div class="qj-toolbar" x-data="{ currentStatus: '{{ status_filter }}' }">
+        <div class="qj-status-tabs">
+            <button type="button" 
+                    class="qj-status-tab" 
+                    :class="{ 'qj-status-tab--active': currentStatus === 'all' }"
+                    @click="currentStatus = 'all'"
+                    hx-get="{{ url_for('queue_jobs_table') }}?status=all"
+                    hx-target="#qj-table-container"
+                    hx-swap="innerHTML">
+                Tất cả
+            </button>
+            <button type="button" 
+                    class="qj-status-tab" 
+                    :class="{ 'qj-status-tab--active': currentStatus === 'running' }"
+                    @click="currentStatus = 'running'"
+                    hx-get="{{ url_for('queue_jobs_table') }}?status=running"
+                    hx-target="#qj-table-container"
+                    hx-swap="innerHTML">
+                Đang chạy
+            </button>
+            <button type="button" 
+                    class="qj-status-tab" 
+                    :class="{ 'qj-status-tab--active': currentStatus === 'success' }"
+                    @click="currentStatus = 'success'"
+                    hx-get="{{ url_for('queue_jobs_table') }}?status=success"
+                    hx-target="#qj-table-container"
+                    hx-swap="innerHTML">
+                Thành công
+            </button>
+            <button type="button" 
+                    class="qj-status-tab" 
+                    :class="{ 'qj-status-tab--active': currentStatus === 'failed' }"
+                    @click="currentStatus = 'failed'"
+                    hx-get="{{ url_for('queue_jobs_table') }}?status=failed"
+                    hx-target="#qj-table-container"
+                    hx-swap="innerHTML">
+                Thất bại
+            </button>
+        </div>
+
+        <div class="qj-search-box">
+            <span class="material-symbols-outlined qj-search-icon">search</span>
+            <input type="text"
+                   class="qj-search-input"
+                   placeholder="Tìm theo ID..."
+                   value="{{ search }}"
+                   hx-get="{{ url_for('queue_jobs_table') }}"
+                   hx-trigger="keyup[key=='Enter']"
+                   hx-target="#qj-table-container"
+                   hx-swap="innerHTML"
+                   name="search" />
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="qj-table-wrapper">
+        <div id="qj-table-container" hx-get="{{ url_for('queue_jobs_table') }}" hx-trigger="every 10s" hx-swap="innerHTML">
+            {% include "modules/queue_job/views/admin/queue_job_table.j2" %}
+        </div>
+    </div>
+</div>
+
+{% include "modules/queue_job/views/admin/queue_job_detail_modal.j2" %}
+
+<link rel="stylesheet" href="/static/css/queue_jobs.css">
+
+{% endblock %}

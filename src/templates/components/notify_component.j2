@@ -415,6 +415,12 @@ Màu dùng CSS vars từ index.css (:root)
         transition: all .18s ease;
     }
 
+    .nc-modal__btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed !important;
+        pointer-events: none;
+    }
+
     .nc-modal__btn--primary {
         background: var(--primary);
         color: var(--background);

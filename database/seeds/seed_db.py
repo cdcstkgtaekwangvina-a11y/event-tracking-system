@@ -1,14 +1,14 @@
 import asyncio
-from datetime import timezone, timedelta
-from sqlmodel import SQLModel, select
-from database.models.users import Users
-from database.models.events import Events
-from sqlmodel.ext.asyncio.session import AsyncSession
-from database.models.app_db import engine
 import logging
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
-from datetime import datetime
+
+from sqlmodel import SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from database.models.app_db import engine
 from database.models.settings import Settings
+from database.models.users import Users
 from src.modules.setting.setting_constants import AppConfigKey
 
 logging.basicConfig(level=logging.INFO)
@@ -53,33 +53,6 @@ async def seed():
                 ]
 
                 session.add_all(users)
-
-            exiting_event = (await session.exec(select(Events))).first()
-            if exiting_event is None:
-                events = [
-                    Events(
-                        name="Team Building Q2",
-                        description="Hoạt động teambuilding gắn kết tinh thần đồng đội quý 2.",
-                        start_at=datetime.fromisoformat("2026-06-15T09:00:00+07:00"),
-                        end_at=datetime.fromisoformat("2026-06-15T17:00:00+07:00"),
-                        location="Hội trường A",
-                    ),
-                    Events(
-                        name="Training Session",
-                        description="Buổi đào tạo nội bộ về quy trình làm việc mới.",
-                        start_at=datetime.fromisoformat("2026-05-20T14:00:00+07:00"),
-                        end_at=datetime.fromisoformat("2026-05-20T16:00:00+07:00"),
-                        location="Phòng họp 301",
-                    ),
-                    Events(
-                        name="Company Meeting",
-                        description="Họp toàn công ty tổng kết hoạt động quý 1.",
-                        start_at=datetime.fromisoformat("2026-05-18T10:00:00+07:00"),
-                        end_at=datetime.fromisoformat("2026-05-18T12:00:00+07:00"),
-                        location="Online",
-                    )
-                ]
-                session.add_all(events)
 
             exiting_settings = (await session.exec(select(Settings))).first()
             if exiting_settings is None:

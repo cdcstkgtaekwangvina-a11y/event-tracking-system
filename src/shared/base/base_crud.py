@@ -1,90 +1,105 @@
-from src.shared.helpers.time_extensions import get_now_vn
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import SQLModel, select, update, delete
-from sqlmodel.sql.expression import SelectOfScalar, Select
+from collections.abc import Callable, Sequence
+from contextlib import asynccontextmanager
+from inspect import isclass
 from typing import (
-    TypeVar,
-    Generic,
-    Type,
-    Optional,
-    TypeGuard,
-    Any,
-    Sequence,
-    cast,
-    List,
     TYPE_CHECKING,
-    Callable,
-    Union,
+    Any,
+    Generic,
+    Protocol,
+    TypeGuard,
+    TypeVar,
+    cast,
 )
-from sqlalchemy import func, exists, or_, desc, asc, String, and_
+
 from fastapi import HTTPException
+from pydantic import BaseModel
+from sqlalchemy import String, and_, asc, desc, exists, func, or_
+from sqlmodel import SQLModel, delete, select, update
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql.expression import Select, SelectOfScalar
+from typing_extensions import Self, overload
+
+from src.shared.base.base_logger import get_logger
+from src.shared.helpers.time_extensions import get_now_vn
 from src.shared.schemas.pagination_schemas import (
-    PaginationRequest,
-    PaginationResponse,
     CursorPaginationRequest,
     CursorPaginationResponse,
+    PaginationRequest,
+    PaginationResponse,
 )
-from pydantic import BaseModel
-from typing_extensions import Self, overload
-from inspect import isclass
-import logging
-from contextlib import asynccontextmanager
 
-logging.basicConfig(level=logging.ERROR)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
-    from database.models.base_model import (
-        PrimaryModel,
-        CreatedAtModel,
-        UpdatedAtModel,
-        DeletedAtModel,
-    )
+    pass
 
 T = TypeVar("T", bound=SQLModel)
+M = TypeVar("M")
+
+
+class HasIdProtocol(Protocol):
+    id: Any
+
+
+class HasDeletedAtProtocol(Protocol):
+    deleted_at: Any
+
+
+class HasCreatedAtProtocol(Protocol):
+    created_at: Any
+
+
+class HasUpdatedAtProtocol(Protocol):
+    updated_at: Any
 
 
 class BaseCrud(Generic[T]):
-    model: Type[T]
+    model: type[T]
     session: AsyncSession
     statement: SelectOfScalar[Any] | Select[Any]
-    dto_class: Optional[Type[BaseModel]] = None
+    dto_class: type[BaseModel] | None = None
 
-    def __init__(self, session: AsyncSession, model: Type[T]):
+    def __init__(self, session: AsyncSession, model: type[T]):
         self.session = session
         self.model = model
         self.statement = select(model)
         self.dto_class = None
 
-    def is_has_soft_delete(self, model: Type[T]) -> TypeGuard[Type[DeletedAtModel]]:
+    def is_has_soft_delete(
+        self, model: type[M]
+    ) -> TypeGuard[type[HasDeletedAtProtocol]]:
         from database.models.base_model import DeletedAtModel
 
         return isinstance(model, type) and issubclass(model, DeletedAtModel)
 
-    def is_has_created_at(self, model: Type[T]) -> TypeGuard[Type[CreatedAtModel]]:
+    def is_has_primary_key(self, model: type[M]) -> TypeGuard[type[HasIdProtocol]]:
+        from database.models.base_model import PrimaryModel
+
+        return isinstance(model, type) and issubclass(model, PrimaryModel)
+
+    def is_has_created_at(
+        self, model: type[M]
+    ) -> TypeGuard[type[HasCreatedAtProtocol]]:
         from database.models.base_model import CreatedAtModel
 
         return isinstance(model, type) and issubclass(model, CreatedAtModel)
 
-    def is_has_updated_at(self, model: Type[T]) -> TypeGuard[Type[UpdatedAtModel]]:
+    def is_has_updated_at(
+        self, model: type[M]
+    ) -> TypeGuard[type[HasUpdatedAtProtocol]]:
         from database.models.base_model import UpdatedAtModel
 
         return isinstance(model, type) and issubclass(model, UpdatedAtModel)
-
-    def is_has_primary_key(self, model: Type[T]) -> TypeGuard[Type[PrimaryModel[Any]]]:
-        from database.models.base_model import PrimaryModel
-
-        return isinstance(model, type) and issubclass(model, PrimaryModel)
 
     @overload
     def map_dto_class(self, data: T, dto_class: None) -> T: ...
 
     @overload
-    def map_dto_class(self, data: T, dto_class: Type[BaseModel]) -> BaseModel: ...
+    def map_dto_class(self, data: T, dto_class: type[BaseModel]) -> BaseModel: ...
 
     def map_dto_class(
-        self, data: T, dto_class: Optional[Type[BaseModel]]
-    ) -> Union[T, BaseModel]:
+        self, data: T, dto_class: type[BaseModel] | None
+    ) -> T | BaseModel:
         if dto_class:
             return dto_class.model_validate(data, from_attributes=True)
         return data
@@ -95,19 +110,23 @@ class BaseCrud(Generic[T]):
         self,
         dto_class: type[BaseModel],
         *,
-        logic_column: Optional[List[Any]] = None,
+        logic_column: list[Any] | None = None,
     ) -> Self: ...
     @overload
     def select(self, *columns: Any) -> Self: ...
 
-    def select(self, *args: Any, logic_column: Optional[List[Any]] = None) -> Self:
+    def select(
+        self, *args: Any, logic_column: list[Any] | None = None, **kwargs: Any
+    ) -> Self:
+        dto_class_arg = args[0] if args else kwargs.get("dto_class")
+
         if (
-            len(args) == 1
-            and isclass(args[0])
-            and issubclass(args[0], BaseModel)
-            and args[0] != self.model
+            dto_class_arg
+            and isclass(dto_class_arg)
+            and issubclass(dto_class_arg, BaseModel)
+            and dto_class_arg != self.model
         ):
-            self.dto_class = args[0]
+            self.dto_class = dto_class_arg
             table_class = self.model
 
             columns = [
@@ -192,7 +211,7 @@ class BaseCrud(Generic[T]):
             raise e
 
     # end Query builder
-    async def create(self, data, autocommit: bool = True) -> Optional[T]:
+    async def create(self, data, autocommit: bool = True) -> T | None:
         create_data = data.model_dump() if hasattr(data, "model_dump") else data
         db_obj = self.model(**create_data)
 
@@ -211,8 +230,8 @@ class BaseCrud(Generic[T]):
         self,
         statement: SelectOfScalar[Any] | Select[Any] | None = None,
         soft_delete: bool = True,
-        dto_class: Optional[Type[BaseModel]] = None,
-    ) -> Optional[T]:
+        dto_class: type[BaseModel] | None = None,
+    ) -> T | None:
 
         if statement is not None:
             self.statement = statement
@@ -221,20 +240,20 @@ class BaseCrud(Generic[T]):
             self.statement = self.statement.where(self.model.deleted_at == None)
 
         result = await self.session.exec(self.statement)
+        self.statement = select(self.model)
         return result.one()
 
-    async def find_by_id(self, id: Any, soft_delete: bool = True) -> Optional[T]:
+    async def find_by_id(self, id: Any, soft_delete: bool = True) -> T | None:
         statement = self.statement if self.statement is not None else select(self.model)
 
         m = self.model
 
-        if self.is_has_soft_delete(m):
+        if self.is_has_soft_delete(m) and soft_delete:
             if hasattr(m, "deleted_at"):
                 statement = statement.where(m.deleted_at == None)
 
         if self.is_has_primary_key(self.model):
-            primary_key_attr = getattr(self.model, "id")
-            statement = statement.where(primary_key_attr == id)
+            statement = statement.where(self.model.id == id)
         else:
             raise HTTPException(
                 status_code=500, detail="Model does not have a primary key"
@@ -260,25 +279,37 @@ class BaseCrud(Generic[T]):
 
     async def update(
         self,
-        condition: Callable[[Any], Any],
-        data: Any,
+        id: Any = None,
+        condition: Callable[[Any], Any] | None = None,
+        data: Any = None,
         soft_delete: bool = True,
         autocommit: bool = True,
-    ) -> Optional[T]:
+    ) -> T | None:
+        # 1. Xử lý dữ liệu update đầu vào
         update_data = (
             data.model_dump(exclude_unset=True) if hasattr(data, "model_dump") else data
         )
 
         if not update_data:
+            self.statement = select(self.model)
             return None
 
+        # 2. Kiểm tra và tự động cập nhật trường updated_at nếu có
         if hasattr(self, "is_has_updated_at") and self.is_has_updated_at(self.model):
             update_data["updated_at"] = get_now_vn()
 
-        stmt = update(self.model).where(condition(self.model))
+        # 3. Xác định điều kiện WHERE (Ưu tiên id trước, condition sau)
+        if id is not None and self.is_has_primary_key(self.model):
+            where_clause = self.model.id == id
+        elif condition is not None:
+            where_clause = condition(self.model)
+        else:
+            self.statement = select(self.model)
+            return None
+        stmt = update(self.model).where(where_clause)
 
         if soft_delete and self.is_has_soft_delete(self.model):
-            stmt = stmt.where(getattr(self.model, "deleted_at") == None)
+            stmt = stmt.where(self.model.deleted_at == None)
 
         stmt = stmt.values(**update_data).returning(self.model)
 
@@ -287,6 +318,8 @@ class BaseCrud(Generic[T]):
 
         if autocommit:
             await self.session.commit()
+
+        self.statement = select(self.model)
         return db_obj
 
     async def delete(
@@ -302,6 +335,7 @@ class BaseCrud(Generic[T]):
         elif condition is not None:
             where_clause = condition(self.model)
         else:
+            self.statement = select(self.model)
             return False
 
         if soft_delete and self.is_has_soft_delete(self.model):
@@ -318,6 +352,7 @@ class BaseCrud(Generic[T]):
             await self.session.commit()
 
         # Trả về True nếu có ít nhất một dòng dữ liệu bị ảnh hưởng
+        self.statement = select(self.model)
         return result.rowcount > 0
 
     async def any_async(
@@ -335,6 +370,7 @@ class BaseCrud(Generic[T]):
             self.statement = self.statement.where(self.model.deleted_at == None)
         stmt = select(exists(self.statement))
         result = await self.session.exec(stmt)
+        self.statement = select(self.model)
         return bool(result.first())
 
     async def count_async(
@@ -350,13 +386,14 @@ class BaseCrud(Generic[T]):
             self.statement = self.statement.where(self.model.deleted_at == None)
         count_statement = select(func.count()).select_from(self.statement.subquery())
         result = await self.session.exec(count_statement)
+        self.statement = select(self.model)
         return result.one() or 0
 
     async def pagination_async(
         self,
         pagination: PaginationRequest,
-        search_fields: Optional[list[str]] = None,
-        search_conditions: Optional[list[Any]] = None,
+        search_fields: list[str] | None = None,
+        search_conditions: list[Any] | None = None,
         soft_delete: bool = True,
     ) -> PaginationResponse:
 
@@ -394,15 +431,22 @@ class BaseCrud(Generic[T]):
                         if hasattr(self.model, field):
                             column = getattr(self.model, field)
                             search_conditions.append(
-                                column.ilike(f"%{pagination.search}%")
+                                func.unaccent(column).ilike(
+                                    func.unaccent(f"%{pagination.search}%")
+                                )
                             )
                 else:
                     table = getattr(self.model, "__table__", None)
                     if table is not None:
                         for column in table.columns:
-                            if isinstance(column.type, String) or column.type.__class__.__name__ == 'AutoString':
+                            if (
+                                isinstance(column.type, String)
+                                or column.type.__class__.__name__ == "AutoString"
+                            ):
                                 search_conditions.append(
-                                    column.ilike(f"%{pagination.search}%")
+                                    func.unaccent(column).ilike(
+                                        func.unaccent(f"%{pagination.search}%")
+                                    )
                                 )
 
             if search_conditions:
@@ -421,18 +465,17 @@ class BaseCrud(Generic[T]):
                 self.statement = self.statement.order_by(asc(sort_column))
         else:
             sort_col = None
-            if self.is_has_updated_at(self.model):
-                sort_col = cast(Any, self.model.updated_at)
-            elif self.is_has_created_at(self.model):
+            if self.is_has_created_at(self.model):
                 sort_col = cast(Any, self.model.created_at)
+            elif self.is_has_updated_at(self.model):
+                sort_col = cast(Any, self.model.updated_at)
             else:
                 # Fallback an toàn về khóa chính (id) nếu không có timestamp
                 sort_col = cast(Any, getattr(self.model, "id", None))
 
             if sort_col is not None:
-                self.statement = self.statement.order_by(
-                    desc(sort_col) if pagination.is_desc else asc(sort_col)
-                )
+                # Mặc định: mới nhất lên trên (DESC theo created_at)
+                self.statement = self.statement.order_by(desc(sort_col))
 
         # 5. ÁP DỤNG LIMIT & OFFSET
         offset = (pagination.page - 1) * pagination.limit
@@ -447,6 +490,7 @@ class BaseCrud(Generic[T]):
                 self.dto_class.model_validate(row, from_attributes=True) for row in data
             ]
 
+        self.statement = select(self.model)
         return PaginationResponse(
             page=pagination.page,
             limit=pagination.limit,
@@ -458,9 +502,9 @@ class BaseCrud(Generic[T]):
     async def cursor_pagination_async(
         self,
         cursor_request: CursorPaginationRequest,
-        cursor_field: Optional[str] = None,
-        search_fields: Optional[list[str]] = None,
-        search_conditions: Optional[list[Any]] = None,
+        cursor_field: str | None = None,
+        search_fields: list[str] | None = None,
+        search_conditions: list[Any] | None = None,
         soft_delete: bool = True,
     ) -> CursorPaginationResponse:
 
@@ -499,15 +543,22 @@ class BaseCrud(Generic[T]):
                         if hasattr(self.model, field):
                             column = getattr(self.model, field)
                             search_conditions.append(
-                                column.ilike(f"%{cursor_request.search}%")
+                                func.unaccent(column).ilike(
+                                    func.unaccent(f"%{cursor_request.search}%")
+                                )
                             )
                 else:
                     table = getattr(self.model, "__table__", None)
                     if table is not None:
                         for column in table.columns:
-                            if isinstance(column.type, String) or column.type.__class__.__name__ == 'AutoString':
+                            if (
+                                isinstance(column.type, String)
+                                or column.type.__class__.__name__ == "AutoString"
+                            ):
                                 search_conditions.append(
-                                    column.ilike(f"%{cursor_request.search}%")
+                                    func.unaccent(column).ilike(
+                                        func.unaccent(f"%{cursor_request.search}%")
+                                    )
                                 )
 
             if search_conditions:
@@ -633,6 +684,7 @@ class BaseCrud(Generic[T]):
             next_cursor = f"{sort_val}_{id_val}"
             has_more = len(data) >= limit
 
+        self.statement = select(self.model)
         return CursorPaginationResponse(
             data=list(data) if data else None,
             next_cursor=next_cursor,

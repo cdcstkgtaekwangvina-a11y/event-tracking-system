@@ -1,0 +1,76 @@
+<!-- Queue Job Detail Modal -->
+<div class="qj-modal-backdrop" id="qj-detail-modal-backdrop"
+     x-show="isOpen"
+     style="display: none;"
+     x-cloak
+     @click.self="close"
+     x-data="{
+        isOpen: false,
+        job: null,
+        activeTab: 'payload',
+        open(jobData) {
+            this.job = jobData;
+            this.activeTab = 'payload';
+            this.isOpen = true;
+            const el = document.getElementById('qj-detail-modal-backdrop');
+            if (el) el.style.display = 'flex';
+        },
+        close() {
+            this.isOpen = false;
+            const el = document.getElementById('qj-detail-modal-backdrop');
+            if (el) el.style.display = 'none';
+        },
+        init() {
+            window.queueJobDetailModal = this;
+        }
+     }">
+    <div class="qj-modal qj-modal--lg" @click.stop>
+        <div class="qj-modal-header">
+            <div>
+                <h3 class="qj-modal-title">Chi tiết Queue Job</h3>
+                <p class="qj-modal-sub" x-text="job ? 'ID: ' + job.id : ''"></p>
+            </div>
+            <button class="qj-modal-close" @click="close" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <template x-if="job">
+            <div class="qj-modal-body">
+            <!-- Tabs -->
+            <div class="qj-tabs">
+                <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'payload' }" @click="activeTab = 'payload'">
+                    Payload
+                </button>
+                <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'logs' }" @click="activeTab = 'logs'">
+                    Logs & Errors
+                </button>
+                <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'meta' }" @click="activeTab = 'meta'">
+                    Metadata
+                </button>
+            </div>
+
+            <!-- Tab Content: Payload -->
+            <div x-show="activeTab === 'payload'" class="qj-tab-content">
+                <label class="qj-label">Dữ liệu đầu vào (next_payload):</label>
+                <pre class="qj-code-block" x-text="JSON.stringify(job?.next_payload || {}, null, 2)"></pre>
+            </div>
+
+            <!-- Tab Content: Logs -->
+            <div x-show="activeTab === 'logs'" class="qj-tab-content">
+                <label class="qj-label">Nhật ký xử lý (logs):</label>
+                <pre class="qj-code-block" x-text="JSON.stringify(job?.logs || {}, null, 2)"></pre>
+            </div>
+
+            <!-- Tab Content: Meta -->
+            <div x-show="activeTab === 'meta'" class="qj-tab-content">
+                <label class="qj-label">Thông tin hệ thống (meta):</label>
+                <pre class="qj-code-block" x-text="JSON.stringify(job?.meta || {}, null, 2)"></pre>
+            </div>
+        </template>
+
+        <div class="qj-modal-footer">
+            <button type="button" class="qj-btn qj-btn-ghost" @click="close">Đóng</button>
+        </div>
+    </div>
+</div>

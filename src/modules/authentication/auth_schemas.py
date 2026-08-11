@@ -1,9 +1,11 @@
-from src.shared.base.base_schema import BaseSchema
 import re
-from pydantic import EmailStr, Field, field_validator
-from typing import Optional, Any
-from uuid import UUID
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from pydantic import EmailStr, Field, field_validator
+
+from src.shared.base.base_schema import BaseSchema
 
 
 class LoginRequest(BaseSchema):
@@ -37,7 +39,7 @@ class LoginRequest(BaseSchema):
 
 class RegisterRequest(BaseSchema):
     email: EmailStr = Field(description="Email của bạn")
-    username: Optional[str] = Field(
+    username: str | None = Field(
         default=None,
         description="Tên đăng nhập nếu không nhập mặc định là email",
         pattern="^[a-zA-Z][a-zA-Z0-9_.-@]{2,19}$",

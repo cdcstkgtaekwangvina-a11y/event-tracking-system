@@ -1,8 +1,10 @@
-from fastapi import UploadFile, Form
-from src.shared.base.base_schema import BaseSchema
-from typing import Optional, Any
-from pydantic import Field, model_validator
 from datetime import datetime
+from typing import Any
+
+from fastapi import File, Form, UploadFile
+from pydantic import Field, model_validator
+
+from src.shared.base.base_schema import BaseSchema
 
 
 class MediaSchema(BaseSchema):
@@ -19,7 +21,7 @@ class MediaSchema(BaseSchema):
 
 class CreateMediaSchema(BaseSchema):
     name: str = Field(..., max_length=800, description="Tên của file hoặc thư mục")
-    folder_id: Optional[int] = Field(
+    folder_id: int | None = Field(
         default=None,
         gt=0,
         description="ID của thư mục cha (parent_id), để trống nếu nằm ở thư mục gốc",
@@ -27,7 +29,7 @@ class CreateMediaSchema(BaseSchema):
     is_folder: bool = Field(
         default=True, description="True nếu là thư mục, False nếu là file"
     )
-    file: Optional[UploadFile] = Field(
+    file: UploadFile | None = Field(
         default=None,
         description="Tập tin đính kèm (Bắt buộc phải có nếu is_folder = False)",
     )
@@ -54,9 +56,9 @@ class CreateMediaSchema(BaseSchema):
     def as_form(
         cls,
         name: str = Form(...),
-        folder_id: Optional[int] = Form(None),
+        folder_id: int | None = Form(None),
         is_folder: bool = Form(False),
-        file: Optional[UploadFile] = Form(None),
+        file: UploadFile | None = File(None),
     ) -> "CreateMediaSchema":
         """
         Hàm helper biến Schema này thành dạng Form-Data.
@@ -66,20 +68,27 @@ class CreateMediaSchema(BaseSchema):
 
 
 class UpdateMedia(BaseSchema):
-    name: Optional[str] = Field(max_length=800, default=None)
-    folder_id: Optional[int] = Field(gt=0, default=None)
+    name: str | None = Field(max_length=800, default=None)
+    folder_id: int | None = Field(ge=-1, default=None)
 
     @model_validator(mode="after")
     def validate_folder_and_name(self) -> "UpdateMedia":
-        if not self.name and not self.folder_id:
+        if self.name is None and self.folder_id is None:
             raise ValueError("Không có dữ liệu để update")
         return self
 
 
+class BulkDeleteSchema(BaseSchema):
+    ids: list[int] = Field(..., min_length=1, description="Danh sách ID cần xóa")
+    is_soft_delete: bool = Field(
+        default=True, description="True = xóa mềm, False = xóa vĩnh viễn"
+    )
+
+
 class MediaMetaData(BaseSchema):
-    type: Optional[str] = None
+    type: str | None = None
     sizes: int = Field(gt=0)
-    format: Optional[str] = Field(max_length=50)
+    format: str | None = Field(max_length=100)
 
 
 class PrefixNode(BaseSchema):
