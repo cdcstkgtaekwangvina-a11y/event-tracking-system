@@ -55,7 +55,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src: url('../public/fonts/MaterialSymbolsOutlined.woff2') format('woff2'); 
+  src: url('../assets/fonts/MaterialSymbolsOutlined.woff2') format('woff2'); 
 }
 
 .material-symbols-outlined {
