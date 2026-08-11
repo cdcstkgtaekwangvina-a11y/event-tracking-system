@@ -105,6 +105,8 @@
 }
 
 body {
+  min-height: 100vh;
+  margin: 0;
   font-family: "Noto Sans", sans-serif;
   font-optical-sizing: auto;
   display: flex;
@@ -113,6 +115,12 @@ body {
   align-items: center;
   background-color: var(--background);
   color: var(--foreground);
+}
+
+.site-main {
+  display: flex;
+  flex: 1 0 auto;
+  width: 100%;
 }
 
 button, input, select, textarea {

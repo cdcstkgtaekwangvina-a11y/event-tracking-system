@@ -1,3 +1,4 @@
+<span id="event-count" hx-swap-oob="innerHTML">{{ total }}</span>
 {% if events %}
 <div class="events-grid">
     {% set gradients = ['purple-blue', 'pink-red', 'green-teal', 'blue-dark', 'purple-pink', 'green-forest'] %}
@@ -8,7 +9,7 @@
             <span class="material-symbols-outlined icon-large">calendar_today</span>
         </div>
         <div class="card-body">
-            {% if event.start_at and event.start_at <= now and (not event.end_at or event.end_at >= now) %}
+            {% if event_status(event.start_at, event.end_at) == "ongoing" %}
             <span class="event-status event-status--ongoing">Đang diễn ra</span>
             {% else %}
             <span class="event-status event-status--upcoming">Sắp diễn ra</span>
@@ -46,8 +47,10 @@
 
 {% if total_pages > 1 %}
 <div class="pagination">
-    <button class="page-btn" {% if page> 1 %}
-        hx-get="/api/events/cards-html?page={{ page - 1 }}&limit={{ limit }}&search={{ search }}&status={{ status }}&sort_field={{ sort_field }}&is_desc={{ is_desc }}"
+    <button type="button" class="page-btn" {% if page > 1 %}
+        hx-get="/api/events/cards-html"
+        hx-vals='{"page": {{ page - 1 }}, "limit": {{ limit }}}'
+        hx-include="[name='search'], [name='status'], [name='sort_field'], [name='is_desc']"
         hx-target="#events-container"
         hx-swap="innerHTML"
         {% else %}
@@ -58,8 +61,11 @@
 
     <span class="page-info">Trang <b>{{ page }}</b> / {{ total_pages }}</span>
 
-    <button class="page-btn" {% if page < total_pages %}
-        hx-get="/api/events/cards-html?page={{ page + 1 }}&limit={{ limit }}&search={{ search }}&status={{ status }}&sort_field={{ sort_field }}&is_desc={{ is_desc }}" hx-target="#events-container"
+    <button type="button" class="page-btn" {% if page < total_pages %}
+        hx-get="/api/events/cards-html"
+        hx-vals='{"page": {{ page + 1 }}, "limit": {{ limit }}}'
+        hx-include="[name='search'], [name='status'], [name='sort_field'], [name='is_desc']"
+        hx-target="#events-container"
         hx-swap="innerHTML" {% else %} disabled {% endif %}>
         <span class="material-symbols-outlined">chevron_right</span>
     </button>

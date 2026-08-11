@@ -6,9 +6,18 @@
     employeeId: '',
     isLoading: false,
 }">
-    <!-- Top Header and Search Area -->
-    <div class="search-section">
-        <h1 class="section-title">Sự kiện nổi bật</h1>
+    <section class="events-hero" aria-labelledby="events-heading">
+        <h1 id="events-heading" class="section-title">Sự kiện sắp diễn ra</h1>
+        <p class="hero-description">Khám phá và tham gia các sự kiện thú vị của công ty. Đừng bỏ lỡ những trải nghiệm đáng nhớ!</p>
+        <p class="event-total">
+            <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+            Tổng cộng <strong id="event-count">0</strong> sự kiện đang mở đăng ký
+        </p>
+    </section>
+
+    <!-- Search and filters -->
+    <section class="search-section" aria-labelledby="explore-heading">
+        <h2 id="explore-heading" class="explore-title">Khám phá sự kiện</h2>
         <div class="search-bar-wrapper">
             <span class="material-symbols-outlined search-icon">search</span>
             <input type="text" name="search" placeholder="Tìm kiếm sự kiện theo tên hoặc địa điểm..." x-model="search"
@@ -38,8 +47,7 @@
                 </select>
             </label>
         </div>
-        <p class="event-summary">Hiển thị tối đa 10 sự kiện đang diễn ra hoặc sắp diễn ra.</p>
-    </div>
+    </section>
 
     <!-- Events List Container (Loaded and swapped via HTMX) -->
     <div id="events-container" hx-get="/api/events/cards-html" hx-trigger="load, search-changed from:body, event-filters-changed from:body"
@@ -56,6 +64,7 @@
     /* CSS Reset / Base layout overrides */
     body {
         overflow-y: auto !important;
+        background: var(--bg-home-page);
     }
 
     [x-cloak] {
@@ -63,35 +72,83 @@
     }
 
     .home-container {
-        padding: 100px 20px 60px 20px;
+        padding: 96px 20px 48px;
         width: 100%;
-        max-width: 1200px;
+        max-width: 1180px;
         margin: 0 auto;
         display: flex;
         flex-direction: column;
-        gap: 30px;
+        align-self: flex-start;
+        gap: 0;
         box-sizing: border-box;
+    }
+
+    .events-hero,
+    .search-section {
+        background: var(--card);
+        border: 1px solid var(--border);
+    }
+
+    .events-hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 38px 24px 34px;
+        border-radius: 12px 12px 0 0;
+        text-align: center;
+    }
+
+    .hero-description {
+        max-width: 590px;
+        margin: 12px auto 0;
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.65;
+    }
+
+    .event-total {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin: 18px 0 0;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+
+    .event-total .material-symbols-outlined {
+        font-size: 18px;
     }
 
     /* Search bar styling */
     .search-section {
         display: flex;
         flex-direction: column;
-        gap: 15px;
+        gap: 18px;
         width: 100%;
+        padding: 24px 24px 28px;
+        border-top: 0;
+        border-radius: 0 0 12px 12px;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+        box-sizing: border-box;
     }
 
     .section-title {
-        font-size: 28px;
+        font-size: 26px;
         font-weight: 800;
         color: var(--foreground);
         margin: 0;
     }
 
+    .explore-title {
+        margin: 0;
+        color: var(--foreground);
+        font-size: 17px;
+        font-weight: 800;
+    }
+
     .search-bar-wrapper {
         position: relative;
         width: 100%;
-        max-width: 600px;
     }
 
     .search-icon {
@@ -105,15 +162,15 @@
 
     .search-input {
         width: 100%;
-        height: 48px;
-        padding: 10px 15px 10px 50px;
-        border-radius: 12px;
+        height: 42px;
+        padding: 9px 14px 9px 42px;
+        border-radius: 7px;
         border: 1px solid var(--border);
         background-color: var(--card);
         color: var(--foreground);
         font-size: 15px;
         outline: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+        box-shadow: none;
         transition: all 0.2s ease;
         box-sizing: border-box;
     }
@@ -126,25 +183,57 @@
     .event-controls {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
+        align-items: center;
+        gap: 14px 28px;
     }
 
     .event-controls label {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 12px;
         color: var(--text-secondary);
         font-size: 14px;
-        font-weight: 600;
+        font-weight: 400;
     }
 
     .event-controls select {
-        min-height: 38px;
+        min-height: 40px;
+        min-width: 150px;
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: 6px;
         background: var(--card);
         color: var(--foreground);
-        padding: 0 10px;
+        padding: 0 34px 0 12px;
+    }
+
+    @media (max-width: 600px) {
+        .home-container {
+            padding-top: 84px;
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+
+        .events-hero {
+            padding: 30px 18px 28px;
+        }
+
+        .section-title {
+            font-size: 23px;
+        }
+
+        .search-section {
+            padding: 22px 18px 24px;
+        }
+
+        .event-controls label {
+            flex: 1 1 100%;
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .event-controls select {
+            width: 100%;
+        }
     }
 
     .event-summary {
@@ -159,6 +248,7 @@
         grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
         gap: 30px;
         width: 100%;
+        margin-top: 30px;
     }
 
     @media (max-width: 380px) {
