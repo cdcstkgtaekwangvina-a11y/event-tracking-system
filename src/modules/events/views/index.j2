@@ -31,11 +31,36 @@
             class="admin-search-input" />
     </div>
 
+    <div class="admin-event-controls" aria-label="Bộ lọc và sắp xếp sự kiện">
+        <label>Trạng thái
+            <select name="status" @change="$dispatch('admin-event-filters-changed')">
+                <option value="all">Tất cả sự kiện</option>
+                <option value="ongoing">Đang diễn ra</option>
+                <option value="upcoming">Sắp diễn ra</option>
+                <option value="ended">Đã kết thúc</option>
+            </select>
+        </label>
+        <label>Sắp xếp
+            <select name="sort_field" @change="$dispatch('admin-event-filters-changed')">
+                <option value="start_at">Thời gian bắt đầu</option>
+                <option value="name">Tên sự kiện</option>
+                <option value="created_at">Ngày tạo</option>
+                <option value="updated_at">Cập nhật gần nhất</option>
+            </select>
+        </label>
+        <label>Thứ tự
+            <select name="is_desc" @change="$dispatch('admin-event-filters-changed')">
+                <option value="false">Tăng dần</option>
+                <option value="true">Giảm dần</option>
+            </select>
+        </label>
+    </div>
+
     <!-- Event Cards Grid Container -->
     <div id="admin-events-container" 
         hx-get="/api/events/admin-cards-html" 
-        hx-trigger="load, search-changed from:body, refresh-events from:body"
-        hx-include="[name='search']" 
+        hx-trigger="load, search-changed from:body, admin-event-filters-changed from:body, refresh-events from:body"
+        hx-include="[name='search'], [name='status'], [name='sort_field'], [name='is_desc']"
         hx-swap="innerHTML">
         <div class="admin-no-events">
             <div class="spinner-sm"></div>
@@ -124,6 +149,31 @@
     </div>
 
 </div>
+
+<style>
+    .admin-event-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 16px 0 24px;
+    }
+    .admin-event-controls label {
+        align-items: center;
+        color: var(--text-secondary);
+        display: flex;
+        font-size: 14px;
+        font-weight: 600;
+        gap: 8px;
+    }
+    .admin-event-controls select {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--foreground);
+        min-height: 38px;
+        padding: 0 10px;
+    }
+</style>
 
 <script>
     function adminEventsApp() {

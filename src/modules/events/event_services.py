@@ -3,9 +3,16 @@ from database.models.events import Events
 from database.models.events_employees import EventsEmployees
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
-from .event_schemas import EventCreateRequest, EventUpdateRequest, EventsSchema
-from sqlalchemy import func
+from .event_schemas import (
+    EventCreateRequest,
+    EventUpdateRequest,
+    EventsSchema,
+    AdminEventQuery,
+    PublicEventQuery,
+)
+from sqlalchemy import and_, func, or_
 from typing import Any, cast
+from datetime import datetime, timezone
 
 
 class EventServices:
@@ -31,6 +38,83 @@ class EventServices:
             isouter=True,
         ).group_by(Events.id)
         return await self.crud.pagination_async(pagination)
+
+    async def get_public_events_raw(
+        self, pagination: PublicEventQuery
+    ) -> PaginationResponse:
+        """Return only events that are in progress or have not started yet."""
+        now = datetime.now(timezone.utc)
+
+        if pagination.status == "ongoing":
+            time_condition = and_(
+                Events.start_at <= now,
+                or_(Events.end_at.is_(None), Events.end_at >= now),
+            )
+        elif pagination.status == "upcoming":
+            time_condition = Events.start_at > now
+        else:
+            # An event is visible when it has not ended. Events without a start
+            # time are excluded because their state cannot be determined.
+            time_condition = and_(
+                Events.start_at.is_not(None),
+                or_(Events.end_at.is_(None), Events.end_at >= now),
+            )
+
+        self.crud.select(
+            EventsSchema,
+            logic_column=[
+                func.count(cast(Any, EventsEmployees.employee_id)).label(
+                    EventsSchema.nameof(lambda e: e.employee_count)
+                ),
+            ],
+        ).join(
+            target=EventsEmployees,
+            onclause=EventsEmployees.event_id == Events.id,
+            isouter=True,
+        ).where(time_condition).group_by(Events.id)
+
+        return await self.crud.pagination_async(
+            pagination,
+            search_fields=["name", "location", "description"],
+        )
+
+    async def get_admin_events_raw(
+        self, pagination: AdminEventQuery
+    ) -> PaginationResponse:
+        """Return the event history for administrators, optionally by status."""
+        now = datetime.now(timezone.utc)
+        time_condition = None
+
+        if pagination.status == "ongoing":
+            time_condition = and_(
+                Events.start_at <= now,
+                or_(Events.end_at.is_(None), Events.end_at >= now),
+            )
+        elif pagination.status == "upcoming":
+            time_condition = Events.start_at > now
+        elif pagination.status == "ended":
+            time_condition = Events.end_at < now
+
+        query = self.crud.select(
+            EventsSchema,
+            logic_column=[
+                func.count(cast(Any, EventsEmployees.employee_id)).label(
+                    EventsSchema.nameof(lambda e: e.employee_count)
+                ),
+            ],
+        ).join(
+            target=EventsEmployees,
+            onclause=EventsEmployees.event_id == Events.id,
+            isouter=True,
+        )
+        if time_condition is not None:
+            query.where(time_condition)
+        query.group_by(Events.id)
+
+        return await self.crud.pagination_async(
+            pagination,
+            search_fields=["name", "location", "description"],
+        )
 
     async def get_events(
         self, pagination: PaginationRequest
