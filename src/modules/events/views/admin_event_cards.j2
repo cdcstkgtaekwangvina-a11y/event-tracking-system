@@ -70,7 +70,7 @@
 {% if total_pages > 1 %}
 <div class="admin-pagination">
     <button type="button" class="admin-page-btn" {% if page > 1 %}
-        hx-get="/api/events/admin-cards-html?page={{ page - 1 }}&search={{ search }}"
+        hx-get="/api/events/admin-cards-html?page={{ page - 1 }}&limit={{ limit }}&search={{ search }}&status={{ status }}&sort_field={{ sort_field }}&is_desc={{ is_desc }}"
         hx-target="#admin-events-container"
         hx-swap="innerHTML"
         {% else %}
@@ -82,7 +82,7 @@
     <span class="admin-page-info">Trang <b>{{ page }}</b> / {{ total_pages }}</span>
 
     <button type="button" class="admin-page-btn" {% if page < total_pages %}
-        hx-get="/api/events/admin-cards-html?page={{ page + 1 }}&search={{ search }}" 
+        hx-get="/api/events/admin-cards-html?page={{ page + 1 }}&limit={{ limit }}&search={{ search }}&status={{ status }}&sort_field={{ sort_field }}&is_desc={{ is_desc }}"
         hx-target="#admin-events-container"
         hx-swap="innerHTML" {% else %} disabled {% endif %}>
         <span class="material-symbols-outlined">chevron_right</span>
