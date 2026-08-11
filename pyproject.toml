@@ -1,5 +1,5 @@
 [project]
-name = "my-fastapi-app"
+name = "event-tracking-system"
 version = "0.1.0"
 dependencies = []
 
