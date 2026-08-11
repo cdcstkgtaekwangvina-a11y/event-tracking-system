@@ -1,22 +1,27 @@
-from fastapi import Response, HTTPException
-from database.models.app_db import SessionDep, Depends
+from __future__ import annotations
+
+import os
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
+
+from dotenv import load_dotenv
+from fastapi import HTTPException, Response
+from jwt import ExpiredSignatureError, InvalidTokenError, decode, encode
+from pwdlib import PasswordHash
 from sqlmodel import or_
+
+from database.models.app_db import Depends, SessionDep
 from src.modules.user.role_constants import ROLE
+from src.modules.user.user_services import UserServices
+from src.shared.base.base_response import BaseResponse
+
 from .auth_schemas import (
-    RegisterRequest,
     LoginRequest,
-    TokenResponse,
+    RegisterRequest,
     TokenData,
+    TokenResponse,
 )
 from .auth_select import LoginSelect
-from pwdlib import PasswordHash
-from datetime import timedelta, datetime, timezone
-from jwt import decode, encode, InvalidTokenError, ExpiredSignatureError
-from dotenv import load_dotenv
-import os
-from src.shared.base.base_response import BaseResponse
-from src.modules.user.user_services import UserServices
 
 if TYPE_CHECKING:
     from database.models.users import Users
