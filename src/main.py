@@ -2,27 +2,25 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import granian
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from granian.constants import Interfaces
-from granian.log import LogLevels
 
+from src.shared.base.base_logger import get_logger
 from src.shared.base.base_queue import queue_service
 from src.shared.middlewares.handel_exception import handle_exceptions
 
+logger = get_logger("main")
 load_dotenv()
 
 environment: str = os.getenv("env") or "dev"
-
 from src.shared.backgroundtasks import *
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Server is running")
+    logger.info("Server is starting")
     from database.models.app_db import init_db
 
     await init_db()
@@ -35,10 +33,10 @@ async def lifespan(app: FastAPI):
     yield
 
     await queue_service.stop()
-    print("Server is shutdown")
+    logger.info("Server is shutdown")
 
 
-SRC_DIR = Path(__file__).resolve().parent  # Thư mục 'src'
+SRC_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SRC_DIR.parent
 
 
@@ -66,11 +64,11 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-if environment == "dev":
-    log_level = LogLevels.debug
-else:
-    log_level = LogLevels.info
+
 if __name__ == "__main__":
+    import granian
+    from granian.constants import Interfaces
+
     port = int(os.getenv("PORT", 8000))
 
     reload: bool = environment == "dev"
@@ -80,5 +78,4 @@ if __name__ == "__main__":
         port=port,
         interface=Interfaces.ASGI,
         reload=reload,
-        log_level=log_level,
     ).serve()
