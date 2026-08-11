@@ -1,43 +1,3 @@
-<!-- Employee Delete Confirmation Modal -->
-<div class="emp-modal-backdrop" id="emp-delete-modal-backdrop"
-     x-show="isOpen"
-     style="display: none;"
-     x-cloak
-     @click.self="close"
-     @emp-delete-open.window="open($event.detail)"
-     x-data="employeeDeleteModal()">
-    <div class="emp-modal emp-modal--sm" @click.stop>
-        <div class="emp-modal-header">
-            <h3 class="emp-modal-title emp-modal-title--danger" x-text="mode === 'bulk' ? 'Xác nhận xoá nhiều' : 'Xác nhận xoá'">Xác nhận xoá</h3>
-            <button class="emp-modal-close" @click="close" type="button">
-                <span class="material-symbols-outlined">close</span>
-            </button>
-        </div>
-        <div class="emp-modal-body emp-delete-body">
-            <span class="material-symbols-outlined emp-delete-icon">warning</span>
-            <template x-if="mode === 'single'">
-                <p class="emp-delete-text">
-                    Bạn có chắc muốn xoá nhân viên
-                    <strong x-text="employeeName">"..."</strong>?
-                </p>
-            </template>
-            <template x-if="mode === 'bulk'">
-                <p class="emp-delete-text">
-                    Bạn có chắc muốn xoá <strong x-text="employeeIds.length">0</strong> nhân viên đã chọn?
-                </p>
-            </template>
-            <p class="emp-delete-sub">Hành động này không thể hoàn tác.</p>
-        </div>
-        <div class="emp-modal-footer">
-            <button type="button" class="emp-btn emp-btn-ghost" @click="close">Huỷ</button>
-            <button type="button" class="emp-btn emp-btn-danger" @click="confirm" :disabled="loading">
-                <span x-show="loading" class="emp-spinner emp-spinner-sm"></span>
-                <span x-text="loading ? 'Đang xoá...' : 'Xoá'">Xoá</span>
-            </button>
-        </div>
-    </div>
-</div>
-
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('employeeDeleteModal', () => ({
@@ -101,3 +61,43 @@
         }));
     });
 </script>
+
+<!-- Employee Delete Confirmation Modal -->
+<div class="emp-modal-backdrop" id="emp-delete-modal-backdrop"
+     x-show="isOpen"
+     style="display: none;"
+     x-cloak
+     @click.self="close"
+     @emp-delete-open.window="open($event.detail)"
+     x-data="employeeDeleteModal()">
+    <div class="emp-modal emp-modal--sm" @click.stop>
+        <div class="emp-modal-header">
+            <h3 class="emp-modal-title emp-modal-title--danger" x-text="mode === 'bulk' ? 'Xác nhận xoá nhiều' : 'Xác nhận xoá'">Xác nhận xoá</h3>
+            <button class="emp-modal-close" @click="close" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="emp-modal-body emp-delete-body">
+            <span class="material-symbols-outlined emp-delete-icon">warning</span>
+            <template x-if="mode === 'single'">
+                <p class="emp-delete-text">
+                    Bạn có chắc muốn xoá nhân viên
+                    <strong x-text="employeeName">"..."</strong>?
+                </p>
+            </template>
+            <template x-if="mode === 'bulk'">
+                <p class="emp-delete-text">
+                    Bạn có chắc muốn xoá <strong x-text="employeeIds.length">0</strong> nhân viên đã chọn?
+                </p>
+            </template>
+            <p class="emp-delete-sub">Hành động này không thể hoàn tác.</p>
+        </div>
+        <div class="emp-modal-footer">
+            <button type="button" class="emp-btn emp-btn-ghost" @click="close">Huỷ</button>
+            <button type="button" class="emp-btn emp-btn-danger" @click="confirm" :disabled="loading">
+                <span x-show="loading" class="emp-spinner emp-spinner-sm"></span>
+                <span x-text="loading ? 'Đang xoá...' : 'Xoá'">Xoá</span>
+            </button>
+        </div>
+    </div>
+</div>

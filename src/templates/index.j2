@@ -13,6 +13,18 @@
   <meta name="description" content="Trang web điểm danh build bằng fastapi và jinja2">
   {% endblock %}
   <title id="page-title">{% block title %}Event tracking system{% endblock %}</title>
+  <script>
+    // Universal patch for Alpine.js + HTMX compatibility
+    (function() {
+      const origAddEvt = document.addEventListener.bind(document);
+      document.addEventListener = function(type, listener, options) {
+        if (type === 'alpine:init' && window.Alpine) {
+          try { listener(); } catch(e) { console.error('Error in alpine:init listener during HTMX swap:', e); }
+        }
+        return origAddEvt(type, listener, options);
+      };
+    })();
+  </script>
   <script src="{{ url_for('static', path='js/vendors/htmx.min.js') }}"></script>
   <script src="{{ url_for('static', path='js/vendors/htmx.hx-ws.js') }}"></script>
   <script defer src="{{ url_for('static', path='js/vendors/alpine.min.js') }}"></script>
@@ -71,6 +83,17 @@
           return this.selectedIds.length > 0;
         },
       });
+    }
+  });
+
+  // Re-process Alpine components after HTMX content swap
+  document.addEventListener('htmx:afterSettle', function(evt) {
+    if (window.Alpine && evt.detail && evt.detail.target) {
+      try {
+        window.Alpine.initTree(evt.detail.target);
+      } catch (e) {
+        console.error('Error re-initializing Alpine tree after HTMX swap:', e);
+      }
     }
   });
 </script>

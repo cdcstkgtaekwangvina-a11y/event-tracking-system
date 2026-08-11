@@ -1,3 +1,7 @@
+[project]
+name = "my-fastapi-app"
+version = "0.1.0"
+dependencies = []
 
 [environment]
 root = ["."] 

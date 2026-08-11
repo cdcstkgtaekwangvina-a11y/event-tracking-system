@@ -10,6 +10,7 @@ from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationR
 from src.shared.services.redis_services import RedisDep
 
 from .queue_job_schemas import CreateQueueJobSchema, QueueJobSchema
+from .queue_job_select import QueueJobSelect
 
 logger = get_logger(__name__)
 
@@ -27,11 +28,15 @@ class QueueJobServices:
     ) -> BaseResponse[PaginationResponse]:
         cache_key = self.redis.get_pagination_key(CacheTags.QUEUE_JOB, pagination)
 
+        async def get_data_async():
+            return await self.crud.select(QueueJobSelect).pagination_async(
+                pagination, search_fields=["type", "status"]
+            )
+
         result = await self.redis.get_or_set_async(
             key=cache_key,
-            async_func=lambda: self.crud.pagination_async(
-                pagination, search_fields=["id"]
-            ),
+            async_func=get_data_async,
+            expires=60,
             tags=[CacheTags.QUEUE_JOB],
             model_class=PaginationResponse,
         )
