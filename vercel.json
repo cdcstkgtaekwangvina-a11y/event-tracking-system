@@ -3,6 +3,7 @@
   "framework": "fastapi",
   "functions": {
     "src/main.py": {
+      "includeFiles": "src/static/**",
       "maxDuration": 60
     }
   }

@@ -86,7 +86,7 @@
         <div class="header-sidebar">
             <a href="{{ url_for('home') }}" class="logo-wrapper" x-show="isSidebar || $store.screen.isMobile"
                 x-transition.opacity.duration.150ms>
-                <img style="width: 90px;" src="{{ url_for('static', path='public/app_logo.png') }}" alt="logo">
+                <img style="width: 90px;" src="{{ url_for('static', path='assets/app_logo.png') }}" alt="logo">
             </a>
 
             <button class="toggle-sidebar flex-center" @click="toggle_sidebar">
