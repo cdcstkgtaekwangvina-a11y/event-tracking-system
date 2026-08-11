@@ -1,9 +1,9 @@
 import asyncio
 from typing import Any, cast
-from uuid import uuid8
 
 from fastapi import UploadFile
 from sqlmodel import and_, col, or_
+from uuid6 import uuid8
 
 from database.models.app_db import SessionDep, SessionFactoryDep
 from database.models.media import Medias

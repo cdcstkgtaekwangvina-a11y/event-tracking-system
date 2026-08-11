@@ -1,16 +1,19 @@
 from __future__ import annotations
-from uuid import UUID
-from database.models.app_db import SessionDep
-from src.shared.base import BaseCrud, BaseResponse
-from sqlmodel import or_
+
+from typing import TYPE_CHECKING, cast
+
 from pwdlib import PasswordHash
-from src.shared.helpers import RandomHelpers, get_vn_time
-from .user_select import UserSelect
-from typing import TYPE_CHECKING, Optional
-from src.shared.services.redis_services import RedisDep
-from .user_schemas import UserSchema
-from src.shared.constants.cache_tags import CacheTags
+from sqlmodel import or_
+from uuid6 import UUID
+
+from database.models.app_db import SessionDep
 from database.models.media import Medias
+from src.shared.base import BaseCrud, BaseResponse
+from src.shared.constants.cache_tags import CacheTags
+from src.shared.helpers import RandomHelpers, get_vn_time
+from src.shared.services.redis_services import RedisDep
+
+from .user_select import BaseUserSelect, UserSelect
 
 if TYPE_CHECKING:
     from database.models.users import Users
@@ -24,25 +27,29 @@ class UserServices:
 
         self.crud = BaseCrud[Users](session, Users)
 
-    async def get_raw_user(self, id: UUID | str) -> Optional[UserSchema]:
+    async def get_raw_user(self, id: UUID | str) -> UserSelect | None:
         cache_key = f"{CacheTags.USER}:{id}"
         from database.models.users import Users
 
-        return await self.cache.get_or_set_async(
-            cache_key,
-            async_func=lambda: (
-                self.crud.select(
-                    UserSchema, logic_column=[UserSchema.nameof(lambda x: x.file_id)]
-                )
-                .join(Medias, isouter=True)
-                .group_by(Users.id)
-                .find_by_id(id)
+        return cast(
+            UserSelect | None,
+            await self.cache.get_or_set_async(
+                cache_key,
+                async_func=lambda: (
+                    self.crud.select(
+                        UserSelect,
+                        logic_column=[UserSelect.nameof(lambda x: x.file_id)],
+                    )
+                    .join(Medias, isouter=True)
+                    .group_by(Users.id)
+                    .find_by_id(id)
+                ),
+                tags=[CacheTags.USER],
+                model_class=UserSelect,
             ),
-            tags=[CacheTags.USER],
-            model_class=UserSchema,
         )
 
-    async def get_user(self, id: UUID | str) -> BaseResponse[UserSchema]:
+    async def get_user(self, id: UUID | str) -> BaseResponse[UserSelect]:
         user = await self.get_raw_user(id)
 
         if not user:
@@ -59,7 +66,7 @@ class UserServices:
             req.username = req.email
 
         exiting_user = (
-            await self.crud.select(UserSelect)
+            await self.crud.select(BaseUserSelect)
             .where(or_(Users.email == req.email, Users.username == req.username))
             .find_one()
         )

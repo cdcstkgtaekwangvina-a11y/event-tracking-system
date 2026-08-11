@@ -1,10 +1,13 @@
 from datetime import datetime
-from uuid import UUID, uuid8
-from sqlmodel import Field, SQLModel, Relationship
-from .base_model import PrimaryModel, CreatedAtModel, UpdatedAtModel
+from typing import TYPE_CHECKING, Any, Optional, cast
+
 from sqlalchemy import DateTime
-from typing import cast, Any, Optional, TYPE_CHECKING
+from sqlmodel import Field, Relationship, SQLModel
+from uuid6 import UUID, uuid8
+
 from src.modules.user.role_constants import ROLE
+
+from .base_model import CreatedAtModel, PrimaryModel, UpdatedAtModel
 
 if TYPE_CHECKING:
     from database.models.media import Medias
@@ -37,5 +40,5 @@ class Users(
     google_sub: str | None = Field(
         default=None, max_length=500, nullable=True, unique=True, index=True
     )
-    media_id: Optional[int] = Field(default=None, foreign_key="medias.id")
+    media_id: int | None = Field(default=None, foreign_key="medias.id")
     media: Optional["Medias"] = Relationship(back_populates="users")

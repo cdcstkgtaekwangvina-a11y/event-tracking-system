@@ -1,5 +1,6 @@
+from uuid6 import UUID
+
 from src.shared.base.base_schema import BaseSchema
-from uuid import UUID
 
 
 class LoginSelect(BaseSchema):

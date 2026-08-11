@@ -1,19 +1,20 @@
-from src.shared.base.base_schema import BaseSchema
-from uuid import UUID
-from typing import Optional
 from datetime import datetime
+
+from uuid6 import UUID
+
+from src.shared.base.base_schema import BaseSchema
 
 
 class UserSchema(BaseSchema):
-    id: Optional[UUID]
-    name: Optional[str]
-    username: Optional[str]
-    email: Optional[str]
-    role: Optional[str]
+    id: UUID | None
+    name: str | None
+    username: str | None
+    email: str | None
+    role: str | None
     is_active: bool
-    avatar_url: Optional[str]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    file_id: Optional[int] = None
-    file_url: Optional[str] = None
+    avatar_url: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    file_id: int | None = None
+    file_url: str | None = None
     token_version: int = 0
