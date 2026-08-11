@@ -6,5 +6,15 @@
       "includeFiles": "src/static/**",
       "maxDuration": 60
     }
-  }
+  },
+  "headers": [
+    {
+      "source": "/fonts/(.*)\\.woff2",
+      "headers": [
+        { "key": "Content-Type", "value": "font/woff2" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ]
 }

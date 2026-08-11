@@ -49,6 +49,7 @@ def create_app() -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
     app.router.route_class = BaseRoute
     app.mount("/static", StaticFiles(directory=SRC_DIR / "static"), name="static")
+    app.mount("/fonts", StaticFiles(directory=PROJECT_ROOT / "public" / "fonts"), name="fonts")
     templates = global_values(Jinja2Templates(directory=PROJECT_ROOT / "src"))
 
     app.state.templates = templates
