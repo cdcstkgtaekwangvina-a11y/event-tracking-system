@@ -1,10 +1,10 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from uuid6 import UUID
 
 from database.models.app_db import engine
 from database.models.settings import Settings

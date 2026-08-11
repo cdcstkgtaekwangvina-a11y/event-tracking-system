@@ -2,10 +2,10 @@ import math
 import os
 from datetime import date, datetime
 from typing import cast
+from uuid import UUID
 
 from polars import DataFrame
 from sqlmodel import func, select
-from uuid6 import UUID
 
 from database.models.app_db import get_session_factory
 from database.models.employees import Employees

@@ -1,8 +1,8 @@
 from datetime import date
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import Field, field_validator
-from uuid6 import UUID
 
 from src.shared.base.base_schema import BaseSchema
 

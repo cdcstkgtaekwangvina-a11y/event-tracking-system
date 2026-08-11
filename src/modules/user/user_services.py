@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
+from uuid import UUID
 
 from pwdlib import PasswordHash
 from sqlmodel import or_
-from uuid6 import UUID
 
 from database.models.app_db import SessionDep
 from database.models.media import Medias

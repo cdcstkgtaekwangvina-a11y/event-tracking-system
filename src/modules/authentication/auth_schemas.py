@@ -1,9 +1,9 @@
 import re
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import EmailStr, Field, field_validator
-from uuid6 import UUID
 
 from src.shared.base.base_schema import BaseSchema
 

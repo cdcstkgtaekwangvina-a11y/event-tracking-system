@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional, cast
+from uuid import UUID
 
 from sqlalchemy import DateTime
 from sqlmodel import Field, Relationship, SQLModel
-from uuid6 import UUID, uuid8
+from uuid6 import uuid8
 
 from src.modules.user.role_constants import ROLE
 
