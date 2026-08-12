@@ -4,7 +4,19 @@
     {% set gradients = ['purple-blue', 'pink-red', 'green-teal', 'blue-dark', 'purple-pink', 'green-forest'] %}
 {% for event in events %}
     {% set grad_class = gradients[loop.index0 % 6] %}
-    <div class="event-card">
+    <div class="event-card"
+         @click="selectedEvent = {
+             id: {{ event.id }},
+             name: {{ event.name | tojson | forceescape }},
+             description: {{ (event.description or '') | tojson | forceescape }},
+             location: {{ (event.location or '') | tojson | forceescape }},
+             start_at: {{ (event.start_at.strftime('%Y-%m-%d') if event.start_at else '') | tojson | forceescape }},
+             start_time: {{ (event.start_at.strftime('%I:%M %p') if event.start_at else '') | tojson | forceescape }},
+             end_time: {{ (event.end_at.strftime('%I:%M %p') if event.end_at else '') | tojson | forceescape }},
+             url_image: {{ (event.url_image or '') | tojson | forceescape }},
+             employee_count: {{ event.employee_count or 0 }},
+             status: {{ event_status(event.start_at, event.end_at) | tojson | forceescape }}
+         }; isOpen = true;">
         {% if event.url_image %}
         <div class="card-header" style="background: url('{{ event.url_image }}') no-repeat center center/cover;"></div>
         {% else %}

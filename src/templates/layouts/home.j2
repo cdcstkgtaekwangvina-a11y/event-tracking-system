@@ -1,6 +1,7 @@
 <div class="home-container" x-data="{
     search: '',
     isOpen: false,
+    selectedEvent: null,
     eventId: null,
     eventName: '',
     employeeId: '',
@@ -57,6 +58,9 @@
             <p>Đang tải danh sách sự kiện...</p>
         </div>
     </div>
+
+    <!-- Event Detail Modal -->
+    {% include "modules/events/views/event_detail_modal.j2" %}
 
 </div>
 
@@ -267,6 +271,7 @@
         display: flex;
         flex-direction: column;
         transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+        cursor: pointer;
     }
 
     .event-card:hover {
