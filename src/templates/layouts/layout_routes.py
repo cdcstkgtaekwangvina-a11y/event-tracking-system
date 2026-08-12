@@ -39,17 +39,31 @@ def layouts_routes(app: FastAPI) -> FastAPI:
     @app.get(
         "/404", include_in_schema=False, response_class=HTMLResponse, name="not_found"
     )
-    def not_found(req: BaseRequest):
-        return req.response_html(name="/templates/not_found.j2", context={})
+    def not_found(
+        req: BaseRequest,
+        auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
+    ):
+        return req.response_html(
+            name="/templates/not_found.j2", 
+            context={},
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+        )
 
     @app.get(
         "/error", include_in_schema=False, response_class=HTMLResponse, name="error"
     )
-    def error(req: BaseRequest):
+    def error(
+        req: BaseRequest,
+        auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
+    ):
         if not req.cookies.get("error_permitted"):
             return RedirectResponse(url="/404", status_code=status.HTTP_302_FOUND)
 
-        response = req.response_html(name="/templates/error.j2", context={})
+        response = req.response_html(
+            name="/templates/error.j2", 
+            context={},
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+        )
         response.delete_cookie("error_permitted")
         return response
 
