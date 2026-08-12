@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import os
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
@@ -91,27 +90,26 @@ class AuthenticationServices:
         if not user.password or not password_hash.verify(req.password, user.password):
             return BaseResponse.fail(message="Mật khẩu không chính xác")
 
+        res = BaseResponse.no_content(message="Đăng nhập thành công")
         token_data = self.__create_token(
-            {"id": str(user.id), "role": user.role, "token_version": user.token_version}
+            {"id": str(user.id), "role": user.role, "version": user.token_version}
         )
-        res = BaseResponse.ok(data=token_data, message="Đăng nhập thành công")
+
         res.set_cookie(
             key="access_token",
             value=token_data.access_token,
-            httponly=False,
-            path="/",
-            max_age=12 * 7 * 24 * 60 * 60,
+            httponly=True,
+            expires=token_data.exp,
             samesite="lax",
             secure=False,
         )
         return res
 
     def logout(self, response: Response) -> BaseResponse[None]:
-        res = BaseResponse.ok(message="Đăng xuất thành công")
+        res = BaseResponse.no_content(message="Đăng xuất thành công")
         res.delete_cookie(
             key="access_token",
-            path="/",
-            httponly=False,
+            httponly=True,
             samesite="lax",
         )
         return res
