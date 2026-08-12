@@ -54,8 +54,12 @@
             </div>
         </div>
         {% else%}
-        <a class="login-btn" href="{{ url_for('login_view') }}?redirect={{ request.url|string|urlencode }}"
-            style="text-decoration: none;">
+        {% set req_path = request.url.path|lower %}
+        {% if '404' in req_path or 'error' in req_path or '/auth/' in req_path %}
+        <a class="login-btn" href="{{ url_for('login_view') }}" style="text-decoration: none;">
+        {% else %}
+        <a class="login-btn" href="{{ url_for('login_view') }}?redirect={{ request.url|string|urlencode }}" style="text-decoration: none;">
+        {% endif %}
             <span class="material-symbols-outlined">login</span>
             <span x-show="$store.screen.isMobile === false" style="font-weight: bold;">Đăng nhập</span>
         </a>
