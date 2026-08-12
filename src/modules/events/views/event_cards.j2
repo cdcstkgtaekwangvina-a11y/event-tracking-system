@@ -1,15 +1,37 @@
+<span id="event-count" hx-swap-oob="innerHTML">{{ total }}</span>
 {% if events %}
 <div class="events-grid">
     {% set gradients = ['purple-blue', 'pink-red', 'green-teal', 'blue-dark', 'purple-pink', 'green-forest'] %}
-    {% for event in events %}
+{% for event in events %}
     {% set grad_class = gradients[loop.index0 % 6] %}
-    <div class="event-card">
+    <div class="event-card"
+         @click="selectedEvent = {
+             id: {{ event.id }},
+             name: {{ event.name | tojson | forceescape }},
+             description: {{ (event.description or '') | tojson | forceescape }},
+             location: {{ (event.location or '') | tojson | forceescape }},
+             start_at: {{ (event.start_at.strftime('%Y-%m-%d') if event.start_at else '') | tojson | forceescape }},
+             start_time: {{ (event.start_at.strftime('%I:%M %p') if event.start_at else '') | tojson | forceescape }},
+             end_time: {{ (event.end_at.strftime('%I:%M %p') if event.end_at else '') | tojson | forceescape }},
+             url_image: {{ (event.url_image or '') | tojson | forceescape }},
+             employee_count: {{ event.employee_count or 0 }},
+             status: {{ event_status(event.start_at, event.end_at) | tojson | forceescape }}
+         }; isOpen = true;">
+        {% if event.url_image %}
+        <div class="card-header" style="background: url('{{ event.url_image }}') no-repeat center center/cover;"></div>
+        {% else %}
         <div class="card-header {{ grad_class }}">
             <span class="material-symbols-outlined icon-large">calendar_today</span>
         </div>
+        {% endif %}
         <div class="card-body">
+            {% if event_status(event.start_at, event.end_at) == "ongoing" %}
+            <span class="event-status event-status--ongoing">Đang diễn ra</span>
+            {% else %}
+            <span class="event-status event-status--upcoming">Sắp diễn ra</span>
+            {% endif %}
             <h3 class="event-title">{{ event.name }}</h3>
-            <p class="event-desc" title="{{ event.description }}">{{ event.description }}</p>
+            <p class="event-desc" title="{{ (event.description or '') | striptags | forceescape }}">{{ (event.description or '') | striptags }}</p>
 
             <div class="event-info">
                 <div class="info-item">
@@ -41,8 +63,10 @@
 
 {% if total_pages > 1 %}
 <div class="pagination">
-    <button class="page-btn" {% if page> 1 %}
-        hx-get="/api/events/cards-html?page={{ page - 1 }}&search={{ search }}"
+    <button type="button" class="page-btn" {% if page > 1 %}
+        hx-get="/api/events/cards-html"
+        hx-vals='{"page": {{ page - 1 }}, "limit": {{ limit }}}'
+        hx-include="[name='search'], [name='status'], [name='sort_field'], [name='is_desc']"
         hx-target="#events-container"
         hx-swap="innerHTML"
         {% else %}
@@ -53,8 +77,11 @@
 
     <span class="page-info">Trang <b>{{ page }}</b> / {{ total_pages }}</span>
 
-    <button class="page-btn" {% if page < total_pages %}
-        hx-get="/api/events/cards-html?page={{ page + 1 }}&search={{ search }}" hx-target="#events-container"
+    <button type="button" class="page-btn" {% if page < total_pages %}
+        hx-get="/api/events/cards-html"
+        hx-vals='{"page": {{ page + 1 }}, "limit": {{ limit }}}'
+        hx-include="[name='search'], [name='status'], [name='sort_field'], [name='is_desc']"
+        hx-target="#events-container"
         hx-swap="innerHTML" {% else %} disabled {% endif %}>
         <span class="material-symbols-outlined">chevron_right</span>
     </button>

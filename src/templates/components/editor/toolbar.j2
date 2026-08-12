@@ -1,0 +1,33 @@
+<!-- Shared editor toolbar. Keep this as the single source used by every editor surface. -->
+<div class="toolbar">
+    <div class="btn-group">
+        <button type="button" class="btn" title="Hoàn tác" @click="myEditor.chain().focus().undo().run()">↩️</button>
+        <button type="button" class="btn" title="Làm lại" @click="myEditor.chain().focus().redo().run()">↪️</button>
+    </div>
+    <div class="divider"></div>
+    <div class="btn-group">
+        <button type="button" class="btn" :class="isActive('bold') && 'active'" title="In đậm" @click="myEditor.chain().focus().toggleBold().run()"><b>B</b></button>
+        <button type="button" class="btn" :class="isActive('italic') && 'active'" title="In nghiêng" @click="myEditor.chain().focus().toggleItalic().run()"><i>I</i></button>
+        <button type="button" class="btn" :class="isActive('underline') && 'active'" title="Gạch chân" @click="myEditor.chain().focus().toggleUnderline().run()"><u>U</u></button>
+        <button type="button" class="btn" :class="isActive('strike') && 'active'" title="Gạch ngang chữ" @click="myEditor.chain().focus().toggleStrike().run()"><del>S</del></button>
+    </div>
+    <div class="divider"></div>
+    {% include "templates/components/editor/heading_dropdown.j2" %}
+    <div class="divider"></div>
+    {% include "templates/components/editor/align_dropdown.j2" %}
+    <div class="divider"></div>
+    {% include "templates/components/editor/list_dropdown.j2" %}
+    <div class="divider"></div>
+    {% include "templates/components/editor/table_dropdown.j2" %}
+    <div class="divider"></div>
+    {% include "templates/components/editor/color_dropdown.j2" %}
+    <div class="divider"></div>
+    {% include "templates/components/editor/link_popover.j2" %}
+    <div class="divider"></div>
+    {% include "templates/components/editor/emoji_popover.j2" %}
+    <div class="divider"></div>
+    <button type="button" class="btn" title="Kẻ ngang phân trang" @click="myEditor.chain().focus().setHorizontalRule().run()">➖ Ngang</button>
+    <div style="flex-grow: 1;"></div>
+    <button type="button" class="btn-media" title="Thêm Media từ tệp của bạn"
+        @click="$dispatch('editor-open-media-picker', { purpose: 'editor' })">📂 Thêm Media</button>
+</div>

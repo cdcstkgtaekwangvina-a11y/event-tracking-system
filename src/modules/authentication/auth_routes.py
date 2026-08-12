@@ -24,7 +24,11 @@ class AuthenticationController:
         auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
     ):
         if auth.is_valid:
-            return auth.redirect_with(redirect or "/")
+            target = redirect or "/"
+            lower = target.lower()
+            if any(bad in lower for bad in ["404", "error", "/auth/login", "/auth/register"]):
+                target = "/"
+            return auth.redirect_with(target)
         return req.response_html(
             name="modules/authentication/views/login.j2", context={"redirect": redirect}
         )
