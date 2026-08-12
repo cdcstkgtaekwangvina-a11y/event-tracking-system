@@ -14,10 +14,11 @@
             darkModeText: null, lightModeText: null, customStyle: null, isSidebar: false,
 
             validateEmail() {
+                const pattern = /^[a-zA-Z][a-zA-Z0-9_.\-@]{2,19}$/;
                 if (!this.email_or_username) {
                     this.errors.email_or_username = "Vui lòng nhập tên đăng nhập hoặc email";
-                } else if (this.email_or_username.trim().length < 3) {
-                    this.errors.email_or_username = "Tên đăng nhập hoặc email phải từ 3 ký tự trở lên";
+                } else if (!pattern.test(this.email_or_username)) {
+                    this.errors.email_or_username = "Định dạng không hợp lệ (3-20 ký tự, bắt đầu bằng chữ)";
                 } else {
                     this.errors.email_or_username = "";
                 }
@@ -25,10 +26,17 @@
 
             validatePassword() {
                 const v = this.password.trim();
-                if (!v) {
-                    this.errors.password = "Vui lòng nhập mật khẩu";
-                } else {
-                    this.errors.password = "";
+                this.errors.password = "";
+                if (v.length < 8) {
+                    this.errors.password = "Mật khẩu phải có ít nhất 8 ký tự";
+                } else if (!/[A-Z]/.test(v)) {
+                    this.errors.password = "Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa";
+                } else if (!/[a-z]/.test(v)) {
+                    this.errors.password = "Mật khẩu phải chứa ít nhất 1 chữ cái viết thường";
+                } else if (!/\d/.test(v)) {
+                    this.errors.password = "Mật khẩu phải chứa ít nhất 1 chữ số";
+                } else if (!/[@$!%*?&]/.test(v)) {
+                    this.errors.password = "Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (@$!%*?&)";
                 }
             },
 
@@ -59,25 +67,9 @@
                 notify.toast.dismiss(loadingId);
 
                 // ── Thành công ────────────────────────────────────
-                if (res.status_code === 200 || res.status_code === 204 || res.success) {
-                    if (res.data && res.data.access_token) {
-                        document.cookie = `access_token=${res.data.access_token}; path=/; max-age=${12 * 7 * 24 * 60 * 60}; SameSite=Lax`;
-                    }
+                if (res.status_code === 204) {
                     const urlParams = new URLSearchParams(window.location.search);
-                    let redirect = urlParams.get('redirect') || '/';
-                    
-                    try {
-                        const redirectUrl = new URL(redirect, window.location.origin);
-                        const path = redirectUrl.pathname.toLowerCase();
-                        if (!path || path === '/' || path.includes('/404') || path.includes('/error') || path.includes('/auth/login') || path.includes('/auth/register')) {
-                            redirect = '/';
-                        }
-                    } catch (e) {
-                        const lower = redirect.toLowerCase();
-                        if (!redirect || lower.includes('404') || lower.includes('error') || lower.includes('/auth/login') || lower.includes('/auth/register')) {
-                            redirect = '/';
-                        }
-                    }
+                    const redirect = urlParams.get('redirect') || '/';
 
                     notify.toast.success('Đăng nhập thành công!', 'Đang chuyển hướng...');
                     await new Promise(r => setTimeout(r, 1200));
@@ -115,7 +107,7 @@
         {% include "templates/headers/toggle_theme.j2" %}
         {% endwith %}
     </div>
-    <div class="login-form" x-data="{isHide : true}">
+    <div class="login-form" x-data="{isHide : true, isDisable : true}">
         <div class="login-info">
             <div class="login-logo">
                 <span class="material-symbols-outlined">login</span>
@@ -124,12 +116,13 @@
             <p>Đăng nhập để tiếp tục</p>
 
         </div>
-        <form class="form-input" @submit.prevent="await loginAsync()">
+        <div class="form-input">
             <div class="input-items">
                 <label for="username_email">Tên đăng nhập hoặc email</label>
                 <input x-ref="username_email" name="username_email" type="text"
                     placeholder="Nhập tên đăng nhập hoặc email" @keydown.space.prevent
-                    @keydown.enter.prevent="$refs.password.focus()" x-model="email_or_username" />
+                    @keydown.enter.prevent="$refs.password.focus()" x-model="email_or_username"
+                    @input="isDisable = checkInput()" />
             </div>
 
             <div class="password-input">
@@ -137,18 +130,19 @@
                     <label for="password">Mật khẩu</label>
                     <input x-ref="password" name="password" :type="isHide ? 'password' : 'text'"
                         placeholder="Nhập mật khẩu" @keydown.space.prevent
-                        x-model="password" />
+                        @keydown.enter.prevent="$refs.username_email.focus()" x-model="password"
+                        @input="isDisable = checkInput()" />
                 </div>
                 <button class="toggle-password" @click="isHide = !isHide" type="button">
                     <span class="material-symbols-outlined">visibility</span>
                 </button>
             </div>
-            <button :class="(!email_or_username || !password || isLoading) ? 'login-btn-disabled' : 'login-btn'" type="submit"
-                :disabled="!email_or_username || !password || isLoading">
-                <span x-show="!isLoading">Đăng nhập</span>
-                <span x-show="isLoading">Đang xử lý...</span>
-            </button>
-        </form>
+        </div>
+        <button :class="isDisable || isLoading ? 'login-btn-disabled' : 'login-btn'" type="button"
+            :disabled="isDisable || isLoading" @click="await loginAsync()">
+            <span x-show="!isLoading">Đăng nhập</span>
+            <span x-show="isLoading">Đang xử lý...</span>
+        </button>
         <a class="forgot-password"
             href="{{ url_for('forgot_password_view') }}?redirect={{ redirect|string|urlencode }}">Quên mật khẩu</a>
     </div>
