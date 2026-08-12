@@ -49,6 +49,9 @@ def create_app() -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
     app.router.route_class = BaseRoute
     app.mount("/static", StaticFiles(directory=SRC_DIR / "static"), name="static")
+    fonts_dir = PROJECT_ROOT / "public" / "fonts"
+    if fonts_dir.exists():
+        app.mount("/fonts", StaticFiles(directory=fonts_dir), name="fonts")
     templates = global_values(Jinja2Templates(directory=PROJECT_ROOT / "src"))
 
     app.state.templates = templates
@@ -64,6 +67,17 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 if __name__ == "__main__":
     import granian
