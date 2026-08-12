@@ -25,8 +25,13 @@
             },
 
             validatePassword() {
-                const v = this.password.trim();
                 this.errors.password = "";
+                const v = this.password.trim();
+                if (!v) {
+                    this.errors.password = "Vui lòng nhập mật khẩu";
+                    return;
+                }
+                
                 if (v.length < 8) {
                     this.errors.password = "Mật khẩu phải có ít nhất 8 ký tự";
                 } else if (!/[A-Z]/.test(v)) {
@@ -54,6 +59,7 @@
             },
 
             async loginAsync() {
+                if (this.checkInput()) return;
                 if (this.isLoading) return;
                 this.isLoading = true;
 
@@ -68,8 +74,26 @@
 
                 // ── Thành công ────────────────────────────────────
                 if (res.status_code === 204) {
+                    // Fallback cookie for cross-origin issues
+                    if (res.data && res.data.access_token) {
+                        document.cookie = `access_token=${res.data.access_token}; path=/; max-age=${12 * 7 * 24 * 60 * 60}; SameSite=Lax`;
+                    }
+                    
                     const urlParams = new URLSearchParams(window.location.search);
-                    const redirect = urlParams.get('redirect') || '/';
+                    let redirect = urlParams.get('redirect') || '/';
+                    
+                    try {
+                        const redirectUrl = new URL(redirect, window.location.origin);
+                        const path = redirectUrl.pathname.toLowerCase();
+                        if (!path || path === '/' || path.includes('/404') || path.includes('/error') || path.includes('/auth/login') || path.includes('/auth/register')) {
+                            redirect = '/';
+                        }
+                    } catch (e) {
+                        const lower = redirect.toLowerCase();
+                        if (!redirect || lower.includes('404') || lower.includes('error') || lower.includes('/auth/login') || lower.includes('/auth/register')) {
+                            redirect = '/';
+                        }
+                    }
 
                     notify.toast.success('Đăng nhập thành công!', 'Đang chuyển hướng...');
                     await new Promise(r => setTimeout(r, 1200));
@@ -116,7 +140,7 @@
             <p>Đăng nhập để tiếp tục</p>
 
         </div>
-        <div class="form-input">
+        <form class="form-input" @submit.prevent="await loginAsync()">
             <div class="input-items">
                 <label for="username_email">Tên đăng nhập hoặc email</label>
                 <input x-ref="username_email" name="username_email" type="text"
@@ -137,12 +161,13 @@
                     <span class="material-symbols-outlined">visibility</span>
                 </button>
             </div>
-        </div>
-        <button :class="isDisable || isLoading ? 'login-btn-disabled' : 'login-btn'" type="button"
-            :disabled="isDisable || isLoading" @click="await loginAsync()">
-            <span x-show="!isLoading">Đăng nhập</span>
-            <span x-show="isLoading">Đang xử lý...</span>
-        </button>
+            
+            <button :class="isDisable || isLoading ? 'login-btn-disabled' : 'login-btn'" type="submit"
+                :disabled="isDisable || isLoading">
+                <span x-show="!isLoading">Đăng nhập</span>
+                <span x-show="isLoading">Đang xử lý...</span>
+            </button>
+        </form>
         <a class="forgot-password"
             href="{{ url_for('forgot_password_view') }}?redirect={{ redirect|string|urlencode }}">Quên mật khẩu</a>
     </div>
