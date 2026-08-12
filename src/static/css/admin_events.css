@@ -478,3 +478,110 @@
 :root[data-theme="dark"] .btn-modal-danger:hover {
     background-color: rgba(239, 68, 68, 0.25);
 }
+
+/* Compact create/update event dialog */
+.admin-modal-container {
+    width: min(720px, calc(100vw - 32px));
+    max-width: 720px;
+    max-height: calc(100vh - 32px);
+    border-radius: 12px;
+}
+
+.admin-modal-header { padding: 18px 20px; }
+.admin-modal-body { padding: 20px 18px 24px; gap: 18px; }
+.admin-form-input { min-height: 42px; }
+
+.admin-input-with-icon { position: relative; }
+.admin-input-with-icon > .material-symbols-outlined {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 11px;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 19px;
+    pointer-events: none;
+}
+.admin-input-with-icon .admin-form-input { padding-left: 38px; }
+
+.admin-modal-footer { padding: 12px 18px; }
+
+/* The modal toolbar is rendered from components/editor/toolbar.j2. */
+.event-modal-toolbar > .toolbar {
+    margin: 0;
+    border-radius: 0;
+}
+.event-modal-toolbar.is-no-field > .toolbar { opacity: .45; }
+.event-modal-toolbar.is-no-field > .toolbar button,
+.event-modal-toolbar.is-no-field > .toolbar .dropdown-wrapper { pointer-events: none; }
+.event-modal-toolbar.is-inline-field > .toolbar button,
+.event-modal-toolbar.is-inline-field > .toolbar .dropdown-wrapper,
+.event-modal-toolbar.is-inline-field > .toolbar .btn-media { opacity: .32; }
+.event-modal-toolbar.is-inline-field > .toolbar button[title="In đậm"],
+.event-modal-toolbar.is-inline-field > .toolbar button[title="In nghiêng"],
+.event-modal-toolbar.is-inline-field > .toolbar .dropdown-wrapper:has(.color-dropdown) { opacity: 1; }
+
+/* Only relocate the existing editor; its own toolbar/content styling is unchanged. */
+#event-desc .editor-wrapper { margin-top: 0; }
+
+.event-rich-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--input);
+    color: var(--foreground);
+    outline: none;
+    font-size: 14px;
+}
+.event-rich-input { min-height: 42px; padding: 10px 12px; white-space: nowrap; overflow: hidden; }
+.event-rich-input:focus { border-color: var(--foreground); }
+[contenteditable][data-placeholder]:empty::before { content: attr(data-placeholder); color: var(--text-secondary); pointer-events: none; }
+
+.admin-input-with-icon .event-rich-input { padding-left: 38px; }
+.event-field-error { color: #dc2626; font-size: 12px; }
+.event-image-dropzone {
+    min-height: 112px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--text-secondary);
+    border-radius: 8px;
+    background: var(--sidebar-bg);
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+}
+.event-image-dropzone.is-dragging { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--card)); }
+.event-image-empty { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.event-image-empty .material-symbols-outlined { margin-bottom: 4px; font-size: 34px; color: var(--text-secondary); }
+.event-image-empty strong { font-size: 13px; font-weight: 500; }
+.event-image-empty small { margin-top: 2px; color: var(--text-secondary); }
+.event-image-preview { position: relative; width: 100%; }
+.event-image-preview img { display: block; width: 100%; max-height: 200px; object-fit: contain; }
+.event-image-preview button { position: absolute; top: 5px; right: 5px; padding: 6px 9px; border: 0; border-radius: 5px; background: rgba(15,23,42,.8); color: #fff; cursor: pointer; }
+.event-use-media-btn {
+    align-self: flex-start;
+    margin-top: 8px;
+    padding: 7px 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--card);
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.event-use-media-btn:hover { background: var(--sidebar-bg); }
+.event-use-media-btn .material-symbols-outlined { font-size: 18px; }
+
+@media (max-width: 640px) {
+    .admin-modal-overlay { padding: 8px; }
+    .admin-modal-container { width: 100%; max-height: calc(100vh - 16px); }
+    .admin-form-row { grid-template-columns: 1fr; }
+    .admin-modal-footer { flex-wrap: wrap; }
+    .btn-modal-danger { width: 100%; margin-right: 0 !important; }
+}
