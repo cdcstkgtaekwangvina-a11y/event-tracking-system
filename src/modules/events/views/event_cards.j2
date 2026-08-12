@@ -10,6 +10,7 @@
              name: {{ event.name | tojson | forceescape }},
              description: {{ (event.description or '') | tojson | forceescape }},
              location: {{ (event.location or '') | tojson | forceescape }},
+             url_map: {{ (event.url_map or '') | tojson | forceescape }},
              start_at: {{ (event.start_at.strftime('%Y-%m-%d') if event.start_at else '') | tojson | forceescape }},
              start_time: {{ (event.start_at.strftime('%I:%M %p') if event.start_at else '') | tojson | forceescape }},
              end_time: {{ (event.end_at.strftime('%I:%M %p') if event.end_at else '') | tojson | forceescape }},
@@ -31,6 +32,8 @@
             <span class="event-status event-status--upcoming">Sắp diễn ra</span>
             {% endif %}
             <h3 class="event-title">{{ event.name }}</h3>
+            {#
+            === ĐOẠN CODE CŨ (Ngày/Giờ/Địa điểm hiển thị thành 3 ô riêng biệt bên dưới mô tả, comment lại để giữ tham khảo) ===
             <p class="event-desc" title="{{ (event.description or '') | striptags | forceescape }}">{{ (event.description or '') | striptags }}</p>
 
             <div class="event-info">
@@ -55,7 +58,57 @@
                         đã đăng ký</span>
                 </div>
             </div>
+            =======================================================================================
+            #}
+            {#
+            === ĐOẠN CODE CŨ (ngày/giờ/địa điểm dùng chung 1 icon lịch, không có icon riêng cho địa điểm) ===
+            <p class="event-meta-line">
+                <span class="material-symbols-outlined">calendar_today</span>
+                <span>
+                    {{ event.start_at.strftime('%d/%m/%Y') if event.start_at else 'Chưa xác định' }}
+                    {% if event.start_at %}· {{ event.start_at.strftime('%H:%M') }} - {{ event.end_at.strftime('%H:%M') if event.end_at else '00:00' }}{% endif %}
+                    {% if event.location %}· {{ event.location }}{% endif %}
+                </span>
+            </p>
+            =======================================================================================
+            #}
+            <!-- Địa điểm & thời gian được gộp chung vào khối mô tả; địa điểm có icon riêng (location_on)
+                 để người dùng dễ hình dung đâu là địa chỉ -->
+            <div class="event-desc-block">
+                <p class="event-meta-line">
+                    <span class="event-meta-item">
+                        <span class="material-symbols-outlined">calendar_today</span>
+                        <span>
+                            {{ event.start_at.strftime('%d/%m/%Y') if event.start_at else 'Chưa xác định' }}
+                            {% if event.start_at %}· {{ event.start_at.strftime('%H:%M') }} - {{ event.end_at.strftime('%H:%M') if event.end_at else '00:00' }}{% endif %}
+                        </span>
+                    </span>
+                    {% if event.location %}
+                    <span class="event-meta-item">
+                        <span class="material-symbols-outlined">location_on</span>
+                        <span>{{ event.location }}</span>
+                    </span>
+                    {% endif %}
+                </p>
+                {#
+                === ĐOẠN CODE CŨ (kiểm tra rỗng trên chuỗi HTML gốc -> comment lại để giữ tham khảo):
+                === LỖI: TipTap lưu mô tả trống thành "<p></p>" (chuỗi không rỗng thật), striptags xoá tag
+                === để lại chuỗi rỗng -> hiện dòng trống, không có fallback.
+                <p class="event-desc" title="{{ (event.description or '') | striptags | forceescape }}">{{ (event.description or '') | striptags }}</p>
+                =======================================================================================
+                #}
+                {% set home_desc_text = (event.description or '') | striptags | trim %}
+                <p class="event-desc" title="{{ home_desc_text | forceescape }}">{{ home_desc_text or 'Chưa có mô tả' }}</p>
+            </div>
 
+            {#<div class="event-info">
+                <div class="info-item">
+                    <span class="material-symbols-outlined">group</span>
+                    <span class="registrant-count-text" id="reg-count-{{ event.id }}">{{ event.employee_count }} người
+                        đã đăng ký</span>
+                </div>
+            </div>
+            #}
         </div>
     </div>
     {% endfor %}

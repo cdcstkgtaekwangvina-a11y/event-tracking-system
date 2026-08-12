@@ -102,8 +102,8 @@
                         <small class="event-field-error" x-show="errors.name" x-text="errors.name"></small>
                     </div>
 
-                    <!-- Description -->
-                    <div class="admin-form-group">
+                    <!-- Description (Địa điểm, Thời gian nằm chung trong khối Mô tả; Link Google Maps tách riêng bên dưới) -->
+                    <div class="admin-form-group admin-desc-group">
                         <label for="event-desc">Mô tả</label>
                         <div id="event-desc" @focusin="activeField = 'description'; activeEditor = null">
                             {% with editor_hide_toolbar=true %}
@@ -111,12 +111,50 @@
                             {% endwith %}
                         </div>
                         <small class="event-field-error" x-show="errors.description" x-text="errors.description"></small>
+
+                        <!-- Location (không bắt buộc - chỉ "Tên sự kiện" là bắt buộc) -->
+                        <div class="admin-form-group">
+                            <label for="event-location">Địa điểm</label>
+                            <div class="admin-input-with-icon">
+                                <span class="material-symbols-outlined">location_on</span>
+                                <div id="event-location" x-ref="locationEditor" contenteditable="true" role="textbox"
+                                    class="event-rich-input" data-placeholder="Ví dụ: Hội trường A / Online"
+                                    @focus="activateEditor('location', $el)" @keyup="captureSelection()" @mouseup="captureSelection()"
+                                    @keydown.enter.prevent @input="form.location = $el.innerHTML" @blur="sanitizeInlineField('location', $el)"></div>
+                            </div>
+                            <small class="event-field-error" x-show="errors.location" x-text="errors.location"></small>
+                        </div>
+
+                        <!-- Start & End Date Time (không bắt buộc) -->
+                        <div class="admin-form-row">
+                            <div class="admin-form-group">
+                                <label for="event-start">Thời gian bắt đầu</label>
+                                <input type="datetime-local" id="event-start" x-model="form.start_at" class="admin-form-input" @focus="activeField = null" />
+                                <small class="event-field-error" x-show="errors.start_at" x-text="errors.start_at"></small>
+                            </div>
+                            <div class="admin-form-group">
+                                <label for="event-end">Thời gian kết thúc</label>
+                                <input type="datetime-local" id="event-end" x-model="form.end_at" class="admin-form-input" @focus="activeField = null" />
+                                <small class="event-field-error" x-show="errors.end_at" x-text="errors.end_at"></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Link Google Maps (tách riêng khỏi khối Mô tả - dùng để mở địa chỉ trên Google Maps ở trang chi tiết sự kiện) -->
+                    <div class="admin-form-group">
+                        <label for="event-url-map">Link Google Maps</label>
+                        <div class="admin-input-with-icon">
+                            <span class="material-symbols-outlined">map</span>
+                            <input type="url" id="event-url-map" x-model="form.url_map" class="admin-form-input"
+                                placeholder="https://maps.google.com/?q=..." @focus="activeField = null" />
+                        </div>
+                        <small class="event-field-error" x-show="errors.url_map" x-text="errors.url_map"></small>
                     </div>
 
                     <!-- Event image -->
                     <div class="admin-form-group">
                         <label>Ảnh sự kiện</label>
-                        <div class="event-image-dropzone" :class="{ 'is-dragging': isDraggingImage }"
+                        {#<div class="event-image-dropzone" :class="{ 'is-dragging': isDraggingImage }"
                             tabindex="0" role="button" @focus="activeField = null"
                             @click="$refs.eventImage.click()" @keydown.enter.prevent="$refs.eventImage.click()"
                             @dragover.prevent="isDraggingImage = true" @dragleave.prevent="isDraggingImage = false"
@@ -135,6 +173,7 @@
                                 </div>
                             </template>
                         </div>
+                        #}
                         <input x-ref="eventImage" type="file" hidden accept="image/jpeg,image/png"
                             @change="selectEventImage($event.target.files[0]); $event.target.value = ''">
                         <button type="button" class="event-use-media-btn" @click="openEventMediaPicker()">
@@ -144,7 +183,10 @@
                         <small class="event-field-error" x-show="errors.image" x-text="errors.image"></small>
                     </div>
 
-                    <!-- Location -->
+                    {#
+                    === ĐOẠN CODE CŨ (Địa điểm, Link Google Maps, Thời gian từng nằm RIÊNG ở đây (sau ảnh sự kiện),
+                    === tách biệt khỏi khối Mô tả - comment lại để giữ tham khảo. Đã chuyển 3 field này vào
+                    === chung khối "Mô tả" (div.admin-desc-group) ngay phía trên, xem lại phần "Description". ===
                     <div class="admin-form-group">
                         <label for="event-location">Địa điểm <span style="color: red;">*</span></label>
                         <div class="admin-input-with-icon">
@@ -157,19 +199,30 @@
                         <small class="event-field-error" x-show="errors.location" x-text="errors.location"></small>
                     </div>
 
-                    <!-- Start & End Date Time -->
+                    <div class="admin-form-group">
+                        <label for="event-url-map">Link Google Maps</label>
+                        <div class="admin-input-with-icon">
+                            <span class="material-symbols-outlined">map</span>
+                            <input type="url" id="event-url-map" x-model="form.url_map" class="admin-form-input"
+                                placeholder="https://maps.google.com/?q=..." @focus="activeField = null" />
+                        </div>
+                        <small class="event-field-error" x-show="errors.url_map" x-text="errors.url_map"></small>
+                    </div>
+
                     <div class="admin-form-row">
                         <div class="admin-form-group">
-                            <label for="event-start">Thời gian bắt đầu <span style="color: red;">*</span></label>
-                            <input type="datetime-local" id="event-start" x-model="form.start_at" required class="admin-form-input" @focus="activeField = null" />
+                            <label for="event-start">Thời gian bắt đầu</label>
+                            <input type="datetime-local" id="event-start" x-model="form.start_at" class="admin-form-input" @focus="activeField = null" />
                             <small class="event-field-error" x-show="errors.start_at" x-text="errors.start_at"></small>
                         </div>
                         <div class="admin-form-group">
-                            <label for="event-end">Thời gian kết thúc <span style="color: red;">*</span></label>
-                            <input type="datetime-local" id="event-end" x-model="form.end_at" required class="admin-form-input" @focus="activeField = null" />
+                            <label for="event-end">Thời gian kết thúc</label>
+                            <input type="datetime-local" id="event-end" x-model="form.end_at" class="admin-form-input" @focus="activeField = null" />
                             <small class="event-field-error" x-show="errors.end_at" x-text="errors.end_at"></small>
                         </div>
                     </div>
+                    =======================================================================================
+                    #}
 
                 </div>
 
@@ -201,8 +254,8 @@
     .admin-event-controls {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
-        margin: 16px 0 24px;
+        gap: 10px;
+        margin: 10px 0;
     }
     .admin-event-controls label {
         align-items: center;
@@ -522,12 +575,26 @@
                 }
             },
 
+            /*
+            === ĐOẠN CODE CŨ (bắt buộc cả location, start_at, end_at - comment lại để giữ tham khảo) ===
             validateForm() {
                 const errors = {};
                 if (!this.plainText(this.form.name)) errors.name = 'Vui lòng nhập tên sự kiện.';
                 if (!this.plainText(this.form.location)) errors.location = 'Vui lòng nhập địa điểm.';
                 if (!this.form.start_at) errors.start_at = 'Vui lòng chọn thời gian bắt đầu.';
                 if (!this.form.end_at) errors.end_at = 'Vui lòng chọn thời gian kết thúc.';
+                if (this.form.start_at && this.form.end_at && new Date(this.form.start_at) >= new Date(this.form.end_at)) {
+                    errors.end_at = 'Thời gian kết thúc phải sau thời gian bắt đầu.';
+                }
+                this.errors = errors;
+                return Object.keys(errors).length === 0;
+            },
+            =======================================================================================
+            */
+            // Chỉ "Tên sự kiện" là bắt buộc; các trường khác optional nên chỉ validate khi có giá trị.
+            validateForm() {
+                const errors = {};
+                if (!this.plainText(this.form.name)) errors.name = 'Vui lòng nhập tên sự kiện.';
                 if (this.form.start_at && this.form.end_at && new Date(this.form.start_at) >= new Date(this.form.end_at)) {
                     errors.end_at = 'Thời gian kết thúc phải sau thời gian bắt đầu.';
                 }
@@ -588,10 +655,12 @@
                 // Format datetime fields back to ISO strings or keep as null if empty
                 try {
                     if (this.imageFile) this.form.url_image = await this.uploadImage(this.imageFile);
+                    // ĐOẠN CODE CŨ: start_at/end_at luôn được ép về ISO string vì trước đây là bắt buộc.
+                    // -> Giờ 2 trường này optional nên chỉ convert khi có giá trị, tránh new Date('').toISOString() lỗi.
                     const payload = {
                         ...this.form,
-                        start_at: new Date(this.form.start_at).toISOString(),
-                        end_at: new Date(this.form.end_at).toISOString(),
+                        start_at: this.form.start_at ? new Date(this.form.start_at).toISOString() : null,
+                        end_at: this.form.end_at ? new Date(this.form.end_at).toISOString() : null,
                         url_image: this.form.url_image || null,
                         url_map: this.form.url_map || null
                     };

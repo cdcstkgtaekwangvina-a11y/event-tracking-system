@@ -35,8 +35,12 @@
   --text-secondary: #a9a9a9;
   --login-bg: rgb(251, 250, 251);
   --shadow: rgba(255, 255, 255, 0.867);
-  --input: #f6f6f6;
-  --logout: #f87171;                   
+  /* ĐOẠN CODE CŨ: --input: #f6f6f6; -> gần như trắng, bị sao chép nhầm từ theme sáng (rgb(242,243,244)),
+     khiến các input dùng var(--input) (VD: .event-rich-input ở Tên sự kiện/Địa điểm) không đổi màu tối.
+     admin_events.css đã tự override riêng cho .admin-form-input thành #262626, nay đồng bộ luôn ở biến gốc
+     để MỌI input dùng --input đều đổi màu tối đúng, không phải override riêng lẻ từng nơi. */
+  --input: #262626;
+  --logout: #f87171;
   --logout-bg: rgba(248, 113, 113, 0.15);
   --sidebar-bg: #171717;
 
@@ -103,6 +107,13 @@
 }
 .outstanding_btn:hover {
   background-color: var(--border);
+}
+
+/* ĐOẠN CODE CŨ: html không đặt scrollbar-gutter -> mỗi khi số lượng sự kiện load vào thay đổi chiều cao trang
+   (đủ để vượt/không vượt viewport), thanh scroll dọc tự ẩn/hiện, làm toàn bộ layout (header, wrapper, controls...)
+   bị dịch ngang vài px do khác bề rộng khả dụng. Đặt "stable" để luôn chừa sẵn khoảng cho scrollbar, tránh layout bị lệch. */
+html {
+  scrollbar-gutter: stable;
 }
 
 body {

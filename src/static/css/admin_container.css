@@ -7,3 +7,14 @@
     box-sizing: border-box;
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* ĐOẠN CODE CŨ (không có): body toàn site (index.css) dùng justify-content:center; align-items:center;
+   để căn giữa các trang đơn giản (login...). Nhưng layout admin (sidebar + #admin-main-content) là con
+   trực tiếp của body, nên khi nội dung admin thấp hơn viewport (VD: không có sự kiện) body sẽ CĂN GIỮA
+   cả khối admin theo chiều dọc, còn khi nội dung cao hơn viewport (VD: nhiều sự kiện) nó lại dồn lên đỉnh.
+   -> Header/wrapper/controls bị nhảy vị trí mỗi khi số lượng sự kiện thay đổi qua lại 2 trường hợp này.
+   Ghi đè lại để layout admin luôn neo ở trên cùng, không phụ thuộc chiều cao nội dung. */
+body:has(#admin-main-content) {
+    justify-content: flex-start;
+    align-items: stretch;
+}

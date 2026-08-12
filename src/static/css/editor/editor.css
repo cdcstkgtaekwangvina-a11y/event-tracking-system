@@ -2,14 +2,20 @@
 @import "drag_handle.css";
 @import "floating_menu.css";
 @import "placeholder.css";
+/* CHỦ Ý THIẾT KẾ: vùng NỘI DUNG soạn thảo (.editor-wrapper, .tiptap, bảng trong nội dung) dùng MÀU CỐ ĐỊNH
+   (sáng, giống trang giấy) thay vì var(--foreground)/var(--background)/var(--border)... Lý do: nội dung Mô tả
+   là rich text có thể chứa màu chữ do người dùng tự chọn hoặc dán từ Word/Google Docs (thường có màu chữ
+   đen/đậm cố định) - nếu nền soạn thảo đổi theo theme tối, chữ cũ sẽ chìm vào nền và không đọc được.
+   Riêng TOOLBAR/DROPDOWN/POPOVER (nút bấm, icon, menu... do app kiểm soát, không chứa nội dung người dùng)
+   vẫn dùng var(--...) để đổi theo theme sáng/tối như bình thường. */
 /* Base Editor Layout */
     .editor-wrapper {
         position: relative;
-        border: 1px solid var(--border, #cbd5e1);
+        border: 1px solid #cbd5e1;
         border-radius: 12px;
         overflow: visible;
         /* Needed for dropdowns and handles */
-        background: var(--background, #fff);
+        background: #fff;
         box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         margin-top: 20px;
         font-family: "Noto Sans", sans-serif;
@@ -340,7 +346,7 @@
         outline: none;
         font-size: 15px;
         line-height: 1.6;
-        color: var(--foreground, #1e293b);
+        color: #1e293b;
     }
 
     /* Underline styling */
@@ -372,7 +378,7 @@
     .tiptap table td,
     .tiptap table th {
         min-width: 1em;
-        border: 1px solid var(--border, #cbd5e1);
+        border: 1px solid #cbd5e1;
         padding: 8px 12px;
         vertical-align: top;
         box-sizing: border-box;
@@ -382,7 +388,7 @@
     .tiptap table th {
         font-weight: bold;
         text-align: left;
-        background-color: var(--bg-home-page, #f8fafc);
+        background-color: #f8fafc;
     }
 
     .tiptap table .selectedCell:after {
