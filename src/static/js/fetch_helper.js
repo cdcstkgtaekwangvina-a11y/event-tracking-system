@@ -23,6 +23,7 @@ export const fetchHelper = {
       const fullPath = queryString ? `${path}?${queryString}` : path;
       const res = await fetch(resolveUrl(fullPath), {
         method: "GET",
+        credentials: "include",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
           ...(options.requireAuth
@@ -47,6 +48,7 @@ export const fetchHelper = {
       const fullPath = queryString ? `${path}?${queryString}` : path;
       const res = await fetch(resolveUrl(fullPath), {
         method: "GET",
+        credentials: "include",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
           ...(options.requireAuth
@@ -77,6 +79,7 @@ export const fetchHelper = {
 
       const res = await fetch(resolveUrl(path), {
         method: "POST",
+        credentials: "include",
         headers: headers,
         body: isFormData ? payload : JSON.stringify(payload),
       });
@@ -90,6 +93,7 @@ export const fetchHelper = {
     try {
       const res = await fetch(resolveUrl(path), {
         method: "PUT",
+        credentials: "include",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
           ...(options.requireAuth
@@ -109,6 +113,7 @@ export const fetchHelper = {
     try {
       const res = await fetch(resolveUrl(path), {
         method: "PATCH",
+        credentials: "include",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
           ...(options.requireAuth
@@ -128,6 +133,7 @@ export const fetchHelper = {
     try {
       const res = await fetch(resolveUrl(path), {
         method: "DELETE",
+        credentials: "include",
         headers: {
           ...(options.headers || { "Content-Type": contentType.json }),
           ...(options.requireAuth
