@@ -5,9 +5,13 @@
 {% for event in events %}
     {% set grad_class = gradients[loop.index0 % 6] %}
     <div class="event-card">
+        {% if event.url_image %}
+        <div class="card-header" style="background: url('{{ event.url_image }}') no-repeat center center/cover;"></div>
+        {% else %}
         <div class="card-header {{ grad_class }}">
             <span class="material-symbols-outlined icon-large">calendar_today</span>
         </div>
+        {% endif %}
         <div class="card-body">
             {% if event_status(event.start_at, event.end_at) == "ongoing" %}
             <span class="event-status event-status--ongoing">Đang diễn ra</span>

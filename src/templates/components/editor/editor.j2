@@ -1,7 +1,8 @@
 <link rel="stylesheet" href="/static/css/editor/editor.css">
 
 <div class="editor-wrapper" x-data="editorApp()" x-init="initEditor($el)"
-    @tiptap-selection-change.window="$event.detail.version = Date.now()">
+    @tiptap-selection-change.window="$event.detail.version = Date.now()"
+    @editor-open-media-picker.window="openMediaPicker($event.detail?.purpose || 'editor')">
     <!-- Drag Handle Gutter Icon -->
     <div class="drag-handle" x-show="dragHandle.visible" :style="`top: ${dragHandle.top}px; left: ${dragHandle.left}px`"
         @mousedown="dragHandle.onMouseDown($event)" @mouseup="dragHandle.onMouseUp($event)" draggable="true"
@@ -11,6 +12,10 @@
     </div>
 
     <!-- Toolbar -->
+    {% if not editor_hide_toolbar|default(false) %}
+    {% include "templates/components/editor/toolbar.j2" %}
+    {% endif %}
+    {#
     <div class="toolbar">
         <!-- Undo/Redo -->
         <div class="btn-group">
@@ -72,6 +77,7 @@
             📂 Thêm Media
         </button>
     </div>
+    #}
 
     <!-- Editor Content Area -->
     <div class="editor-container">
@@ -324,6 +330,7 @@
             viewMode: localStorage.getItem('mediaViewMode') || 'grid',
             mediaPicker: {
                 open: false,
+                purpose: 'editor',
                 loading: false,
                 uploading: false,
                 folderId: '',
@@ -448,7 +455,8 @@
                     this.syncPickerSelectionClasses();
                 }
             },
-            openMediaPicker() {
+            openMediaPicker(purpose = 'editor') {
+                this.mediaPicker.purpose = purpose;
                 this.mediaPicker.open = true;
                 this.mediaPicker.folderId = '';
                 this.mediaPicker.folderStack = [];
@@ -494,11 +502,22 @@
                 this.syncPickerSelectionClasses();
             },
             canInsertSelectedMedia() {
-                return !!(this.mediaPicker.selected && this.mediaPicker.selected.kind !== 'folder' && this.mediaPicker.selected.url);
+                const selected = this.mediaPicker.selected;
+                if (!selected || selected.kind === 'folder' || !selected.url) return false;
+                return this.mediaPicker.purpose !== 'event-image' || selected.type === 'image';
             },
             insertSelectedMedia() {
                 const selected = this.mediaPicker.selected;
-                if (!selected || !selected.url || selected.kind === 'folder' || !window.myEditor) return;
+                if (!selected || !selected.url || selected.kind === 'folder') return;
+
+                if (this.mediaPicker.purpose === 'event-image') {
+                    if (selected.type !== 'image') return;
+                    window.dispatchEvent(new CustomEvent('event-image-media-selected', { detail: selected }));
+                    this.closeMediaPicker();
+                    return;
+                }
+
+                if (!window.myEditor) return;
 
                 const name = selected.name || selected.url.split('/').pop() || 'media';
                 const url = selected.url;
