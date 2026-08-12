@@ -3,11 +3,10 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/png" sizes="180x180" href="/static/public/{% block logo %}app_logo.png{% endblock %}" />
+  <link rel="icon" type="image/png" sizes="180x180" href="/static/assets/{% block logo %}app_logo.png{% endblock %}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="/static/css/index.css">
-  <link rel="preload" href="{{ url_for('static', path='public/fonts/MaterialSymbolsOutlined.woff2') }}" as="font"
-    type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/MaterialSymbolsOutlined.woff2" as="font" type="font/woff2" crossorigin>
   <meta name="keywords" content="python, fastapi, jinja2, check-in, điểm danh, sự kiện">
   {% block meta %}
   <meta name="description" content="Trang web điểm danh build bằng fastapi và jinja2">
@@ -15,11 +14,11 @@
   <title id="page-title">{% block title %}Event tracking system{% endblock %}</title>
   <script>
     // Universal patch for Alpine.js + HTMX compatibility
-    (function() {
+    (function () {
       const origAddEvt = document.addEventListener.bind(document);
-      document.addEventListener = function(type, listener, options) {
+      document.addEventListener = function (type, listener, options) {
         if (type === 'alpine:init' && window.Alpine) {
-          try { listener(); } catch(e) { console.error('Error in alpine:init listener during HTMX swap:', e); }
+          try { listener(); } catch (e) { console.error('Error in alpine:init listener during HTMX swap:', e); }
         }
         return origAddEvt(type, listener, options);
       };
@@ -87,7 +86,7 @@
   });
 
   // Re-process Alpine components after HTMX content swap
-  document.addEventListener('htmx:afterSettle', function(evt) {
+  document.addEventListener('htmx:afterSettle', function (evt) {
     if (window.Alpine && evt.detail && evt.detail.target) {
       try {
         window.Alpine.initTree(evt.detail.target);

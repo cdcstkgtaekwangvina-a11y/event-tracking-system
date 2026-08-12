@@ -1,13 +1,18 @@
 {% if events %}
 <div class="events-grid">
     {% set gradients = ['purple-blue', 'pink-red', 'green-teal', 'blue-dark', 'purple-pink', 'green-forest'] %}
-    {% for event in events %}
+{% for event in events %}
     {% set grad_class = gradients[loop.index0 % 6] %}
     <div class="event-card">
         <div class="card-header {{ grad_class }}">
             <span class="material-symbols-outlined icon-large">calendar_today</span>
         </div>
         <div class="card-body">
+            {% if event.start_at and event.start_at <= now and (not event.end_at or event.end_at >= now) %}
+            <span class="event-status event-status--ongoing">Đang diễn ra</span>
+            {% else %}
+            <span class="event-status event-status--upcoming">Sắp diễn ra</span>
+            {% endif %}
             <h3 class="event-title">{{ event.name }}</h3>
             <p class="event-desc" title="{{ event.description }}">{{ event.description }}</p>
 
@@ -42,7 +47,7 @@
 {% if total_pages > 1 %}
 <div class="pagination">
     <button class="page-btn" {% if page> 1 %}
-        hx-get="/api/events/cards-html?page={{ page - 1 }}&search={{ search }}"
+        hx-get="/api/events/cards-html?page={{ page - 1 }}&limit={{ limit }}&search={{ search }}&status={{ status }}&sort_field={{ sort_field }}&is_desc={{ is_desc }}"
         hx-target="#events-container"
         hx-swap="innerHTML"
         {% else %}
@@ -54,7 +59,7 @@
     <span class="page-info">Trang <b>{{ page }}</b> / {{ total_pages }}</span>
 
     <button class="page-btn" {% if page < total_pages %}
-        hx-get="/api/events/cards-html?page={{ page + 1 }}&search={{ search }}" hx-target="#events-container"
+        hx-get="/api/events/cards-html?page={{ page + 1 }}&limit={{ limit }}&search={{ search }}&status={{ status }}&sort_field={{ sort_field }}&is_desc={{ is_desc }}" hx-target="#events-container"
         hx-swap="innerHTML" {% else %} disabled {% endif %}>
         <span class="material-symbols-outlined">chevron_right</span>
     </button>

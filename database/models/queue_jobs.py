@@ -1,11 +1,12 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any, cast
-from uuid import UUID, uuid8
+from uuid import UUID
 
 from sqlalchemy import DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
+from uuid6 import uuid8
 
 from src.shared.base.base_schema import BaseSchema
 

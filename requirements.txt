@@ -20,7 +20,6 @@ email-validator==2.3.0
 fastapi==0.136.1
 fastapi-restful==0.6.0
 fastexcel==0.20.2
-granian==2.7.4
 greenlet==3.5.0
 h11==0.16.0
 hiredis==3.4.0
@@ -66,3 +65,4 @@ websockets==16.0
 Werkzeug==3.1.8
 xlsxwriter==3.2.9
 yarg==0.1.10
+uuid6==2025.0.1

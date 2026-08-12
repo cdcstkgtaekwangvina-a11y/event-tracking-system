@@ -1,5 +1,5 @@
 from fastapi import Depends
-from .event_schemas import EventCreateRequest, EventUpdateRequest
+from .event_schemas import AdminEventQuery, EventCreateRequest, EventUpdateRequest, PublicEventQuery
 from .event_services import EventServices
 from src.shared.base import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
@@ -30,9 +30,9 @@ class EventController:
     async def get_events_cards_html(
         self,
         req: BaseRequest,
-        q: PaginationRequest = Depends(),
+        q: PublicEventQuery = Depends(),
     ):
-        pagination_result = await self.service.get_events_raw(pagination=q)
+        pagination_result = await self.service.get_public_events_raw(pagination=q)
         limit = pagination_result.limit
         total = pagination_result.total
         total_pages = (total + limit - 1) // limit if limit > 0 else 1
@@ -48,6 +48,9 @@ class EventController:
                 "total": total,
                 "total_pages": total_pages,
                 "search": q.search or "",
+                "status": q.status,
+                "sort_field": q.sort_field,
+                "is_desc": q.is_desc,
                 "now": datetime.now(timezone.utc),
             },
         )
@@ -56,9 +59,9 @@ class EventController:
     async def get_events_admin_cards_html(
         self,
         req: BaseRequest,
-        q: PaginationRequest = Depends(),
+        q: AdminEventQuery = Depends(),
     ):
-        pagination_result = await self.service.get_events_raw(pagination=q)
+        pagination_result = await self.service.get_admin_events_raw(pagination=q)
         limit = pagination_result.limit
         total = pagination_result.total
         total_pages = (total + limit - 1) // limit if limit > 0 else 1
@@ -74,6 +77,9 @@ class EventController:
                 "total": total,
                 "total_pages": total_pages,
                 "search": q.search or "",
+                "status": q.status,
+                "sort_field": q.sort_field,
+                "is_desc": q.is_desc,
                 "now": datetime.now(timezone.utc),
             },
         )

@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import Depends
+from sqlalchemy import NullPool
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -10,15 +11,25 @@ from database.db_config import DatabaseConfig
 
 db_url: str = DatabaseConfig().db_url()
 
-engine = create_async_engine(
-    db_url,
-    echo=True,
-    pool_size=15,
-    max_overflow=20,
-    pool_timeout=30,
-    pool_recycle=1800,
-    pool_pre_ping=True,
-)
+if DatabaseConfig().ENV == "dev":
+    engine = create_async_engine(
+        db_url,
+        echo=True,
+        pool_size=15,
+        max_overflow=20,
+        pool_timeout=30,
+        pool_recycle=1800,
+        pool_pre_ping=True,
+    )
+else:
+    engine = create_async_engine(
+        db_url,
+        poolclass=NullPool,
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+        },
+    )
 
 async_session_factory = async_sessionmaker(
     bind=engine,

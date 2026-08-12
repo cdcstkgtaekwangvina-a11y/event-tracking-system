@@ -1,14 +1,14 @@
 import asyncio
-from datetime import timezone, timedelta
-from sqlmodel import SQLModel, select
-from database.models.users import Users
-from database.models.events import Events
-from sqlmodel.ext.asyncio.session import AsyncSession
-from database.models.app_db import engine
 import logging
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
-from datetime import datetime
+
+from sqlmodel import SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from database.models.app_db import engine
 from database.models.settings import Settings
+from database.models.users import Users
 from src.modules.setting.setting_constants import AppConfigKey
 
 logging.basicConfig(level=logging.INFO)

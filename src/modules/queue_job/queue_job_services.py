@@ -1,4 +1,6 @@
-from uuid import UUID, uuid8
+from uuid import UUID
+
+from uuid6 import uuid8
 
 from database.models.app_db import SessionDep
 from database.models.queue_jobs import QueueJob
