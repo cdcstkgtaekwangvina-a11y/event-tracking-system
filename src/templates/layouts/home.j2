@@ -10,10 +10,16 @@
     <section class="events-hero" aria-labelledby="events-heading">
         <h1 id="events-heading" class="section-title">Sự kiện sắp diễn ra</h1>
         <p class="hero-description">Khám phá và tham gia các sự kiện thú vị của công ty. Đừng bỏ lỡ những trải nghiệm đáng nhớ!</p>
+        {#
+        === ĐOẠN CODE CŨ (dòng "Tổng cộng X sự kiện đang mở đăng ký", comment lại để giữ tham khảo) ===
         <p class="event-total">
             <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
             Tổng cộng <strong id="event-count">0</strong> sự kiện đang mở đăng ký
         </p>
+        =======================================================================================
+        #}
+        <!-- Giữ span#event-count ẩn để event_cards.j2 (hx-swap-oob="innerHTML") vẫn có target hợp lệ -->
+        <span id="event-count" style="display: none;"></span>
     </section>
 
     <!-- Search and filters -->
@@ -352,6 +358,47 @@
         color: #1d4ed8;
     }
 
+    /* Dark mode: badge màu sáng cố định trước đây gây chói/lệch tông trên card nền tối */
+    :root[data-theme="dark"] .event-status--ongoing {
+        background: rgba(34, 197, 94, 0.18);
+        color: #4ade80;
+    }
+
+    :root[data-theme="dark"] .event-status--upcoming {
+        background: rgba(59, 130, 246, 0.18);
+        color: #60a5fa;
+    }
+
+    /* Địa điểm & thời gian gộp chung vào khối mô tả (event-desc-block), không còn hiển thị thành ô riêng */
+    .event-desc-block {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    /* ĐOẠN CODE CŨ: cả ngày/giờ/địa điểm dùng chung 1 icon lịch, không có icon riêng cho địa điểm nên khó
+       hình dung đâu là địa chỉ. Tách thành từng cụm icon+chữ riêng (.event-meta-item) qua flex-wrap. */
+    .event-meta-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 14px;
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .event-meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .event-meta-line .material-symbols-outlined {
+        font-size: 16px;
+    }
+
     .event-desc {
         font-size: 14px;
         color: var(--text-secondary);
@@ -492,6 +539,9 @@
     }
 
     /* Empty search result state */
+    /* ĐOẠN CODE CŨ: border-radius: 16px; -> không khớp với .admin-no-events (12px) bên trang admin, gây lệch kích thước giữa 2 khối tương đương. */
+    /* ĐOẠN CODE CŨ: thiếu box-sizing: border-box -> padding + border bị cộng thêm ra ngoài width: 100%,
+       khiến khối này tràn rộng hơn (lệch mép trái/phải) so với .search-section/.events-hero phía trên. */
     .no-events {
         display: flex;
         flex-direction: column;
@@ -500,8 +550,9 @@
         padding: 60px 20px;
         text-align: center;
         width: 100%;
+        box-sizing: border-box;
         border: 1px dashed var(--border);
-        border-radius: 16px;
+        border-radius: 12px;
         background-color: var(--card);
     }
 
