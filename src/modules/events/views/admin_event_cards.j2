@@ -19,6 +19,9 @@
         {% endif %}
 
         <div class="admin-event-card">
+            {% if event.url_image %}
+            <div class="admin-card-image" style="height: 160px; background: url('{{ event.url_image }}') no-repeat center center/cover; margin: -24px -24px 0 -24px; border-radius: 11px 11px 0 0;"></div>
+            {% endif %}
             <!-- Card Header: Title & Status -->
             <div class="admin-card-header">
                 <h3 class="admin-event-title" title="{{ event.name }}">{{ event.name }}</h3>

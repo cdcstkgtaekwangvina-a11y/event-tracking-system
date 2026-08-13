@@ -23,6 +23,7 @@ class QueueJobSchema(BaseSchema):
     finished_at: datetime | None
     progress: int = Field(default=0, ge=0, le=100)
     logs: dict[str, Any] | None
-    meta: dict[str, Any] | None
-    next_payload: dict[str, Any] | None
-    created_at: datetime | None
+
+
+class StopQueueJobSchema(BaseSchema):
+    id: UUID
