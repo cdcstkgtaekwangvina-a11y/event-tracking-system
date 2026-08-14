@@ -4,7 +4,7 @@ from src.modules.queue_job.queue_job_services import QueueJobServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import RequireAuth
-from src.shared.schemas.pagination_schemas import FilterRequest, PaginationRequest
+from src.shared.schemas.pagination_schemas import FilterRequest, PaginationQuery
 
 TAG_NAME = "admin/queue-jobs"
 router = BaseRouter(
@@ -24,7 +24,7 @@ class QueueJobAdminViews:
     async def queue_jobs(
         self,
         req: BaseRequest,
-        pagination: PaginationRequest = Depends(),
+        pagination: PaginationQuery,
         status: str | None = None,
     ):
         if "limit" not in req.query_params:
@@ -54,7 +54,7 @@ class QueueJobAdminViews:
     async def queue_jobs_table_html(
         self,
         req: BaseRequest,
-        pagination: PaginationRequest = Depends(),
+        pagination: PaginationQuery,
         status: str | None = None,
     ):
         if "limit" not in req.query_params:

@@ -1,9 +1,10 @@
 from uuid import UUID
 
+from sqlmodel import and_, col
 from uuid6 import uuid8
 
 from database.models.app_db import SessionDep
-from database.models.queue_jobs import QueueJob
+from database.models.queue_jobs import JobStatus, QueueJob
 from src.shared.base.base_crud import BaseCrud
 from src.shared.base.base_logger import get_logger
 from src.shared.base.base_response import BaseResponse
@@ -11,7 +12,8 @@ from src.shared.constants.cache_tags import CacheTags
 from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
 from src.shared.services.redis_services import RedisDep
 
-from .queue_job_schemas import CreateQueueJobSchema, QueueJobSchema
+from .queue_job_schemas import CreateQueueJobSchema, QueueJobSchema, StopQueueJobSchema
+from .queue_job_select import QueueJobSelect
 
 logger = get_logger(__name__)
 
@@ -29,11 +31,15 @@ class QueueJobServices:
     ) -> BaseResponse[PaginationResponse]:
         cache_key = self.redis.get_pagination_key(CacheTags.QUEUE_JOB, pagination)
 
+        async def get_data_async():
+            return await self.crud.select(QueueJobSelect).pagination_async(
+                pagination, search_fields=["type", "status"]
+            )
+
         result = await self.redis.get_or_set_async(
             key=cache_key,
-            async_func=lambda: self.crud.pagination_async(
-                pagination, search_fields=["id"]
-            ),
+            async_func=get_data_async,
+            expires=60,
             tags=[CacheTags.QUEUE_JOB],
             model_class=PaginationResponse,
         )
@@ -71,3 +77,33 @@ class QueueJobServices:
         if not new_job:
             return None
         return new_job
+
+    async def cancel_job(self, jobs: StopQueueJobSchema) -> BaseResponse[None]:
+        exiting_jobs = (
+            await self.crud.select(QueueJob)
+            .where(
+                and_(
+                    col(QueueJob.status) == JobStatus.RUNNING.value,
+                    col(QueueJob.id) == jobs.id,
+                )
+            )
+            .find_one()
+        )
+        if not exiting_jobs:
+            return BaseResponse.not_found(message="Không tìm thấy job")
+
+        from src.shared.base.base_queue import queue_service
+        from src.shared.helpers.time_extensions import get_vn_time
+
+        async with self.crud.transaction():
+            exiting_jobs.status = JobStatus.CANCELLED.value
+            exiting_jobs.finished_at = get_vn_time()
+            self.session.add(exiting_jobs)
+            canceled = queue_service.cancel_job(str(exiting_jobs.id))
+
+            if not canceled:
+                return BaseResponse.error("Có lỗi xảy ra khi hủy tác vụ")
+
+            await self.session.commit()
+        await self.redis.invalidate_tags_async([CacheTags.QUEUE_JOB.value])
+        return BaseResponse.ok()
