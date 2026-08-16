@@ -300,6 +300,16 @@ class EmployeeBackgroundTask:
                 job.finished_at = get_now_vn()
                 job.logs = job_logs.model_dump()
 
+                # Tạo chuỗi overall_log tổng kết
+                if total_failed == 0:
+                    overall_log = f"Nhập dữ liệu thành công: {successful_rows_count}/{total_records} khách mời đã được thêm/cập nhật."
+                elif successful_rows_count == 0:
+                    overall_log = f"Nhập dữ liệu thất bại: Toàn bộ {total_failed}/{total_records} bản ghi gặp lỗi."
+                else:
+                    overall_log = f"Xử lý hoàn tất: {successful_rows_count}/{total_records} khách mời thành công, phát hiện {total_failed} bản ghi bị lỗi."
+
+                job.overall_log = overall_log
+
                 if successful_rows_count > 0:
                     max_id_stmt = select(func.max(Employees.id))
                     max_id_result = await session.exec(max_id_stmt)

@@ -35,6 +35,7 @@ class BaseQueueJob(SQLModel):
     meta: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
     logs: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
     next_payload: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
+    overall_log: str | None = Field(default=None, nullable=True)
 
 
 class QueueJob(PrimaryModel[UUID], CreatedAtModel, BaseQueueJob, table=True):

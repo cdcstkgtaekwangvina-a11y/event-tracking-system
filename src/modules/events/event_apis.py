@@ -1,4 +1,13 @@
+from datetime import datetime, timezone
+
 from fastapi import Depends
+from fastapi.responses import HTMLResponse
+
+from src.shared.base import BaseRouter
+from src.shared.base.base_request import BaseRequest
+from src.shared.helpers.cbv import clean_cbv
+from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagination
+
 from .event_schemas import (
     AdminEventQuery,
     EventCreateRequest,
@@ -8,12 +17,6 @@ from .event_schemas import (
     parse_public_event_query,
 )
 from .event_services import EventServices
-from src.shared.base import BaseRouter
-from src.shared.helpers.cbv import clean_cbv
-from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagination
-from src.shared.base.base_request import BaseRequest
-from fastapi.responses import HTMLResponse
-from datetime import datetime, timezone
 
 TAG_NAME = "events"
 router = BaseRouter(controller=TAG_NAME, tags=[TAG_NAME])
