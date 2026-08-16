@@ -3,26 +3,196 @@
 {%block body %}
 {% include "templates/headers/index.j2" %}
 
-<h1>Trang không tồn tại</h1>
-<h2>404!</h2>
-<a class="home-button" href="{{ url_for('home') }}">Về trang chủ</a>
-{% include "templates/footers/index.j2" %}
+<div class="error-page-container">
+    <div class="error-content">
+        <h1 class="error-code">
+            4
+            <div class="zero-circle">
+                <span class="material-symbols-outlined compass-icon">explore</span>
+            </div>
+            4
+        </h1>
+        <h2 class="error-title">Trang không tồn tại</h2>
+        <p class="error-description">
+            Trang bạn đang tìm kiếm đã bị xoá, đổi tên, hoặc chưa từng tồn tại.<br>Hãy kiểm tra lại đường dẫn hoặc quay về trang chủ.
+        </p>
+        
+        <div class="error-actions">
+            <a class="btn btn-primary" href="{{ url_for('home') }}">
+                <span class="material-symbols-outlined">home</span>
+                Về trang chủ
+            </a>
+            <button class="btn btn-outline" onclick="window.history.back()">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Quay lại
+            </button>
+        </div>
+    </div>
+</div>
+
 <style>
-    .home-button {
-        text-decoration: none;
-        color: var(--foreground);
+    .error-page-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        margin-top: 20px;
-        border-radius: 10px;
-        border: 1px solid var(--border);
-        padding: 10px;
+        min-height: calc(100vh - 160px); /* Account for header and footer */
+        padding: 2rem;
+        background-color: var(--background);
     }
 
-    .home-button:hover {
-        transform: scale(1.01);
-        box-shadow: 0 5px 10px var(--border);
+    .error-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        max-width: 600px;
+    }
+
+    .error-code {
+        font-size: 160px;
+        font-family: "Arial Black", "Impact", sans-serif;
+        font-weight: 900;
+        line-height: 1;
+        margin: 0;
+        color: #475569; /* Slate-600 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0px;
+        letter-spacing: -8px;
+        animation: float 4s ease-in-out infinite;
+    }
+
+    .zero-circle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 120px;
+        height: 120px;
+        background-color: #475569;
+        border-radius: 50%;
+        margin: 0 4px;
+        box-shadow: inset 0 -4px 10px rgba(0,0,0,0.15);
+    }
+
+    .compass-icon {
+        font-size: 70px !important;
+        color: #ffffff !important;
+        animation: lost-compass 3s ease-in-out infinite;
+        transform-origin: center center;
+    }
+
+    @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-12px); }
+        100% { transform: translateY(0px); }
+    }
+
+    @keyframes lost-compass {
+        0% { transform: rotate(0deg); }
+        20% { transform: rotate(-25deg); }
+        40% { transform: rotate(15deg); }
+        60% { transform: rotate(-10deg); }
+        80% { transform: rotate(5deg); }
+        100% { transform: rotate(0deg); }
+    }
+
+    .error-title {
+        font-size: 24px;
+        font-weight: 700;
+        margin: 20px 0 10px;
+        color: var(--foreground);
+    }
+
+    .error-description {
+        font-size: 15px;
+        color: var(--text-secondary, #64748b);
+        line-height: 1.6;
+        margin: 0 0 32px;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+
+    .btn .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    .btn-primary {
+        background-color: var(--foreground, #0f172a);
+        color: var(--background, #ffffff);
+        border: 1px solid var(--foreground, #0f172a);
+    }
+
+    .btn-primary:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
+
+    .btn-outline {
+        background-color: transparent;
+        color: var(--foreground, #334155);
+        border: 1px solid var(--border, #e2e8f0);
+    }
+
+    .btn-outline:hover {
+        background-color: var(--accent, #f1f5f9);
+    }
+
+    @media (max-width: 640px) {
+        .error-code {
+            font-size: 80px;
+        }
+        .zero-circle {
+            width: 70px;
+            height: 70px;
+        }
+        .compass-icon {
+            font-size: 40px !important;
+        }
+        .error-title {
+            font-size: 20px;
+        }
+        .error-description {
+            font-size: 14px;
+        }
+        .error-actions {
+            flex-direction: column-reverse;
+            width: 100%;
+        }
+        .btn {
+            width: 100%;
+        }
+    }
+
+    /* Dark mode overrides */
+    :root[data-theme="dark"] .error-code {
+        color: #cbd5e1; /* Slate-300 */
+    }
+    :root[data-theme="dark"] .zero-circle {
+        background-color: #cbd5e1;
+    }
+    :root[data-theme="dark"] .compass-icon {
+        color: var(--background) !important;
     }
 </style>
 {% endblock %}
