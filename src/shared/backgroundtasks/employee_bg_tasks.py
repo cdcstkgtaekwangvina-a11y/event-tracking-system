@@ -5,10 +5,12 @@ from typing import cast
 from uuid import UUID
 
 from polars import DataFrame
-from sqlmodel import func, select
+from sqlmodel import and_, func, select
 
 from database.models.app_db import get_session_factory
 from database.models.employees import Employees
+from database.models.events_employees import EventsEmployees
+from database.models.events import Events
 from database.models.queue_jobs import JobStatus, QueueJob, QueueJobLogs
 from src.modules.employees.employee_schemas import BulkUpsertResponse
 from src.shared.base.base_client import BaseClient
@@ -64,7 +66,15 @@ class EmployeeBackgroundTask:
     ) -> BulkUpsertResponse | None:
 
         async with get_session_factory()() as session:
-            job = await session.get(QueueJob, job_id)
+            query_job = await session.exec(
+                select(QueueJob).where(
+                    and_(
+                        QueueJob.id == job_id,
+                        QueueJob.status == JobStatus.RUNNING.value,
+                    )
+                )
+            )
+            job = query_job.first()
             if not job:
                 return
 
@@ -77,6 +87,17 @@ class EmployeeBackgroundTask:
             # 1. Validate payload
             next_payload = job.next_payload
             file_url = next_payload.get("file_url") if next_payload else None
+            event_id: int | None = (
+                next_payload.get("event_id", None) if next_payload else None
+            )
+            exiting_event = False
+
+            if event_id:
+                exiting_event = bool(
+                    (
+                        await session.exec(select(Events).where(Events.id == event_id))
+                    ).first()
+                )
 
             if not next_payload or not file_url:
                 job.status = JobStatus.FAILED
@@ -237,6 +258,16 @@ class EmployeeBackgroundTask:
                                 else:
                                     session.add(emp)
                                 await session.flush()
+
+                                # Upsert liên kết event-employee nếu event_id hợp lệ
+                                if exiting_event and event_id and emp.id:
+                                    event_emp = EventsEmployees(
+                                        event_id=event_id,
+                                        employee_id=emp.id,
+                                    )
+                                    await session.merge(event_emp)
+                                    await session.flush()
+
                                 successful_rows_count += 1
                         except Exception as db_err:
                             batch_errors.append(
