@@ -117,10 +117,6 @@ body {
     opacity: 1;
 }
 
-.prof-hidden-input {
-    display: none;
-}
-
 .prof-avatar-hint p {
     margin: 0 0 8px;
     font-size: 12px;

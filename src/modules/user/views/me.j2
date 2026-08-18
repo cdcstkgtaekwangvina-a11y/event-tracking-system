@@ -9,7 +9,7 @@
         "role": user.role or "",
         "avatar_url": user.file_url or user.avatar_url or "",
         "is_super_admin": is_super_admin,
-    } | tojson | forceescape }})'>
+    } | tojson | forceescape }})' @avatar-media-selected.window="avatarUrl = $event.detail.url">
     <div class="prof-topbar">
         <a href="/admin" class="prof-back-link">
             <span class="material-symbols-outlined">arrow_back</span>
@@ -24,20 +24,17 @@
             <h2 class="prof-card-title">Thông tin cá nhân</h2>
 
             <div class="prof-avatar-row">
-                <div class="prof-avatar-wrapper">
+                <div class="prof-avatar-wrapper" @click="window.avatarLibraryPicker?.open()">
                     <img x-show="avatarUrl" :src="avatarUrl" class="prof-avatar-img" alt="avatar">
                     <span x-show="!avatarUrl" class="material-symbols-outlined prof-avatar-placeholder">account_circle</span>
-                    <div class="prof-avatar-overlay" @click="$refs.avatarInput.click()">
-                        <span x-show="avatarLoading" class="prof-spinner"></span>
-                        <span x-show="!avatarLoading" class="material-symbols-outlined">photo_camera</span>
+                    <div class="prof-avatar-overlay">
+                        <span class="material-symbols-outlined">photo_library</span>
                     </div>
                 </div>
-                <input type="file" x-ref="avatarInput" accept="image/png,image/jpeg,image/jpg" class="prof-hidden-input"
-                    @change="onAvatarSelected($event)">
                 <div class="prof-avatar-hint">
-                    <p>Ảnh đại diện (PNG, JPG, JPEG, tối đa 5MB)</p>
-                    <button type="button" class="prof-btn prof-btn-secondary" :disabled="avatarLoading"
-                        @click="$refs.avatarInput.click()">Đổi ảnh đại diện</button>
+                    <p>Ảnh đại diện được chọn từ thư viện Media</p>
+                    <button type="button" class="prof-btn prof-btn-secondary"
+                        @click="window.avatarLibraryPicker?.open()">Chọn từ thư viện</button>
                 </div>
             </div>
 
@@ -116,13 +113,181 @@
 </div>
 
 <link rel="stylesheet" href="/static/css/profile.css">
+<link rel="stylesheet" href="/static/css/media_picker.css">
+
+<!-- Chọn ảnh đại diện có sẵn từ thư viện Media -->
+<div class="media-picker-modal" x-data="avatarLibraryPicker()" x-show="isOpen" x-cloak
+    @keydown.escape.window="isOpen && close()">
+    <div class="media-picker-backdrop" @click="close()"></div>
+    <div class="media-picker-dialog media-picker-dialog--sm" @click.stop>
+        <div class="media-picker-header">
+            <div>
+                <h3>Chọn ảnh đại diện</h3>
+                <p x-text="folderId ? 'Đang xem thư mục con' : 'Chọn một ảnh có sẵn trong thư viện'"></p>
+            </div>
+            <div class="media-picker-header-actions">
+                <button type="button" class="media-picker-nav-btn" @click="goBack()"
+                    :disabled="loading || !folderStack.length">Quay lại</button>
+                <button type="button" class="media-picker-nav-btn" @click="goRoot()"
+                    :disabled="loading">Trang đầu</button>
+                <button type="button" class="media-picker-close-btn" @click="close()">×</button>
+            </div>
+        </div>
+        <div class="media-picker-toolbar">
+            <div class="media-picker-search">
+                <span class="material-symbols-outlined">search</span>
+                <input type="text" placeholder="Tìm ảnh..." x-model="search" @keydown.enter.prevent="load(folderId)">
+            </div>
+        </div>
+        <div class="media-picker-body">
+            <div class="media-picker-main">
+                <div class="media-picker-status" x-show="loading">
+                    <div class="spinner-sm"></div>
+                    <span>Đang tải...</span>
+                </div>
+                <div class="media-body media-picker-items" id="avatar-picker-items"></div>
+            </div>
+            <aside class="media-picker-sidebar">
+                <template x-if="selected">
+                    <div class="media-picker-detail">
+                        <div class="media-picker-preview">
+                            <img :src="selected.url" :alt="selected.name">
+                        </div>
+                        <div class="media-picker-fields">
+                            <div class="media-picker-field">
+                                <span class="label">Tên</span>
+                                <span class="value" x-text="selected.name"></span>
+                            </div>
+                        </div>
+                        <div class="media-picker-actions">
+                            <button type="button" class="media-picker-primary" :disabled="saving"
+                                @click="confirm()">
+                                <span x-text="saving ? 'Đang lưu...' : 'Dùng ảnh này'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="!selected">
+                    <div class="media-picker-empty">
+                        <span class="material-symbols-outlined">photo_library</span>
+                        <p>Chọn một ảnh để xem trước ở đây.</p>
+                    </div>
+                </template>
+            </aside>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener('alpine:init', () => {
+        Alpine.data('avatarLibraryPicker', () => ({
+            isOpen: false,
+            loading: false,
+            saving: false,
+            folderId: '',
+            folderStack: [],
+            selected: null,
+            search: '',
+            viewMode: 'grid',
+            init() {
+                window.avatarLibraryPicker = this;
+            },
+            async load(folderId = '', pushHistory = false) {
+                const container = document.getElementById('avatar-picker-items');
+                if (!container) return;
+                if (pushHistory && this.folderId) this.folderStack.push(this.folderId);
+
+                this.loading = true;
+                this.folderId = folderId || '';
+                this.selected = null;
+
+                const params = new URLSearchParams();
+                params.set('picker', 'true');
+                params.set('type_filter', 'image');
+                params.set('limit', '60');
+                if (this.folderId) params.set('folder_id', this.folderId);
+                if (this.search) params.set('search', this.search);
+
+                const url = "{{ url_for('media_manager') }}/items/html?" + params.toString();
+                container.innerHTML = '<div class="media-loading"><div class="spinner-sm"></div><span>Đang tải dữ liệu...</span></div>';
+                try {
+                    await htmx.ajax('GET', url, { target: '#avatar-picker-items', swap: 'innerHTML' });
+                } finally {
+                    this.loading = false;
+                    this.syncSelectionClasses();
+                }
+            },
+            syncSelectionClasses() {
+                const container = document.getElementById('avatar-picker-items');
+                if (!container) return;
+                const selectedId = this.selected?.id;
+                container.querySelectorAll('.media-row, .media-grid-card').forEach((el) => {
+                    el.classList.toggle('selected', !!selectedId && parseInt(el.dataset.id) === selectedId);
+                });
+            },
+            open() {
+                window.activeMediaPicker = this;
+                this.isOpen = true;
+                this.folderId = '';
+                this.folderStack = [];
+                this.selected = null;
+                this.search = '';
+                this.load('');
+            },
+            close() {
+                this.isOpen = false;
+            },
+            goRoot() {
+                this.folderStack = [];
+                this.load('');
+            },
+            goBack() {
+                const previousFolderId = this.folderStack.pop();
+                this.load(previousFolderId || '');
+            },
+            handleItemClick(event) {
+                const itemEl = event.currentTarget.closest('.media-row, .media-grid-card');
+                if (!itemEl) return;
+
+                const kind = itemEl.dataset.mediaKind || itemEl.dataset.type || 'file';
+                if (kind === 'folder') {
+                    this.load(itemEl.dataset.id, true);
+                    return;
+                }
+
+                this.selected = {
+                    id: parseInt(itemEl.dataset.id),
+                    name: itemEl.dataset.mediaName || '',
+                    url: itemEl.dataset.mediaUrl || '',
+                };
+                this.syncSelectionClasses();
+            },
+            async confirm() {
+                if (!this.selected || this.saving) return;
+                this.saving = true;
+                try {
+                    const res = await window.fetchHelper.put('User/profile/avatar/media', { media_id: this.selected.id });
+                    if (res.status_code === 200) {
+                        window.notify?.toast?.success?.('Thành công', res.message || 'Cập nhật ảnh đại diện thành công');
+                        window.dispatchEvent(new CustomEvent('avatar-media-selected', {
+                            detail: { url: res.data.file_url || res.data.avatar_url }
+                        }));
+                        this.close();
+                    } else {
+                        window.notify?.toast?.error?.('Lỗi', res.message || 'Cập nhật ảnh đại diện thất bại');
+                    }
+                } catch (e) {
+                    window.notify?.toast?.error?.('Lỗi', 'Có lỗi xảy ra khi chọn ảnh');
+                } finally {
+                    this.saving = false;
+                }
+            },
+        }));
+
         Alpine.data('profilePage', (initial) => ({
             role: initial.role,
             isSuperAdmin: initial.is_super_admin,
             avatarUrl: initial.avatar_url,
-            avatarLoading: false,
             savingProfile: false,
             changingPassword: false,
             form: {
@@ -144,42 +309,6 @@
             roleLabel(role) {
                 const labels = { 'SUPPER_ADMIN': 'Super Admin', 'ADMIN': 'Admin', 'COMMON': 'Nhân viên' };
                 return labels[role] || role || '—';
-            },
-            onAvatarSelected(event) {
-                const file = event.target.files && event.target.files[0];
-                event.target.value = '';
-                if (!file) return;
-
-                const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
-                if (!allowedTypes.includes(file.type)) {
-                    window.notify?.toast?.error?.('Lỗi', 'Chỉ chấp nhận file ảnh định dạng PNG hoặc JPG/JPEG');
-                    return;
-                }
-                if (file.size > 5 * 1024 * 1024) {
-                    window.notify?.toast?.error?.('Lỗi', 'Kích thước ảnh đại diện không được vượt quá 5MB');
-                    return;
-                }
-
-                this.uploadAvatar(file);
-            },
-            async uploadAvatar(file) {
-                if (this.avatarLoading) return;
-                this.avatarLoading = true;
-                try {
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    const res = await window.fetchHelper.post('User/profile/avatar', formData);
-                    if (res.status_code === 200) {
-                        this.avatarUrl = res.data.file_url || res.data.avatar_url;
-                        window.notify?.toast?.success?.('Thành công', 'Cập nhật ảnh đại diện thành công');
-                    } else {
-                        window.notify?.toast?.error?.('Lỗi', res.message || 'Cập nhật ảnh đại diện thất bại');
-                    }
-                } catch (e) {
-                    window.notify?.toast?.error?.('Lỗi', 'Có lỗi xảy ra khi tải ảnh lên');
-                } finally {
-                    this.avatarLoading = false;
-                }
             },
             async saveProfile() {
                 if (this.savingProfile) return;

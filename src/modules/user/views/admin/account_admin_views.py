@@ -1,7 +1,7 @@
 from fastapi import Depends
 
-from src.modules.account.account_services import AccountServices
 from src.modules.user.role_constants import ROLE
+from src.modules.user.user_services import UserServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth
@@ -13,12 +13,12 @@ router = BaseRouter(
     tags=[TAG_NAME],
     dependencies=[Depends(RequireAuth(roles=[ROLE.ADMIN]))],
 )
-base_path = "modules/account/views/admin/"
+base_path = "modules/user/views/admin/"
 
 
 @clean_cbv(router)
 class AccountAdminViews:
-    def __init__(self, service: AccountServices = Depends()):
+    def __init__(self, service: UserServices = Depends()):
         self.service = service
 
     @router.get(name="accounts")
