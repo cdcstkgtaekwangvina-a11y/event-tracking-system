@@ -31,7 +31,7 @@
                     data-media-size="{{ item.media_metadata.sizes if item.media_metadata and item.media_metadata.sizes else '' }}"
                     {% if picker_mode %}
                     :class="{ 'selected': mediaPicker.selected && mediaPicker.selected.id === {{ item.id }} }"
-                    @click="window.editorMediaPicker?.handleItemClick($event)" {% else %}
+                    @click="window.activeMediaPicker?.handleItemClick($event)" {% else %}
                     :class="{ 'selected': $store.mediaSelection.isSelected({{ item.id }}) }" draggable="true" {% if not
                     item.is_folder %}
                     @dblclick="window.mediaActions?.forceDownload('{{ item.url }}', '{{ item.name }}')" {% endif %}
@@ -160,7 +160,7 @@
                 data-media-size="{{ item.media_metadata.sizes if item.media_metadata and item.media_metadata.sizes else '' }}"
                 {% if picker_mode %}
                 :class="{ 'selected': mediaPicker.selected && mediaPicker.selected.id === {{ item.id }} }"
-                @click="window.editorMediaPicker?.handleItemClick($event)" {% else %}
+                @click="window.activeMediaPicker?.handleItemClick($event)" {% else %}
                 :class="{ 'selected': $store.mediaSelection.isSelected({{ item.id }}) }" {% if not deleted_media %}
                 draggable="true" {% if not item.is_folder %}
                 @dblclick="window.mediaActions?.forceDownload('{{ item.url }}', '{{ item.name }}')" {% endif %}

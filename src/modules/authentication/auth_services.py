@@ -92,7 +92,7 @@ class AuthenticationServices:
 
         res = BaseResponse.no_content(message="Đăng nhập thành công")
         token_data = self.__create_token(
-            {"id": str(user.id), "role": user.role, "version": user.token_version}
+            {"id": str(user.id), "role": user.role, "token_version": user.token_version}
         )
 
         res.set_cookie(

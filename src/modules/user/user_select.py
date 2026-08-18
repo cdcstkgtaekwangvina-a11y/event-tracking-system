@@ -25,3 +25,16 @@ class UserSelect(BaseSchema):
     file_id: int | None = None
     file_url: str | None = None
     token_version: int = 0
+
+
+class AccountSelect(BaseSchema):
+    """Projection used by the admin account-management list/edit screens
+    (`/admin/account`) — no password/hash exposed."""
+
+    id: UUID
+    name: str
+    username: str
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
