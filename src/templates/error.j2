@@ -1,16 +1,182 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "templates/index.j2" %}
+{% block title %}Đã xảy ra lỗi{% endblock %}
+{%block body %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/svg+xml" sizes="any" href="../static/assets/error.svg" />
-    <title>Lỗi</title>
-</head>
+<div class="error-page-container">
+    <div class="error-content">
+        <div class="warning-icon-wrapper">
+            <div class="warning-icon-inner">
+                <span class="material-symbols-outlined">warning</span>
+            </div>
+        </div>
+        
+        <h1 class="error-title">Đã xảy ra lỗi</h1>
+        <p class="error-description">
+            Ứng dụng gặp sự cố không mong muốn.<br>Vui lòng thử lại hoặc quay về trang chủ.
+        </p>
+        
+        <div class="error-actions">
+            <a class="btn btn-primary" href="{{ url_for('home') }}">
+                <span class="material-symbols-outlined">home</span>
+                Về trang chủ
+            </a>
+            <button class="btn btn-outline" onclick="window.location.reload()">
+                <span class="material-symbols-outlined">refresh</span>
+                Thử lại
+            </button>
+        </div>
+    </div>
+</div>
 
-<body>
-    <h1>Hiện trang đang bị lỗi</h1>
-    <a href="/">về trang chủ</a>
-</body>
+<style>
+    .error-page-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: calc(100vh - 160px); /* Account for header and footer */
+        padding: 2rem;
+        background-color: var(--background);
+    }
 
-</html>
+    .error-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        max-width: 600px;
+    }
+
+    .warning-icon-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        border: 2px solid rgba(239, 68, 68, 0.2); /* Red-200 border */
+        margin-bottom: 24px;
+        animation: pulse-warning 2s infinite ease-out;
+    }
+
+    @keyframes pulse-warning {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+        70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .warning-icon-inner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background-color: rgba(254, 226, 226, 0.8); /* Red-50 bg */
+    }
+
+    .warning-icon-inner .material-symbols-outlined {
+        font-size: 36px;
+        color: #ef4444; /* Red-500 */
+    }
+
+    .error-title {
+        font-size: 24px;
+        font-weight: 700;
+        margin: 0 0 10px;
+        color: var(--foreground);
+    }
+
+    .error-description {
+        font-size: 15px;
+        color: var(--text-secondary, #64748b);
+        line-height: 1.6;
+        margin: 0 0 32px;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+    }
+
+    .btn .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    .btn-primary {
+        background-color: var(--foreground, #0f172a);
+        color: var(--background, #ffffff);
+        border: 1px solid var(--foreground, #0f172a);
+    }
+
+    .btn-primary:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
+
+    .btn-outline {
+        background-color: transparent;
+        color: var(--foreground, #334155);
+        border: 1px solid var(--border, #e2e8f0);
+    }
+
+    .btn-outline:hover {
+        background-color: var(--accent, #f1f5f9);
+    }
+
+    @media (max-width: 640px) {
+        .warning-icon-wrapper {
+            width: 80px;
+            height: 80px;
+        }
+        .warning-icon-inner {
+            width: 56px;
+            height: 56px;
+        }
+        .warning-icon-inner .material-symbols-outlined {
+            font-size: 28px;
+        }
+        .error-title {
+            font-size: 20px;
+        }
+        .error-description {
+            font-size: 14px;
+        }
+        .error-actions {
+            flex-direction: column-reverse;
+            width: 100%;
+            align-items: stretch;
+            gap: 12px;
+        }
+        .btn {
+            width: 100%;
+            margin: 0;
+        }
+    }
+
+    /* Dark mode overrides */
+    :root[data-theme="dark"] .warning-icon-wrapper {
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+    :root[data-theme="dark"] .warning-icon-inner {
+        background-color: rgba(239, 68, 68, 0.15);
+    }
+</style>
+{% endblock %}

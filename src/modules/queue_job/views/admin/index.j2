@@ -2,7 +2,154 @@
 {% block admin_title %}Quản lý Queue Jobs{% endblock %}
 
 {% block admin_body %}
-<div class="qj-container">
+<script>
+(function() {
+    window.mapJob = {
+        "bulk_upsert_employees_task": "Import khách mời",
+    };
+    window.reverseMapJob = Object.fromEntries(
+        Object.entries(window.mapJob).map(([k, v]) => [v.toLowerCase(), k])
+    );
+
+    function registerQueueJobsApp() {
+        if (!window.Alpine) return;
+
+        Alpine.data('queueJobsApp', () => ({
+            jobs: [],
+            total: 0,
+            page: 1,
+            limit: 10,
+            currentStatus: '{{ status_filter or "all" }}',
+            searchQuery: '{{ search or "" }}',
+            sortField: 'created_at',
+            isDesc: true,
+            loading: false,
+            timer: null,
+
+            async initData() {
+                await this.fetchJobs();
+                if (this.timer) clearInterval(this.timer);
+                this.timer = setInterval(() => {
+                    this.fetchJobs(this.page, true);
+                }, 5000);
+            },
+
+            async fetchJobs(newPage = 1, isBackground = false) {
+                if (!isBackground) this.loading = true;
+                this.page = newPage;
+                try {
+                    while (!window.fetchHelper) {
+                        await new Promise(r => setTimeout(r, 50));
+                    }
+
+                    const params = {
+                        page: this.page,
+                        limit: this.limit,
+                        sort_field: this.sortField,
+                        is_desc: this.isDesc
+                    };
+                    if (this.currentStatus && this.currentStatus !== 'all') {
+                        params.status = this.currentStatus;
+                    }
+                    if (this.searchQuery && this.searchQuery.trim()) {
+                        params.search = this.resolveSearch(this.searchQuery.trim());
+                    }
+
+                    const res = await window.fetchHelper.get('queue-jobs', params);
+                    if (res && res.status_code === 200 && res.data) {
+                        this.jobs = res.data.data || [];
+                        this.total = res.data.total_items || res.data.total || 0;
+                    } else if (res && res.data) {
+                        this.jobs = res.data.data || res.data || [];
+                        this.total = res.total_items || res.total || this.jobs.length;
+                    } else if (Array.isArray(res)) {
+                        this.jobs = res;
+                        this.total = res.length;
+                    }
+                } catch (e) {
+                    console.error("Lỗi khi gọi API Queue Jobs:", e);
+                } finally {
+                    if (!isBackground) this.loading = false;
+                }
+            },
+
+            setStatus(status) {
+                this.currentStatus = status;
+                this.fetchJobs(1);
+            },
+
+            getJobTypeLabel(type) {
+                if (!type) return '—';
+                const map = window.mapJob || {};
+                return map[type] || type;
+            },
+
+            resolveSearch(query) {
+                const rmap = window.reverseMapJob || {};
+                const lowerQuery = query.toLowerCase();
+                for (const [label, dbKey] of Object.entries(rmap)) {
+                    if (label.includes(lowerQuery) || lowerQuery.includes(label)) {
+                        return dbKey;
+                    }
+                }
+                return query;
+            },
+
+            toggleSort(field) {
+                if (this.sortField === field) {
+                    this.isDesc = !this.isDesc;
+                } else {
+                    this.sortField = field;
+                    this.isDesc = true;
+                }
+                this.fetchJobs(1);
+            },
+
+            sortIcon(field) {
+                if (this.sortField !== field) return 'unfold_more';
+                return this.isDesc ? 'arrow_downward' : 'arrow_upward';
+            },
+
+            isSortActive(field) {
+                return this.sortField === field;
+            },
+
+            formatDate(dateStr) {
+                if (!dateStr) return '—';
+                try {
+                    const d = new Date(dateStr);
+                    if (isNaN(d.getTime())) return String(dateStr);
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = d.getFullYear();
+                    const hours = String(d.getHours()).padStart(2, '0');
+                    const minutes = String(d.getMinutes()).padStart(2, '0');
+                    const seconds = String(d.getSeconds()).padStart(2, '0');
+                    return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+                } catch (e) {
+                    return String(dateStr);
+                }
+            },
+
+            showDetail(job) {
+                window.queueJobDetailModal?.open(job);
+            },
+
+            destroy() {
+                if (this.timer) clearInterval(this.timer);
+            }
+        }));
+    }
+
+    if (window.Alpine) {
+        registerQueueJobsApp();
+    } else {
+        document.addEventListener('alpine:init', registerQueueJobsApp);
+    }
+})();
+</script>
+
+<div class="qj-container" x-data="queueJobsApp()" x-init="initData()">
     <!-- Header -->
     <div class="qj-header">
         <div>
@@ -10,74 +157,44 @@
             <p class="qj-sub">Theo dõi các tiến trình xử lý ngầm (Import nhân viên, xử lý hàng loạt...)</p>
         </div>
         <div class="qj-header-actions">
-            <button type="button" class="qj-btn qj-btn-secondary" 
-                    hx-get="{{ url_for('queue_jobs_table') }}" 
-                    hx-target="#qj-table-container" 
-                    hx-swap="innerHTML">
-                <span class="material-symbols-outlined">refresh</span>
+            <button type="button" class="qj-btn qj-btn-secondary" @click="fetchJobs(1)" :disabled="loading">
+                <span class="material-symbols-outlined" :class="{ 'qj-spin': loading }">refresh</span>
                 Làm mới
             </button>
         </div>
     </div>
 
     <!-- Filters & Search Bar -->
-    <div class="qj-toolbar" x-data="{ currentStatus: '{{ status_filter }}' }">
+    <div class="qj-toolbar">
         <div class="qj-status-tabs">
-            <button type="button" 
-                    class="qj-status-tab" 
-                    :class="{ 'qj-status-tab--active': currentStatus === 'all' }"
-                    @click="currentStatus = 'all'"
-                    hx-get="{{ url_for('queue_jobs_table') }}?status=all"
-                    hx-target="#qj-table-container"
-                    hx-swap="innerHTML">
+            <button type="button" class="qj-status-tab" :class="{ 'qj-status-tab--active': currentStatus === 'all' }"
+                @click="setStatus('all')">
                 Tất cả
             </button>
-            <button type="button" 
-                    class="qj-status-tab" 
-                    :class="{ 'qj-status-tab--active': currentStatus === 'running' }"
-                    @click="currentStatus = 'running'"
-                    hx-get="{{ url_for('queue_jobs_table') }}?status=running"
-                    hx-target="#qj-table-container"
-                    hx-swap="innerHTML">
+            <button type="button" class="qj-status-tab"
+                :class="{ 'qj-status-tab--active': currentStatus === 'running' }" @click="setStatus('running')">
                 Đang chạy
             </button>
-            <button type="button" 
-                    class="qj-status-tab" 
-                    :class="{ 'qj-status-tab--active': currentStatus === 'success' }"
-                    @click="currentStatus = 'success'"
-                    hx-get="{{ url_for('queue_jobs_table') }}?status=success"
-                    hx-target="#qj-table-container"
-                    hx-swap="innerHTML">
+            <button type="button" class="qj-status-tab"
+                :class="{ 'qj-status-tab--active': currentStatus === 'success' }" @click="setStatus('success')">
                 Thành công
             </button>
-            <button type="button" 
-                    class="qj-status-tab" 
-                    :class="{ 'qj-status-tab--active': currentStatus === 'failed' }"
-                    @click="currentStatus = 'failed'"
-                    hx-get="{{ url_for('queue_jobs_table') }}?status=failed"
-                    hx-target="#qj-table-container"
-                    hx-swap="innerHTML">
+            <button type="button" class="qj-status-tab" :class="{ 'qj-status-tab--active': currentStatus === 'failed' }"
+                @click="setStatus('failed')">
                 Thất bại
             </button>
         </div>
 
         <div class="qj-search-box">
             <span class="material-symbols-outlined qj-search-icon">search</span>
-            <input type="text"
-                   class="qj-search-input"
-                   placeholder="Tìm theo ID..."
-                   value="{{ search }}"
-                   hx-get="{{ url_for('queue_jobs_table') }}"
-                   hx-trigger="keyup[key=='Enter']"
-                   hx-target="#qj-table-container"
-                   hx-swap="innerHTML"
-                   name="search" />
+            <input type="text" class="qj-search-input" placeholder="Tìm kiếm công việc (nhập từ khóa)..."
+                x-model="searchQuery" @keydown.enter="fetchJobs(1)" />
         </div>
     </div>
 
     <!-- Table Container -->
     <div class="qj-table-wrapper">
-        <div id="qj-table-container" hx-get="{{ url_for('queue_jobs_table') }}" hx-trigger="every 10s" hx-swap="innerHTML">
+        <div id="qj-table-container">
             {% include "modules/queue_job/views/admin/queue_job_table.j2" %}
         </div>
     </div>
@@ -86,5 +203,4 @@
 {% include "modules/queue_job/views/admin/queue_job_detail_modal.j2" %}
 
 <link rel="stylesheet" href="/static/css/queue_jobs.css">
-
 {% endblock %}

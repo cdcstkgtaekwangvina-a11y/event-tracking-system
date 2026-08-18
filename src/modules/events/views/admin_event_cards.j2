@@ -1,6 +1,8 @@
 {% if events %}
 <div class="admin-events-grid">
+    {% set gradients = ['purple-blue', 'pink-red', 'green-teal', 'blue-dark', 'purple-pink', 'green-forest'] %}
     {% for event in events %}
+        {% set grad_class = gradients[loop.index0 % 6] %}
         {# Calculate status based on now #}
         {% if event.start_at and event.end_at %}
             {% if now < event.start_at %}
@@ -19,8 +21,24 @@
         {% endif %}
 
         <div class="admin-event-card">
+            {#
+            === ĐOẠN CODE CŨ (không có ảnh thì bỏ trống hẳn khối ảnh -> comment lại để giữ tham khảo):
+            === LỖI: card không có ảnh bị thấp hơn card có ảnh; CSS Grid mặc định kéo dãn các card cùng dòng
+            === bằng chiều cao nhau (theo card cao nhất), nên card không ảnh bị dư khoảng trắng lớn, không
+            === đồng nhất giao diện giữa các card trong cùng 1 dòng.
             {% if event.url_image %}
             <div class="admin-card-image" style="height: 160px; background: url('{{ event.url_image }}') no-repeat center center/cover; margin: -24px -24px 0 -24px; border-radius: 11px 11px 0 0;"></div>
+            {% endif %}
+            =======================================================================================
+            #}
+            <!-- Card ảnh: giữ nguyên chiều cao đồng nhất bằng khối gradient + icon thay thế khi không có ảnh
+                 (giống cách card bên trang home xử lý) -->
+            {% if event.url_image %}
+            <div class="admin-card-image" style="height: 160px; background: url('{{ event.url_image }}') no-repeat center center/cover; margin: -24px -24px 0 -24px; border-radius: 11px 11px 0 0;"></div>
+            {% else %}
+            <div class="admin-card-image admin-card-image-placeholder {{ grad_class }}" style="margin: -24px -24px 0 -24px; border-radius: 11px 11px 0 0;">
+                <span class="material-symbols-outlined">calendar_today</span>
+            </div>
             {% endif %}
             <!-- Card Header: Title & Status -->
             <div class="admin-card-header">
@@ -28,7 +46,8 @@
                 <span class="status-badge {{ status_class }}">{{ status_text }}</span>
             </div>
 
-            <!-- Card Body: Details -->
+            {#
+            === ĐOẠN CODE CŨ (Ngày/Giờ/Địa điểm hiển thị thành 3 dòng riêng biệt, comment lại để giữ tham khảo) ===
             <div class="admin-card-body">
                 <div class="admin-info-item">
                     <span class="material-symbols-outlined">calendar_today</span>
@@ -47,12 +66,86 @@
                     <span>{{ event.employee_count or 0 }} người tham gia</span>
                 </div>
             </div>
+            =======================================================================================
+            #}
+            {#
+            === ĐOẠN CODE CŨ (Ngày/Giờ/Địa điểm gộp 1 dòng nhưng vẫn là 1 admin-info-item riêng, chưa nằm
+            === trong khối Mô tả -> comment lại để giữ tham khảo) ===
+            <div class="admin-card-body">
+                <div class="admin-info-item admin-meta-line">
+                    <span class="material-symbols-outlined">calendar_today</span>
+                    <span>
+                        {{ event.start_at.strftime('%d/%m/%Y') if event.start_at else 'Chưa xác định' }}
+                        {% if event.start_at %}· {{ event.start_at.strftime('%H:%M') }}{% endif %}
+                        {% if event.location %}· {{ event.location }}{% endif %}
+                    </span>
+                </div>
+                <div class="admin-info-item">
+                    <span class="material-symbols-outlined">group</span>
+                    <span>{{ event.employee_count or 0 }} người tham gia</span>
+                </div>
+            </div>
+            =======================================================================================
+            #}
+            <!-- Card Body: Ngày/Giờ/Địa điểm nằm chung trong khối Mô tả (giống card bên home),
+                 "Người tham gia" giữ riêng -->
+            <div class="admin-card-body">
+                <div class="admin-desc-block">
+                    {#
+                    === ĐOẠN CODE CŨ (ngày/giờ/địa điểm dùng chung 1 icon lịch, không có icon riêng cho địa điểm) ===
+                    <p class="admin-meta-line">
+                        <span class="material-symbols-outlined">calendar_today</span>
+                        <span>
+                            {{ event.start_at.strftime('%d/%m/%Y') if event.start_at else 'Chưa xác định' }}
+                            {% if event.start_at %}· {{ event.start_at.strftime('%H:%M') }}{% endif %}
+                            {% if event.location %}· {{ event.location }}{% endif %}
+                        </span>
+                    </p>
+                    =======================================================================================
+                    #}
+                    <!-- Địa điểm có icon riêng (location_on) để dễ hình dung đâu là địa chỉ -->
+                    <p class="admin-meta-line">
+                        <span class="admin-meta-item">
+                            <span class="material-symbols-outlined">calendar_today</span>
+                            <span>
+                                {{ event.start_at.strftime('%d/%m/%Y') if event.start_at else 'Chưa xác định' }}
+                                {% if event.start_at %}· {{ event.start_at.strftime('%H:%M') }}{% endif %}
+                            </span>
+                        </span>
+                        {% if event.location %}
+                        <span class="admin-meta-item">
+                            <span class="material-symbols-outlined">location_on</span>
+                            <span>{{ event.location }}</span>
+                        </span>
+                        {% endif %}
+                    </p>
+                    {#
+                    === ĐOẠN CODE CŨ (kiểm tra rỗng trên chuỗi HTML gốc "event.description or ..." -> comment lại):
+                    === LỖI: TipTap lưu mô tả trống thành "<p></p>" (chuỗi không rỗng), nên "or 'Chưa có mô tả'"
+                    === không chạy, sau đó striptags xoá tag để lại chuỗi rỗng thật -> hiện dòng trống, không
+                    === phải chữ "Chưa có mô tả" như mong đợi.
+                    <p class="admin-event-desc" title="{{ (event.description or '') | striptags | forceescape }}">{{ (event.description or 'Chưa có mô tả') | striptags }}</p>
+                    =======================================================================================
+                    #}
+                    {% set admin_desc_text = (event.description or '') | striptags | trim %}
+                    <p class="admin-event-desc" title="{{ admin_desc_text | forceescape }}">{{ admin_desc_text or 'Chưa có mô tả' }}</p>
+                </div>
+                {#<div class="admin-info-item">
+                    <span class="material-symbols-outlined">group</span>
+                    <span>{{ event.employee_count or 0 }} người tham gia</span>
+                </div>#}
+            </div>
 
             <div class="admin-card-divider"></div>
 
             <!-- Card Footer: Action -->
             <div class="admin-card-footer">
-                <button type="button" class="btn-view-details" 
+                {#
+                === ĐOẠN CODE CŨ (build chuỗi JS bằng nháy đơn + filter "escape", comment lại để giữ tham khảo) ===
+                === LỖI: escape chỉ đổi ' thành &#39;, nhưng browser tự decode HTML-entity của attribute
+                === TRƯỚC khi Alpine đọc JS, nên &#39; lại thành ' thật -> đóng chuỗi JS sớm nếu name/description/
+                === location chứa dấu nháy đơn -> $dispatch lỗi cú pháp, "Xem chi tiết" không mở được modal. ===
+                <button type="button" class="btn-view-details"
                     @click="$dispatch('open-edit-modal', {
                         id: {{ event.id }},
                         name: '{{ event.name | escape }}',
@@ -62,6 +155,23 @@
                         location: '{{ (event.location or "") | escape }}',
                         url_image: '{{ (event.url_image or "") | escape }}',
                         url_map: '{{ (event.url_map or "") | escape }}'
+                    })">
+                    Xem chi tiết
+                </button>
+                =======================================================================================
+                #}
+                <!-- Dùng tojson | forceescape (giống event_cards.j2 bên home) để escape đúng cho mọi ký tự
+                     đặc biệt (', ", \, xuống dòng...) trong name/description/location, không bị vỡ cú pháp JS -->
+                <button type="button" class="btn-view-details"
+                    @click="$dispatch('open-edit-modal', {
+                        id: {{ event.id }},
+                        name: {{ event.name | tojson | forceescape }},
+                        description: {{ (event.description or '') | tojson | forceescape }},
+                        start_at: {{ (event.start_at.isoformat() if event.start_at else '') | tojson | forceescape }},
+                        end_at: {{ (event.end_at.isoformat() if event.end_at else '') | tojson | forceescape }},
+                        location: {{ (event.location or '') | tojson | forceescape }},
+                        url_image: {{ (event.url_image or '') | tojson | forceescape }},
+                        url_map: {{ (event.url_map or '') | tojson | forceescape }}
                     })">
                     Xem chi tiết
                 </button>

@@ -1,0 +1,284 @@
+/* ============================================
+   PROFILE PAGE - profile.css
+   Follows the design system in index.css
+   ============================================ */
+
+body {
+    background-color: var(--background);
+    color: var(--foreground);
+}
+
+.prof-container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 30px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.prof-topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.prof-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    transition: color 0.15s ease;
+}
+
+.prof-back-link:hover {
+    color: var(--foreground);
+}
+
+.prof-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--foreground);
+    margin: 0;
+}
+
+.prof-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.prof-card {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.prof-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--foreground);
+    margin: 0;
+}
+
+.prof-avatar-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.prof-avatar-wrapper {
+    position: relative;
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.prof-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.prof-avatar-placeholder {
+    font-size: 56px;
+    color: var(--text-secondary);
+}
+
+.prof-avatar-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.prof-avatar-wrapper:hover .prof-avatar-overlay {
+    opacity: 1;
+}
+
+.prof-avatar-hint p {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.prof-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.prof-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.prof-form-group--full {
+    grid-column: 1 / -1;
+}
+
+.prof-form-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.prof-required {
+    color: #ef4444;
+}
+
+.prof-tooltip-icon {
+    font-size: 15px;
+    cursor: help;
+}
+
+.prof-form-input {
+    height: 40px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-color: var(--background);
+    color: var(--foreground);
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    width: 100%;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.prof-form-input:focus {
+    border-color: var(--foreground);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="dark"] .prof-form-input:focus {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.07);
+}
+
+.prof-form-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.prof-form-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.prof-role-badge {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background-color: rgba(99, 102, 241, 0.12);
+    color: var(--primary);
+}
+
+.prof-card-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.prof-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.18s ease;
+}
+
+.prof-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.prof-btn-primary {
+    background-color: var(--primary);
+    color: var(--background);
+}
+
+.prof-btn-primary:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.prof-btn-secondary {
+    background-color: var(--card);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+}
+
+.prof-btn-secondary:hover:not(:disabled) {
+    background-color: var(--border);
+}
+
+.prof-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2.5px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: prof-spin 0.65s linear infinite;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+.prof-spinner-sm {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+}
+
+@keyframes prof-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 720px) {
+    .prof-container {
+        padding: 16px;
+    }
+
+    .prof-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .prof-form-row {
+        grid-template-columns: 1fr;
+    }
+}

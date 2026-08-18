@@ -5,14 +5,25 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" sizes="180x180" href="/static/assets/{% block logo %}app_logo.png{% endblock %}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="/static/css/index.css">
-  <link rel="preload" href="/fonts/MaterialSymbolsOutlined.woff2" as="font"
-    type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/css/index.css?v=20260812-1">
+  <link rel="preload" href="/fonts/MaterialSymbolsOutlined.woff2" as="font" type="font/woff2" crossorigin>
   <meta name="keywords" content="python, fastapi, jinja2, check-in, điểm danh, sự kiện">
   {% block meta %}
   <meta name="description" content="Trang web điểm danh build bằng fastapi và jinja2">
   {% endblock %}
   <title id="page-title">{% block title %}Event tracking system{% endblock %}</title>
+  <script>
+    // Universal patch for Alpine.js + HTMX compatibility
+    (function () {
+      const origAddEvt = document.addEventListener.bind(document);
+      document.addEventListener = function (type, listener, options) {
+        if (type === 'alpine:init' && window.Alpine) {
+          try { listener(); } catch (e) { console.error('Error in alpine:init listener during HTMX swap:', e); }
+        }
+        return origAddEvt(type, listener, options);
+      };
+    })();
+  </script>
   <script src="{{ url_for('static', path='js/vendors/htmx.min.js') }}"></script>
   <script src="{{ url_for('static', path='js/vendors/htmx.hx-ws.js') }}"></script>
   <script defer src="{{ url_for('static', path='js/vendors/alpine.min.js') }}"></script>
@@ -26,7 +37,7 @@
   import { fetchHelper } from "/static/js/fetch_helper.js"
   document.body.className = document.body.className + " " + currentTheme();
 
-  fetchHelper.baseUrl = "{{ base_url }}" + "/api";
+  fetchHelper.baseUrl = "/api";
   window.fetchHelper = fetchHelper;
 </script>
 <script src="/static/js/theme.js"></script>
@@ -71,6 +82,17 @@
           return this.selectedIds.length > 0;
         },
       });
+    }
+  });
+
+  // Re-process Alpine components after HTMX content swap
+  document.addEventListener('htmx:afterSettle', function (evt) {
+    if (window.Alpine && evt.detail && evt.detail.target) {
+      try {
+        window.Alpine.initTree(evt.detail.target);
+      } catch (e) {
+        console.error('Error re-initializing Alpine tree after HTMX swap:', e);
+      }
     }
   });
 </script>

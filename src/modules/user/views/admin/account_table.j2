@@ -1,0 +1,132 @@
+{% set sort = pagination.sort_field or '' %}
+{% set desc = pagination.is_desc %}
+{% set base_url = url_for('accounts') ~ '/table/html' %}
+
+{% macro qs(page=pagination.page, sf=sort, sd=desc) -%}
+{{ base_url }}?page={{ page }}&limit={{ pagination.limit }}&search={{ search }}&sort_field={{ sf }}&is_desc={{ sd | lower }}
+{%- endmacro %}
+
+{% macro sort_th(label, field, extra_class='') %}
+{% set is_active = (sort == field) %}
+{% set next_desc = 'false' if (is_active and desc) else 'true' %}
+<th class="acc-th acc-th-sort {{ extra_class }} {{ 'acc-th-sort--active' if is_active }}"
+    hx-get="{{ qs(page=1, sf=field, sd=next_desc) }}"
+    hx-target="#acc-table-container"
+    hx-swap="innerHTML"
+    title="Sắp xếp theo {{ label }}">
+    <span class="acc-th-label">{{ label }}</span>
+    {% if is_active %}
+    <span class="material-symbols-outlined acc-sort-icon">{{ 'arrow_downward' if desc else 'arrow_upward' }}</span>
+    {% else %}
+    <span class="material-symbols-outlined acc-sort-icon">unfold_more</span>
+    {% endif %}
+</th>
+{% endmacro %}
+
+<p style="padding: 12px 16px 0; margin: 0; color: var(--text-secondary); font-size: 13px;">
+    Hiển thị {{ accounts | length }} / {{ total }} tài khoản
+</p>
+
+{% if accounts %}
+<table class="acc-table">
+    <thead>
+        <tr>
+            {{ sort_th('Họ và tên', 'name') }}
+            {{ sort_th('Tên đăng nhập', 'username') }}
+            {{ sort_th('Email', 'email') }}
+            <th class="acc-th">Trạng thái</th>
+            {{ sort_th('Ngày tạo', 'created_at') }}
+            <th class="acc-th acc-th-action">Hành động</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for account in accounts %}
+        <tr class="acc-tr" id="acc-row-{{ account.id }}">
+            <td class="acc-td acc-td-name">{{ account.name }}</td>
+            <td class="acc-td acc-td-username">@{{ account.username }}</td>
+            <td class="acc-td">{{ account.email }}</td>
+            <td class="acc-td">
+                {% if account.is_active %}
+                <span class="acc-status acc-status-active">Hoạt động</span>
+                {% else %}
+                <span class="acc-status acc-status-blocked">Bị chặn</span>
+                {% endif %}
+            </td>
+            <td class="acc-td">{{ (account.created_at | string)[:10] if account.created_at else '—' }}</td>
+            <td class="acc-td acc-td-action">
+                {% if account.role == 'SUPPER_ADMIN' and not can_edit_email %}
+                <span class="acc-td-locked-hint" title="Chỉ Super Admin mới có quyền chỉnh sửa tài khoản Super Admin">
+                    <span class="material-symbols-outlined">lock</span>
+                </span>
+                {% else %}
+                <button type="button"
+                        class="acc-action-btn acc-action-edit"
+                        title="Chỉnh sửa"
+                        onclick='window.accountFormModal?.open({ mode: "edit", account: {{ (account.model_dump(mode="json") if account.model_dump is defined else account) | tojson | forceescape }} })'>
+                    <span class="material-symbols-outlined">edit</span>
+                </button>
+                <button type="button"
+                        class="acc-action-btn {{ 'acc-action-unblock' if not account.is_active else 'acc-action-block' }}"
+                        title="{{ 'Bỏ chặn' if not account.is_active else 'Chặn' }}"
+                        onclick='window.accountActions?.toggleActive("{{ account.id }}", {{ account.is_active | tojson }})'>
+                    <span class="material-symbols-outlined">{{ 'lock_open' if not account.is_active else 'block' }}</span>
+                </button>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if total > pagination.limit %}
+<div class="acc-pagination">
+    {% set total_pages = (total / pagination.limit) | round(0, 'ceil') | int %}
+    {% set current_page = pagination.page %}
+
+    <button class="acc-page-btn"
+            {% if current_page <= 1 %}disabled{% endif %}
+            hx-get="{{ qs(page=1) }}"
+            hx-target="#acc-table-container"
+            hx-swap="innerHTML"
+            title="Trang đầu">
+        <span class="material-symbols-outlined">first_page</span>
+    </button>
+
+    <button class="acc-page-btn"
+            {% if current_page <= 1 %}disabled{% endif %}
+            hx-get="{{ qs(page=current_page - 1) }}"
+            hx-target="#acc-table-container"
+            hx-swap="innerHTML"
+            title="Trang trước">
+        <span class="material-symbols-outlined">chevron_left</span>
+    </button>
+
+    <span class="acc-page-info">{{ current_page }} / {{ total_pages }}</span>
+
+    <button class="acc-page-btn"
+            {% if current_page >= total_pages %}disabled{% endif %}
+            hx-get="{{ qs(page=current_page + 1) }}"
+            hx-target="#acc-table-container"
+            hx-swap="innerHTML"
+            title="Trang sau">
+        <span class="material-symbols-outlined">chevron_right</span>
+    </button>
+
+    <button class="acc-page-btn"
+            {% if current_page >= total_pages %}disabled{% endif %}
+            hx-get="{{ qs(page=total_pages) }}"
+            hx-target="#acc-table-container"
+            hx-swap="innerHTML"
+            title="Trang cuối">
+        <span class="material-symbols-outlined">last_page</span>
+    </button>
+</div>
+{% endif %}
+
+{% else %}
+<div class="acc-empty">
+    <span class="material-symbols-outlined acc-empty-icon">group_off</span>
+    <p class="acc-empty-text">Chưa có tài khoản nào</p>
+    <p class="acc-empty-sub">Nhấn "+ Thêm tài khoản" để bắt đầu</p>
+</div>
+{% endif %}

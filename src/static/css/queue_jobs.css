@@ -106,6 +106,7 @@
 }
 
 .qj-status-tab:hover {
+    background-color: var(--border);
     color: var(--foreground);
 }
 
@@ -178,6 +179,25 @@
 
 .qj-th-sort:hover {
     color: var(--foreground);
+}
+
+.qj-th-sort--active {
+    color: var(--foreground);
+}
+
+.qj-th-label {
+    vertical-align: middle;
+}
+
+.qj-sort-icon {
+    font-size: 16px;
+    vertical-align: middle;
+    margin-left: 2px;
+    transition: opacity 0.15s ease;
+}
+
+.qj-sort-icon--idle {
+    opacity: 0.35;
 }
 
 .qj-tr {
@@ -490,4 +510,12 @@
     overflow: auto;
     white-space: pre-wrap;
     word-break: break-all;
+}
+
+.qj-spin {
+    animation: qjSpin 0.8s linear infinite;
+}
+
+@keyframes qjSpin {
+    to { transform: rotate(360deg); }
 }

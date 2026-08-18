@@ -6,14 +6,34 @@
      @click.self="close"
      x-data="{
         isOpen: false,
+        loading: false,
         job: null,
         activeTab: 'payload',
-        open(jobData) {
-            this.job = jobData;
+        async open(jobData) {
+            const jobId = typeof jobData === 'object' ? jobData.id : jobData;
+            this.job = typeof jobData === 'object' ? jobData : { id: jobId };
             this.activeTab = 'payload';
             this.isOpen = true;
+            this.loading = true;
+            
             const el = document.getElementById('qj-detail-modal-backdrop');
             if (el) el.style.display = 'flex';
+
+            try {
+                while (!window.fetchHelper) {
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                const res = await window.fetchHelper.get('queue-jobs/' + jobId);
+                if (res && res.status_code === 200 && res.data) {
+                    this.job = res.data;
+                } else if (res && res.data) {
+                    this.job = res.data;
+                }
+            } catch (e) {
+                console.error('Lỗi khi tải chi tiết Queue Job:', e);
+            } finally {
+                this.loading = false;
+            }
         },
         close() {
             this.isOpen = false;
@@ -35,37 +55,45 @@
             </button>
         </div>
 
+        <template x-if="loading && (!job || !job.next_payload)">
+            <div class="qj-modal-body" style="text-align: center; padding: 40px;">
+                <div style="width:36px;height:36px;border:3px solid rgba(7,163,158,0.2);border-top-color:#07A39E;border-radius:50%;animation:qjSpin 0.8s linear infinite;margin:0 auto 12px;"></div>
+                <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">Đang tải chi tiết công việc...</p>
+            </div>
+        </template>
+
         <template x-if="job">
             <div class="qj-modal-body">
-            <!-- Tabs -->
-            <div class="qj-tabs">
-                <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'payload' }" @click="activeTab = 'payload'">
-                    Payload
-                </button>
-                <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'logs' }" @click="activeTab = 'logs'">
-                    Logs & Errors
-                </button>
-                <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'meta' }" @click="activeTab = 'meta'">
-                    Metadata
-                </button>
-            </div>
+                <!-- Tabs -->
+                <div class="qj-tabs">
+                    <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'payload' }" @click="activeTab = 'payload'">
+                        Payload
+                    </button>
+                    <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'logs' }" @click="activeTab = 'logs'">
+                        Logs & Errors
+                    </button>
+                    <button type="button" class="qj-tab" :class="{ 'qj-tab--active': activeTab === 'meta' }" @click="activeTab = 'meta'">
+                        Metadata
+                    </button>
+                </div>
 
-            <!-- Tab Content: Payload -->
-            <div x-show="activeTab === 'payload'" class="qj-tab-content">
-                <label class="qj-label">Dữ liệu đầu vào (next_payload):</label>
-                <pre class="qj-code-block" x-text="JSON.stringify(job?.next_payload || {}, null, 2)"></pre>
-            </div>
+                <!-- Tab Content: Payload -->
+                <div x-show="activeTab === 'payload'" class="qj-tab-content">
+                    <label class="qj-label">Dữ liệu đầu vào (next_payload):</label>
+                    <pre class="qj-code-block" x-text="JSON.stringify(job?.next_payload || {}, null, 2)"></pre>
+                </div>
 
-            <!-- Tab Content: Logs -->
-            <div x-show="activeTab === 'logs'" class="qj-tab-content">
-                <label class="qj-label">Nhật ký xử lý (logs):</label>
-                <pre class="qj-code-block" x-text="JSON.stringify(job?.logs || {}, null, 2)"></pre>
-            </div>
+                <!-- Tab Content: Logs -->
+                <div x-show="activeTab === 'logs'" class="qj-tab-content">
+                    <label class="qj-label">Nhật ký xử lý (logs):</label>
+                    <pre class="qj-code-block" x-text="JSON.stringify(job?.logs || {}, null, 2)"></pre>
+                </div>
 
-            <!-- Tab Content: Meta -->
-            <div x-show="activeTab === 'meta'" class="qj-tab-content">
-                <label class="qj-label">Thông tin hệ thống (meta):</label>
-                <pre class="qj-code-block" x-text="JSON.stringify(job?.meta || {}, null, 2)"></pre>
+                <!-- Tab Content: Meta -->
+                <div x-show="activeTab === 'meta'" class="qj-tab-content">
+                    <label class="qj-label">Thông tin hệ thống (meta):</label>
+                    <pre class="qj-code-block" x-text="JSON.stringify(job?.meta || {}, null, 2)"></pre>
+                </div>
             </div>
         </template>
 
