@@ -1,0 +1,63 @@
+{% extends "templates/layouts/admin.j2" if not request.headers.get("hx-request") else
+"templates/layouts/admin_blank.j2"%}
+{% block admin_title %}Quản lý Tài khoản{% endblock %}
+{% block admin_body %}
+<div class="acc-container">
+    <!-- Header -->
+    <div class="acc-header">
+        <h1 class="acc-title">Quản lý Tài khoản</h1>
+        <div class="acc-header-actions">
+            <button type="button" class="acc-btn acc-btn-primary" id="btn-add-account"
+                onclick="window.accountFormModal?.open({ mode: 'create' })">
+                <span class="material-symbols-outlined">add</span>
+                Thêm tài khoản
+            </button>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="acc-search-wrapper">
+        <span class="material-symbols-outlined acc-search-icon">search</span>
+        <input type="text" class="acc-search-input" id="acc-search-input"
+            placeholder="Tìm theo tên, tên đăng nhập hoặc email... (Nhấn Enter để tìm)" autocomplete="off"
+            hx-get="{{ url_for('accounts_table') }}" hx-trigger="keyup[key=='Enter']" hx-target="#acc-table-container"
+            hx-swap="innerHTML" name="search" hx-include="#acc-search-input" />
+    </div>
+
+    <!-- Table Container -->
+    <div class="acc-table-wrapper">
+        <div id="acc-table-container">
+            {% include "modules/account/views/admin/account_table.j2" %}
+        </div>
+    </div>
+</div>
+
+{% include "modules/account/views/admin/modals/account_form_modal.j2" %}
+
+<link rel="stylesheet" href="/static/css/account.css">
+<script>
+    window.accountActions = {
+        async toggleActive(id, isActive) {
+            const actionLabel = isActive ? 'chặn' : 'bỏ chặn';
+            const approved = await window.notify.modal.confirm(
+                'Xác nhận',
+                `Bạn có chắc muốn ${actionLabel} tài khoản này?`
+            );
+            if (!approved) return;
+
+            const res = await window.fetchHelper.put('Account/' + id, { is_active: !isActive });
+            if (res.status_code === 200) {
+                window.notify?.toast?.success?.('Thành công', res.message || 'Cập nhật trạng thái thành công');
+                const tableUrl = new URL('{{ url_for("accounts_table") }}', window.location.origin);
+                const curParams = new URLSearchParams(window.location.search);
+                ['page', 'limit', 'search', 'sort_field', 'is_desc'].forEach(k => {
+                    if (curParams.has(k)) tableUrl.searchParams.set(k, curParams.get(k));
+                });
+                htmx.ajax('GET', tableUrl.toString(), { target: '#acc-table-container', swap: 'innerHTML' });
+            } else {
+                window.notify?.toast?.error?.('Lỗi', res.message || 'Cập nhật trạng thái thất bại');
+            }
+        }
+    };
+</script>
+{% endblock %}

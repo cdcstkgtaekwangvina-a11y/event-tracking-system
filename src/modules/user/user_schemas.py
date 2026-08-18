@@ -1,7 +1,43 @@
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import Field, field_validator, model_validator
+
 from src.shared.base.base_schema import BaseSchema
+from src.shared.validators.account_validators import (
+    validate_strong_password,
+    validate_username,
+)
+
+
+class UpdateProfileRequest(BaseSchema):
+    name: str | None = Field(default=None, max_length=300)
+    username: str | None = Field(default=None, max_length=350)
+    email: str | None = Field(default=None, max_length=300)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username_field(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return validate_username(v)
+
+
+class ChangePasswordRequest(BaseSchema):
+    current_password: str
+    new_password: str
+    confirm_new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        return validate_strong_password(v)
+
+    @model_validator(mode="after")
+    def validate_confirm_password(self) -> "ChangePasswordRequest":
+        if self.new_password != self.confirm_new_password:
+            raise ValueError("Xác nhận mật khẩu mới không khớp")
+        return self
 
 
 class UserSchema(BaseSchema):

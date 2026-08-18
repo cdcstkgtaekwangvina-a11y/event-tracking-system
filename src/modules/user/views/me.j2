@@ -1,6 +1,235 @@
 {% extends "templates/index.j2"%}
 
-{% block title %}{{ user.username if user.username else user.email }}{% endblock %}
+{% block title %}{{ user.username if user.username else user.email }} - Hồ sơ cá nhân{% endblock %}
 {% block body %}
-{{ user }}
+<div class="prof-container" x-data='profilePage({{ {
+        "name": user.name or "",
+        "username": user.username or "",
+        "email": user.email or "",
+        "role": user.role or "",
+        "avatar_url": user.file_url or user.avatar_url or "",
+        "is_super_admin": is_super_admin,
+    } | tojson | forceescape }})'>
+    <div class="prof-topbar">
+        <a href="/admin" class="prof-back-link">
+            <span class="material-symbols-outlined">arrow_back</span>
+            Quay lại
+        </a>
+        <h1 class="prof-title">Hồ sơ cá nhân</h1>
+    </div>
+
+    <div class="prof-grid">
+        <!-- Thông tin cá nhân -->
+        <div class="prof-card">
+            <h2 class="prof-card-title">Thông tin cá nhân</h2>
+
+            <div class="prof-avatar-row">
+                <div class="prof-avatar-wrapper">
+                    <img x-show="avatarUrl" :src="avatarUrl" class="prof-avatar-img" alt="avatar">
+                    <span x-show="!avatarUrl" class="material-symbols-outlined prof-avatar-placeholder">account_circle</span>
+                    <div class="prof-avatar-overlay" @click="$refs.avatarInput.click()">
+                        <span x-show="avatarLoading" class="prof-spinner"></span>
+                        <span x-show="!avatarLoading" class="material-symbols-outlined">photo_camera</span>
+                    </div>
+                </div>
+                <input type="file" x-ref="avatarInput" accept="image/png,image/jpeg,image/jpg" class="prof-hidden-input"
+                    @change="onAvatarSelected($event)">
+                <div class="prof-avatar-hint">
+                    <p>Ảnh đại diện (PNG, JPG, JPEG, tối đa 5MB)</p>
+                    <button type="button" class="prof-btn prof-btn-secondary" :disabled="avatarLoading"
+                        @click="$refs.avatarInput.click()">Đổi ảnh đại diện</button>
+                </div>
+            </div>
+
+            <div class="prof-form-row">
+                <div class="prof-form-group">
+                    <label class="prof-form-label">Họ và tên <span class="prof-required">*</span></label>
+                    <input type="text" class="prof-form-input" x-model="form.name" maxlength="300" autocomplete="off">
+                </div>
+                <div class="prof-form-group">
+                    <label class="prof-form-label">Tên đăng nhập <span class="prof-required">*</span></label>
+                    <input type="text" class="prof-form-input" x-model="form.username" maxlength="350" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="prof-form-row">
+                <div class="prof-form-group prof-form-group--full">
+                    <label class="prof-form-label">
+                        Email
+                        <span class="material-symbols-outlined prof-tooltip-icon" x-show="!isSuperAdmin"
+                            title="Liên hệ Super Admin để thay đổi Email">info</span>
+                    </label>
+                    <input type="email" class="prof-form-input" x-model="form.email" maxlength="300"
+                        autocomplete="off" :disabled="!isSuperAdmin"
+                        :title="!isSuperAdmin ? 'Liên hệ Super Admin để thay đổi Email' : ''">
+                </div>
+            </div>
+
+            <div class="prof-form-row">
+                <div class="prof-form-group">
+                    <label class="prof-form-label">Vai trò</label>
+                    <span class="prof-role-badge" x-text="roleLabel(role)">—</span>
+                </div>
+            </div>
+
+            <div class="prof-card-footer">
+                <button type="button" class="prof-btn prof-btn-primary" :disabled="savingProfile" @click="saveProfile">
+                    <span x-show="savingProfile" class="prof-spinner prof-spinner-sm"></span>
+                    <span x-text="savingProfile ? 'Đang lưu...' : 'Lưu thay đổi'">Lưu thay đổi</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Đổi mật khẩu -->
+        <div class="prof-card">
+            <h2 class="prof-card-title">Đổi mật khẩu</h2>
+
+            <div class="prof-form-row">
+                <div class="prof-form-group prof-form-group--full">
+                    <label class="prof-form-label">Mật khẩu hiện tại <span class="prof-required">*</span></label>
+                    <input type="password" class="prof-form-input" x-model="passwordForm.current_password"
+                        autocomplete="current-password">
+                </div>
+            </div>
+            <div class="prof-form-row">
+                <div class="prof-form-group">
+                    <label class="prof-form-label">Mật khẩu mới <span class="prof-required">*</span></label>
+                    <input type="password" class="prof-form-input" x-model="passwordForm.new_password"
+                        autocomplete="new-password">
+                </div>
+                <div class="prof-form-group">
+                    <label class="prof-form-label">Xác nhận mật khẩu mới <span class="prof-required">*</span></label>
+                    <input type="password" class="prof-form-input" x-model="passwordForm.confirm_new_password"
+                        autocomplete="new-password">
+                </div>
+            </div>
+            <p class="prof-form-hint">Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&amp;).</p>
+
+            <div class="prof-card-footer">
+                <button type="button" class="prof-btn prof-btn-primary" :disabled="changingPassword" @click="changePassword">
+                    <span x-show="changingPassword" class="prof-spinner prof-spinner-sm"></span>
+                    <span x-text="changingPassword ? 'Đang xử lý...' : 'Đổi mật khẩu'">Đổi mật khẩu</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="/static/css/profile.css">
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('profilePage', (initial) => ({
+            role: initial.role,
+            isSuperAdmin: initial.is_super_admin,
+            avatarUrl: initial.avatar_url,
+            avatarLoading: false,
+            savingProfile: false,
+            changingPassword: false,
+            form: {
+                name: initial.name,
+                username: initial.username,
+                email: initial.email,
+            },
+            passwordForm: {
+                current_password: '',
+                new_password: '',
+                confirm_new_password: '',
+            },
+            extractErrorMessage(res, fallback) {
+                if (Array.isArray(res)) {
+                    return res.map(e => e.msg || e.message).filter(Boolean).join('; ') || fallback;
+                }
+                return res?.message || fallback;
+            },
+            roleLabel(role) {
+                const labels = { 'SUPPER_ADMIN': 'Super Admin', 'ADMIN': 'Admin', 'COMMON': 'Nhân viên' };
+                return labels[role] || role || '—';
+            },
+            onAvatarSelected(event) {
+                const file = event.target.files && event.target.files[0];
+                event.target.value = '';
+                if (!file) return;
+
+                const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+                if (!allowedTypes.includes(file.type)) {
+                    window.notify?.toast?.error?.('Lỗi', 'Chỉ chấp nhận file ảnh định dạng PNG hoặc JPG/JPEG');
+                    return;
+                }
+                if (file.size > 5 * 1024 * 1024) {
+                    window.notify?.toast?.error?.('Lỗi', 'Kích thước ảnh đại diện không được vượt quá 5MB');
+                    return;
+                }
+
+                this.uploadAvatar(file);
+            },
+            async uploadAvatar(file) {
+                if (this.avatarLoading) return;
+                this.avatarLoading = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const res = await window.fetchHelper.post('User/profile/avatar', formData);
+                    if (res.status_code === 200) {
+                        this.avatarUrl = res.data.file_url || res.data.avatar_url;
+                        window.notify?.toast?.success?.('Thành công', 'Cập nhật ảnh đại diện thành công');
+                    } else {
+                        window.notify?.toast?.error?.('Lỗi', res.message || 'Cập nhật ảnh đại diện thất bại');
+                    }
+                } catch (e) {
+                    window.notify?.toast?.error?.('Lỗi', 'Có lỗi xảy ra khi tải ảnh lên');
+                } finally {
+                    this.avatarLoading = false;
+                }
+            },
+            async saveProfile() {
+                if (this.savingProfile) return;
+                if (!this.form.name?.trim() || !this.form.username?.trim()) {
+                    window.notify?.toast?.error?.('Lỗi', 'Họ tên và tên đăng nhập không được để trống');
+                    return;
+                }
+                this.savingProfile = true;
+                try {
+                    const payload = { name: this.form.name, username: this.form.username };
+                    if (this.isSuperAdmin) payload.email = this.form.email;
+                    const res = await window.fetchHelper.put('User/profile', payload);
+                    if (res.status_code === 200) {
+                        window.notify?.toast?.success?.('Thành công', res.message || 'Cập nhật thông tin thành công');
+                    } else {
+                        window.notify?.toast?.error?.('Lỗi', this.extractErrorMessage(res, 'Cập nhật thông tin thất bại'));
+                    }
+                } catch (e) {
+                    window.notify?.toast?.error?.('Lỗi', 'Có lỗi xảy ra khi lưu thông tin');
+                } finally {
+                    this.savingProfile = false;
+                }
+            },
+            async changePassword() {
+                if (this.changingPassword) return;
+                const { current_password, new_password, confirm_new_password } = this.passwordForm;
+                if (!current_password || !new_password || !confirm_new_password) {
+                    window.notify?.toast?.error?.('Lỗi', 'Vui lòng nhập đầy đủ thông tin mật khẩu');
+                    return;
+                }
+                if (new_password !== confirm_new_password) {
+                    window.notify?.toast?.error?.('Lỗi', 'Xác nhận mật khẩu mới không khớp');
+                    return;
+                }
+                this.changingPassword = true;
+                try {
+                    const res = await window.fetchHelper.put('User/profile/password', this.passwordForm);
+                    if (res.status_code === 200) {
+                        window.notify?.toast?.success?.('Thành công', 'Đổi mật khẩu thành công, vui lòng đăng nhập lại');
+                        setTimeout(() => { window.location.href = '/auth/login'; }, 1500);
+                    } else {
+                        window.notify?.toast?.error?.('Lỗi', this.extractErrorMessage(res, 'Đổi mật khẩu thất bại'));
+                    }
+                } catch (e) {
+                    window.notify?.toast?.error?.('Lỗi', 'Có lỗi xảy ra khi đổi mật khẩu');
+                } finally {
+                    this.changingPassword = false;
+                }
+            },
+        }));
+    });
+</script>
 {% endblock %}
