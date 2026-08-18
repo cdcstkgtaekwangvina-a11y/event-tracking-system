@@ -162,7 +162,10 @@
                 #}
                 <!-- Dùng tojson | forceescape (giống event_cards.j2 bên home) để escape đúng cho mọi ký tự
                      đặc biệt (', ", \, xuống dòng...) trong name/description/location, không bị vỡ cú pháp JS -->
-                <button type="button" class="btn-view-details"
+                <a href="/admin/events/{{ event.id }}" hx-get="/admin/events/{{ event.id }}" hx-target="#admin-main-content" hx-push-url="true" class="btn-view-details">
+                    Xem chi tiết
+                </a>
+                <button type="button" class="btn-edit-card" title="Chỉnh sửa nhanh"
                     @click="$dispatch('open-edit-modal', {
                         id: {{ event.id }},
                         name: {{ event.name | tojson | forceescape }},
@@ -173,7 +176,11 @@
                         url_image: {{ (event.url_image or '') | tojson | forceescape }},
                         url_map: {{ (event.url_map or '') | tojson | forceescape }}
                     })">
-                    Xem chi tiết
+                    <span class="material-symbols-outlined">edit</span>
+                </button>
+                <button type="button" class="btn-delete-card" title="Xóa sự kiện"
+                    @click="$dispatch('delete-event', { id: {{ event.id }}, name: {{ event.name | tojson | forceescape }} })">
+                    <span class="material-symbols-outlined">delete</span>
                 </button>
             </div>
         </div>

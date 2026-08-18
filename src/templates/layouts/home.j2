@@ -1,24 +1,11 @@
 <div class="home-container" x-data="{
     search: '',
-    isOpen: false,
-    selectedEvent: null,
-    eventId: null,
-    eventName: '',
-    employeeId: '',
     isLoading: false,
 }">
     <section class="events-hero" aria-labelledby="events-heading">
         <h1 id="events-heading" class="section-title">Sự kiện sắp diễn ra</h1>
-        <p class="hero-description">Khám phá và tham gia các sự kiện thú vị của công ty. Đừng bỏ lỡ những trải nghiệm đáng nhớ!</p>
-        {#
-        === ĐOẠN CODE CŨ (dòng "Tổng cộng X sự kiện đang mở đăng ký", comment lại để giữ tham khảo) ===
-        <p class="event-total">
-            <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
-            Tổng cộng <strong id="event-count">0</strong> sự kiện đang mở đăng ký
-        </p>
-        =======================================================================================
-        #}
-        <!-- Giữ span#event-count ẩn để event_cards.j2 (hx-swap-oob="innerHTML") vẫn có target hợp lệ -->
+        <p class="hero-description">Khám phá và tham gia các sự kiện thú vị của công ty. Đừng bỏ lỡ những trải nghiệm
+            đáng nhớ!</p>
         <span id="event-count" style="display: none;"></span>
     </section>
 
@@ -27,7 +14,7 @@
         <h2 id="explore-heading" class="explore-title">Khám phá sự kiện</h2>
         <div class="search-bar-wrapper">
             <span class="material-symbols-outlined search-icon">search</span>
-            <input type="text" name="search" placeholder="Tìm kiếm sự kiện theo tên hoặc địa điểm..." x-model="search"
+            <input type="text" name="search" placeholder="Tìm kiếm sự kiện theo tên..." x-model="search"
                 @input.debounce.300ms="$dispatch('search-changed')" class="search-input" />
         </div>
         <div class="event-controls" aria-label="Bộ lọc sự kiện">
@@ -57,17 +44,14 @@
     </section>
 
     <!-- Events List Container (Loaded and swapped via HTMX) -->
-    <div id="events-container" hx-get="/api/events/cards-html" hx-trigger="load, search-changed from:body, event-filters-changed from:body"
+    <div id="events-container" hx-get="/api/events/cards-html"
+        hx-trigger="load, search-changed from:body, event-filters-changed from:body"
         hx-include="[name='search'], [name='status'], [name='sort_field'], [name='is_desc']" hx-swap="innerHTML">
         <div class="spinner-container">
             <div class="spinner"></div>
             <p>Đang tải danh sách sự kiện...</p>
         </div>
     </div>
-
-    <!-- Event Detail Modal -->
-    {% include "modules/events/views/event_detail_modal.j2" %}
-
 </div>
 
 <style>
@@ -278,11 +262,14 @@
         flex-direction: column;
         transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
         cursor: pointer;
+        text-decoration: none;
+        color: inherit;
     }
 
     .event-card:hover {
         transform: translateY(-6px);
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+        text-decoration: none;
     }
 
     /* Header Gradient Themes */

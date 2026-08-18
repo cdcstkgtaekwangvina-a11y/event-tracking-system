@@ -643,7 +643,7 @@
                     deleted_media
                         ? `Bạn có chắc muốn xoá vĩnh viễn ${type === 'folder' ? 'thư mục' : 'file'} này không?`
                         : `Bạn có chắc muốn xoá ${type === 'folder' ? 'thư mục' : 'file'} này không?`,
-                    { icon: 'danger', confirmText: deleted_media ? 'Xóa vĩnh viễn' : 'Xóa', cancelText: 'Hủy' }
+                    { icon: 'warning', confirmText: deleted_media ? 'Xóa vĩnh viễn' : 'Xóa', cancelText: 'Hủy' }
                 );
                 if (!approved) return;
 
@@ -726,7 +726,7 @@
                         ? `Bạn có chắc muốn xoá vĩnh viễn ${count} mục này không?`
                         : `Bạn có chắc muốn chuyển ${count} mục này vào thùng rác không?`,
                     {
-                        icon: 'danger',
+                        icon: 'warning',
                         confirmText: deleted_media ? 'Xóa vĩnh viễn' : 'Xóa',
                         cancelText: 'Hủy'
                     }
@@ -783,7 +783,7 @@
                 const approved = await window.notify.modal.confirm(
                     'Làm trống thùng rác',
                     'Bạn có chắc muốn xoá vĩnh viễn toàn bộ dữ liệu trong thùng rác không?',
-                    { icon: 'danger', confirmText: 'Xóa vĩnh viễn', cancelText: 'Hủy' }
+                    { icon: 'warning', confirmText: 'Xóa vĩnh viễn', cancelText: 'Hủy' }
                 );
                 if (!approved) return;
 

@@ -1,18 +1,21 @@
+from datetime import datetime, timezone
+
+from sqlalchemy import and_, or_
+from sqlmodel import col
+
 from database.models.app_db import SessionDep
-from database.models.events import Events
+from database.models.events import EVENT_STATUS, Events
 from database.models.events_employees import EventsEmployees
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
+
 from .event_schemas import (
-    EventCreateRequest,
-    EventUpdateRequest,
-    EventsSchema,
     AdminEventQuery,
+    EventCreateRequest,
+    EventsPagination,
+    EventUpdateRequest,
     PublicEventQuery,
 )
-from sqlalchemy import and_, func, or_
-from typing import Any, cast
-from datetime import datetime, timezone
 
 
 class EventServices:
@@ -25,19 +28,9 @@ class EventServices:
         return BaseResponse.created(new_event, message="Tạo sự kiện thành công")
 
     async def get_events_raw(self, pagination: PaginationRequest) -> PaginationResponse:
-        self.crud.select(
-            EventsSchema,
-            logic_column=[
-                func.count(cast(Any, EventsEmployees.employee_id)).label(
-                    EventsSchema.nameof(lambda e: e.employee_count)
-                ),
-            ],
-        ).join(
-            target=EventsEmployees,
-            onclause=EventsEmployees.event_id == Events.id,
-            isouter=True,
-        ).group_by(Events.id)
-        return await self.crud.pagination_async(pagination)
+        return await self.crud.select(
+            EventsPagination,
+        ).pagination_async(pagination)
 
     async def get_public_events_raw(
         self, pagination: PublicEventQuery
@@ -47,35 +40,31 @@ class EventServices:
 
         if pagination.status == "ongoing":
             time_condition = and_(
-                Events.start_at <= now,
-                or_(Events.end_at.is_(None), Events.end_at >= now),
+                col(Events.start_at) <= now,
+                or_(col(Events.end_at).is_(None), col(Events.end_at) >= now),
             )
         elif pagination.status == "upcoming":
-            time_condition = Events.start_at > now
+            time_condition = col(Events.start_at) > now
         else:
             # An event is visible when it has not ended. Events without a start
             # time are excluded because their state cannot be determined.
             time_condition = and_(
-                Events.start_at.is_not(None),
-                or_(Events.end_at.is_(None), Events.end_at >= now),
+                col(Events.start_at).is_not(None),
+                or_(col(Events.end_at).is_(None), col(Events.end_at) >= now),
             )
 
-        self.crud.select(
-            EventsSchema,
-            logic_column=[
-                func.count(cast(Any, EventsEmployees.employee_id)).label(
-                    EventsSchema.nameof(lambda e: e.employee_count)
-                ),
-            ],
-        ).join(
-            target=EventsEmployees,
-            onclause=EventsEmployees.event_id == Events.id,
-            isouter=True,
-        ).where(time_condition).group_by(Events.id)
-
-        return await self.crud.pagination_async(
-            pagination,
-            search_fields=["name", "location", "description"],
+        return (
+            await self.crud.select(EventsPagination)
+            .where(
+                and_(col(Events.status) == EVENT_STATUS.PUBLISHED.value, time_condition)
+            )
+            .pagination_async(
+                pagination,
+                search_fields=[
+                    EventsPagination.nameof(lambda x: x.name),
+                    EventsPagination.nameof(lambda x: x.location),
+                ],
+            )
         )
 
     async def get_admin_events_raw(
@@ -87,33 +76,23 @@ class EventServices:
 
         if pagination.status == "ongoing":
             time_condition = and_(
-                Events.start_at <= now,
-                or_(Events.end_at.is_(None), Events.end_at >= now),
+                col(Events.start_at) <= now,
+                or_(col(Events.end_at).is_(None), col(Events.end_at) >= now),
             )
         elif pagination.status == "upcoming":
-            time_condition = Events.start_at > now
+            time_condition = col(Events.start_at) > now
         elif pagination.status == "ended":
-            time_condition = Events.end_at < now
+            time_condition = col(Events.end_at) < now
 
-        query = self.crud.select(
-            EventsSchema,
-            logic_column=[
-                func.count(cast(Any, EventsEmployees.employee_id)).label(
-                    EventsSchema.nameof(lambda e: e.employee_count)
-                ),
-            ],
-        ).join(
-            target=EventsEmployees,
-            onclause=EventsEmployees.event_id == Events.id,
-            isouter=True,
-        )
+        self.crud.select(EventsPagination)
         if time_condition is not None:
-            query.where(time_condition)
-        query.group_by(Events.id)
-
+            self.crud.statement.where(time_condition)
         return await self.crud.pagination_async(
             pagination,
-            search_fields=["name", "location", "description"],
+            search_fields=[
+                EventsPagination.nameof(lambda x: x.name),
+                EventsPagination.nameof(lambda x: x.location),
+            ],
         )
 
     async def get_events(
@@ -152,10 +131,11 @@ class EventServices:
         return BaseResponse.ok(message="Xóa sự kiện thành công")
 
     async def register_employee(self, event_id: int, employee_id: int) -> BaseResponse:
-        from database.models.events_employees import EventsEmployees
-        from database.models.employees import Employees
-        from sqlmodel import select
         from datetime import datetime
+
+        from sqlmodel import select
+
+        from database.models.employees import Employees
 
         # Check if employee exists
         stmt_emp = select(Employees).where(Employees.id == employee_id)

@@ -1,7 +1,9 @@
-from database.models.events import BaseEvents
-from typing import Literal, Optional
 from datetime import datetime
+from typing import Literal
+
 from fastapi import Depends, Query
+
+from database.models.events import BaseEvents
 from src.shared.base.base_schema import BaseSchema
 from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagination
 
@@ -11,24 +13,34 @@ class EventCreateRequest(BaseEvents):
 
 
 class EventUpdateRequest(BaseSchema):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    location: Optional[str] = None
-    start_at: Optional[datetime] = None
-    end_at: Optional[datetime] = None
-    url_image: Optional[str] = None
-    url_map: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    location: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    url_image: str | None = None
+    url_map: str | None = None
+
+
+class EventsPagination(BaseSchema):
+    id: int
+    name: str
+    location: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    url_image: str | None = None
+    url_map: str | None = None
 
 
 class EventsSchema(BaseSchema):
     id: int
     name: str
-    description: Optional[str] = None
-    location: Optional[str] = None
-    start_at: Optional[datetime] = None
-    end_at: Optional[datetime] = None
-    url_image: Optional[str] = None
-    url_map: Optional[str] = None
+    description: str | None = None
+    location: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    url_image: str | None = None
+    url_map: str | None = None
     employee_count: int = 0
 
 

@@ -1,6 +1,6 @@
 {% extends "templates/layouts/admin.j2" if not request.headers.get("hx-request") else
 "templates/layouts/admin_blank.j2"%}
-{% block admin_title %}Quản lý Nhân viên{% endblock %}
+{% block admin_title %}Quản lý khách mời{% endblock %}
 {% block admin_body %}
 <div class="emp-container" x-data="{
     selectedIds: [],
@@ -26,7 +26,7 @@
 }" @emp-deleted.window="clearSelection()">
     <!-- Header -->
     <div class="emp-header">
-        <h1 class="emp-title">Quản lý Nhân viên</h1>
+        <h1 class="emp-title">Quản lý Khách mời</h1>
         <div class="emp-header-actions">
             <button type="button" class="emp-btn emp-btn-danger" id="btn-bulk-delete" x-show="selectedIds.length > 0"
                 x-transition @click="window.employeeDeleteModal?.open({ mode: 'bulk', ids: selectedIds })">

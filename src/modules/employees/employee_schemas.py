@@ -48,6 +48,7 @@ class BulkUpsertEmployeeRequest(BaseSchema):
     file_url: str
     column_map: dict[str, str] | None = None
     header_row: int | None = Field(default=None, ge=0)
+    event_id: int | None = Field(default=None)
 
 
 class BulkUpsertResponse(BaseSchema):
