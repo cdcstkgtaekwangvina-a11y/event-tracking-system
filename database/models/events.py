@@ -1,16 +1,24 @@
 from datetime import datetime
-from sqlmodel import SQLModel, Field, Relationship
-from .base_model import PrimaryModel, CreatedAtModel, UpdatedAtModel, DeletedAtModel
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, cast
+
 from sqlalchemy import DateTime
-from typing import cast, Any, Optional, List, TYPE_CHECKING
+from sqlmodel import BIGINT, Field, Relationship, SQLModel
+
+from .base_model import CreatedAtModel, DeletedAtModel, PrimaryModel, UpdatedAtModel
 
 if TYPE_CHECKING:
-    from database.models.media import Medias
     from database.models.events_employees import EventsEmployees
+
+
+class EVENT_STATUS(StrEnum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
 
 
 class BaseEvents(SQLModel):
     name: str = Field(max_length=300)
+    status: str = Field(max_length=50, default=EVENT_STATUS.DRAFT.value)
     description: str | None = Field(default=None, nullable=True)
     start_at: datetime | None = Field(
         default=None, nullable=True, sa_type=cast(Any, DateTime(timezone=True))
@@ -32,9 +40,5 @@ class Events(
     table=True,
 ):
     __tablename__: str = "events"
-    id: int | None = Field(default=None, primary_key=True)
-    media_id: Optional[int] = Field(default=None, foreign_key="medias.id")
-    employee_links: Optional[List[EventsEmployees]] = Relationship(
-        back_populates="event"
-    )
-    media: Optional["Medias"] = Relationship(back_populates="events")
+    id: int | None = Field(default=None, primary_key=True, sa_type=BIGINT)
+    employee_links: list[EventsEmployees] | None = Relationship(back_populates="event")

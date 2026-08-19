@@ -44,9 +44,9 @@ def layouts_routes(app: FastAPI) -> FastAPI:
         auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
     ):
         return req.response_html(
-            name="/templates/not_found.j2", 
+            name="/templates/not_found.j2",
             context={},
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
         )
 
     @app.get(
@@ -60,9 +60,9 @@ def layouts_routes(app: FastAPI) -> FastAPI:
             return RedirectResponse(url="/404", status_code=status.HTTP_302_FOUND)
 
         response = req.response_html(
-            name="/templates/error.j2", 
+            name="/templates/error.j2",
             context={},
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
         )
         response.delete_cookie("error_permitted")
         return response
