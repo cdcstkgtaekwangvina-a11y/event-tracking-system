@@ -21,23 +21,8 @@ class EmployeeAdminViews:
         self.service = service
 
     @router.get(name="employees")
-    async def employees(
-        self,
-        req: BaseRequest,
-        pagination: PaginationQuery,
-    ):
-        if "limit" not in req.query_params:
-            pagination.limit = 20
-        pagination_data = await self.service.get_employees_raw(pagination)
-        return req.response_html(
-            name=f"{base_path}index.j2",
-            context={
-                "employees": pagination_data.data if pagination_data else [],
-                "total": pagination_data.total_items if pagination_data else 0,
-                "pagination": pagination,
-                "search": pagination.search or "",
-            },
-        )
+    def employees(self, req: BaseRequest):
+        return req.response_html(name=f"{base_path}index.j2")
 
     @router.get("table/html", name="employees_table")
     async def employees_table_html(
