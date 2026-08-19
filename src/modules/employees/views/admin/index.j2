@@ -159,8 +159,14 @@
 
     <!-- Table Container -->
     <div class="emp-table-wrapper">
-        <div id="emp-table-container">
-            {% include "modules/employees/views/admin/employee_table.j2" %}
+        <div id="emp-table-container"
+             hx-get="{{ url_for('employees_table') }}"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="emp-empty">
+                <div class="spinner-sm"></div>
+                <p class="emp-empty-text">Đang tải danh sách nhân viên...</p>
+            </div>
         </div>
     </div>
 </div>
