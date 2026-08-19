@@ -24,18 +24,13 @@
             sortField: 'created_at',
             isDesc: true,
             loading: false,
-            timer: null,
 
             async initData() {
                 await this.fetchJobs();
-                if (this.timer) clearInterval(this.timer);
-                this.timer = setInterval(() => {
-                    this.fetchJobs(this.page, true);
-                }, 5000);
             },
 
-            async fetchJobs(newPage = 1, isBackground = false) {
-                if (!isBackground) this.loading = true;
+            async fetchJobs(newPage = 1) {
+                this.loading = true;
                 this.page = newPage;
                 try {
                     while (!window.fetchHelper) {
@@ -69,7 +64,7 @@
                 } catch (e) {
                     console.error("Lỗi khi gọi API Queue Jobs:", e);
                 } finally {
-                    if (!isBackground) this.loading = false;
+                    this.loading = false;
                 }
             },
 
@@ -133,10 +128,6 @@
 
             showDetail(job) {
                 window.queueJobDetailModal?.open(job);
-            },
-
-            destroy() {
-                if (this.timer) clearInterval(this.timer);
             }
         }));
     }
@@ -186,9 +177,10 @@
         </div>
 
         <div class="qj-search-box">
+            <label for="qj-search-input" class="sr-only" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0;">Tìm kiếm công việc</label>
             <span class="material-symbols-outlined qj-search-icon">search</span>
-            <input type="text" class="qj-search-input" placeholder="Tìm kiếm công việc (nhập từ khóa)..."
-                x-model="searchQuery" @keydown.enter="fetchJobs(1)" />
+            <input type="text" id="qj-search-input" name="search" class="qj-search-input" placeholder="Tìm kiếm công việc (nhập từ khóa)..."
+                x-model="searchQuery" @keydown.enter="fetchJobs(1)" aria-label="Tìm kiếm công việc" />
         </div>
     </div>
 

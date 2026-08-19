@@ -1,8 +1,9 @@
 from fastapi import Depends
+
+from src.modules.events.event_services import EventServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth
-from src.modules.events.event_services import EventServices
 
 base_path = "modules/events/views/"
 
@@ -25,13 +26,14 @@ class AdminEventViews:
 
     @admin_router.get(name="event_admin")
     def events(self, req: BaseRequest):
-        return req.response_html(name=f"{base_path}index.j2")
+        return req.response_html(name=f"{base_path}index.j2", cache_time=3600)
 
     @admin_router.get("{event_id}", name="admin_event_detail")
     def admin_event_detail(self, req: BaseRequest, event_id: int):
         return req.response_html(
             name=f"{base_path}admin_event_detail.j2",
             context={"event_id": event_id},
+            cache_time=3600,
         )
 
 
@@ -50,4 +52,5 @@ class PublicEventViews:
         return req.response_html(
             name=f"{base_path}public_event_detail.j2",
             context={"event_id": event_id},
+            cache_time=3600,
         )
