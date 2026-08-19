@@ -176,6 +176,12 @@
 {% include "modules/employees/views/admin/modals/employee_delete_modal.j2" %}
 
 <link rel="stylesheet" href="/static/css/employees.css">
+<script>
+    window.EMP_URLS = {
+        employeesTable: "{{ url_for('employees_table') }}",
+        mediaManager: "{{ url_for('media_manager') }}"
+    };
+</script>
 <script src="/static/js/employees.js"></script>
 
 {% endblock %}
