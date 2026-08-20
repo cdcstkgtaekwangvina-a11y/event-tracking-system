@@ -11,7 +11,7 @@ from database.db_config import DatabaseConfig
 
 db_url: str = DatabaseConfig().db_url()
 
-if DatabaseConfig().ENV == "dev":
+if DatabaseConfig().DB_HOST == "localhost":
     engine = create_async_engine(
         db_url,
         echo=True,
