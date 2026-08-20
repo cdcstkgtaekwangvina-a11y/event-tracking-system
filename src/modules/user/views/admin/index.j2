@@ -26,8 +26,14 @@
 
     <!-- Table Container -->
     <div class="acc-table-wrapper">
-        <div id="acc-table-container">
-            {% include "modules/user/views/admin/account_table.j2" %}
+        <div id="acc-table-container"
+             hx-get="{{ url_for('accounts_table') }}"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="acc-empty">
+                <div class="acc-spinner acc-spinner-sm"></div>
+                <p class="acc-empty-text">Đang tải danh sách tài khoản...</p>
+            </div>
         </div>
     </div>
 </div>
