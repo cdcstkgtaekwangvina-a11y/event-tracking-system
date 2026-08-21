@@ -189,14 +189,19 @@
         display: flex;
         flex-direction: column;
         border: 1px solid var(--border);
-        padding: 20px;
-        border-radius: 15px;
-        background-color: var(--background-header);
-        box-shadow: 0 5px 8px var(--shadow);
+        padding: 30px 20px;
+        border-radius: 16px;
+        background-color: var(--card); /* Thay var(--background-header) không tồn tại thành var(--card) */
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Bóng đổ gọn gàng hơn */
         justify-content: center;
         align-items: center;
         width: 100%;
         max-width: 400px;
+    }
+    
+    [data-theme="dark"] .login-form {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); /* Đổ bóng đen sâu hơn trong dark mode */
+        border: 1px solid rgba(255, 255, 255, 0.08); /* Viền sáng nhẹ tạo điểm nhấn */
     }
 
     .form-input {
@@ -216,19 +221,19 @@
     }
 
     .input-items input {
-        height: 30px;
-        border: none;
-        outline: 1px solid var(--border);
+        height: 42px; /* Dùng lại height cố định để tự động căn giữa chữ */
+        border: 1px solid var(--border);
+        outline: none;
         border-radius: 8px;
-        color: oklch(0.145 0 0);
-        padding: 10px;
+        color: var(--foreground);
+        padding: 0 12px;
         background-color: var(--input);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .input-items input:focus {
-        box-shadow: 0px 5px 8px var(--shadow);
-        outline: 1px solid var(--border);
-        border: none;
+        border-color: var(--text-secondary);
+        box-shadow: 0 0 0 3px rgba(128, 128, 128, 0.1);
     }
 
     .input-items label {
@@ -347,14 +352,22 @@
         position: relative;
     }
 
+    .password-input input {
+        padding-right: 40px !important;
+    }
+
     .toggle-password {
         background-color: transparent;
         border: none;
         position: absolute;
         right: 10px;
-        top: 48px;
+        top: 42px; /* 33px (label+padding) + 21px (nửa input) - 12px (nửa icon) = 42px */
         cursor: pointer;
         color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 24px;
     }
 
     body {
