@@ -11,9 +11,7 @@ def layouts_routes(app: FastAPI) -> FastAPI:
         req: BaseRequest,
         auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
     ):
-        return req.response_html(
-            name="/templates/layouts/main.j2", context={}, cache_time=3600
-        )
+        return req.response_html(name="/templates/layouts/main.j2", context={})
 
     @app.get(
         "/admin",
