@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -30,7 +30,7 @@ class AuthContext:
 
 class RequireAuth:
     def __init__(
-        self, roles: Optional[Sequence[str]] = None, is_required_auth: bool = True
+        self, roles: Sequence[str] | None = None, is_required_auth: bool = True
     ):
         self.roles = roles
         self.is_required_auth = is_required_auth
@@ -38,38 +38,38 @@ class RequireAuth:
     async def __call__(
         self, req: Request, service: AuthenticationServices = Depends()
     ) -> AuthContext:
-        access_token = None
-
-        auth_header = req.headers.get("Authorization")
-
-        if auth_header and auth_header.lower().startswith("bearer "):
-            parts = auth_header.split(" ")
-            if len(parts) == 2:
-                access_token = parts[1]
-        if not access_token:
+        access_token = req.headers.get("Authorization")
+        if access_token and access_token.lower().startswith("bearer "):
+            access_token = access_token.split(" ")[1]
+        else:
             access_token = req.cookies.get("access_token")
+
+        # Khởi tạo AuthContext mặc định nếu không bắt buộc auth hoặc không có token
+        if not access_token:
+            if self.is_required_auth:
+                if req.url.path.startswith("/api"):
+                    raise HTTPException(status_code=401, detail="Vui lòng đăng nhập")
+                raise HTTPException(status_code=404, detail="Vui lòng đăng nhập")
+            return AuthContext(
+                payload=TokenData(access_token=access_token or ""), is_valid=False
+            )
+
+        payload = service.verify_token(access_token)
 
         def raise_or_set_error(status_code: int, message: str):
             if self.is_required_auth:
                 if req.url.path.startswith("/api"):
                     raise HTTPException(status_code=status_code, detail=message)
                 raise HTTPException(status_code=404, detail=message)
-
             payload.valid = False
             payload.message = message
             payload.status_code = status_code
 
-        # 1. Kiểm tra nếu thiếu token khi bắt buộc phải auth
-        if self.is_required_auth and not access_token:
-            raise_or_set_error(401, "Vui lòng đăng nhập")
-
-        payload = service.verify_token(access_token or "")
-
-        if payload.valid is False:
+        if not payload.valid:
             raise_or_set_error(payload.status_code or 401, payload.message or "")
             return AuthContext(payload=payload, is_valid=False)
 
-        # 2. Kiểm tra User tồn tại
+        # 2. Kiểm tra User
         payload.user = await service.user_services.get_raw_user(payload.id or "")
         if not payload.user:
             raise_or_set_error(401, "User không tồn tại")
@@ -80,6 +80,7 @@ class RequireAuth:
             raise_or_set_error(401, "Token không hợp lệ")
             return AuthContext(payload=payload, is_valid=False)
 
+        # 4. Kiểm tra Roles
         if self.roles:
             from src.modules.user.role_constants import ROLE
 
@@ -94,5 +95,5 @@ class RequireAuth:
         return AuthContext(payload=payload, is_valid=payload.valid)
 
 
-def auth(roles: list[str] = None, is_required_auth: bool = True):
+def auth(roles: list[str] | None = None, is_required_auth: bool = True):
     return Depends(RequireAuth(roles=roles, is_required_auth=is_required_auth))

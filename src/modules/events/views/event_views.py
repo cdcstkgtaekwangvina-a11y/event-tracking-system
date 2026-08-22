@@ -3,14 +3,14 @@ from fastapi import Depends
 from src.modules.events.event_services import EventServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth
+from src.shared.middlewares.auth_middlewares import AuthContext, auth
 
 base_path = "modules/events/views/"
 
 admin_router = BaseRouter(
     controller="admin/events",
     tags=["admin/events"],
-    dependencies=[Depends(RequireAuth(is_required_auth=True))],
+    dependencies=[auth(is_required_auth=True)],
 )
 
 public_router = BaseRouter(
@@ -47,7 +47,7 @@ class PublicEventViews:
         self,
         req: BaseRequest,
         event_id: int,
-        auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
+        auth: AuthContext = auth(is_required_auth=False),
     ):
         return req.response_html(
             name=f"{base_path}public_event_detail.j2",

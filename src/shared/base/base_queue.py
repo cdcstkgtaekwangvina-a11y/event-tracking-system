@@ -48,6 +48,10 @@ class QueueServices:
         while True:
             try:
                 job_id, job_type = await self.job_queue.get()
+            except asyncio.CancelledError:
+                break
+
+            try:
                 func = self._registry.get(job_type)
 
                 if func:
@@ -63,8 +67,6 @@ class QueueServices:
                     finally:
                         self._running_tasks.pop(job_id, None)
 
-            except asyncio.CancelledError:
-                break
             except Exception as e:
                 logger.error(f"❌ Lỗi xử lý task ngầm: {e}")
             finally:

@@ -3,14 +3,14 @@ from fastapi import Depends
 from src.modules.queue_job.queue_job_services import QueueJobServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.middlewares.auth_middlewares import RequireAuth
+from src.shared.middlewares.auth_middlewares import auth
 from src.shared.schemas.pagination_schemas import FilterRequest, PaginationQuery
 
 TAG_NAME = "admin/queue-jobs"
 router = BaseRouter(
     controller=TAG_NAME,
     tags=[TAG_NAME],
-    dependencies=[Depends(RequireAuth(is_required_auth=True))],
+    dependencies=[auth(is_required_auth=True)],
 )
 base_path = "modules/queue_job/views/admin/"
 

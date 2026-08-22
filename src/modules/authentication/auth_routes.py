@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 from fastapi import Depends, Response
-from typing import Optional
-from .auth_services import AuthenticationServices
-from .auth_schemas import RegisterRequest, LoginRequest
-from src.shared.helpers.cbv import clean_cbv
-from src.shared.middlewares.auth_middlewares import RequireAuth, AuthContext
+
 from src.shared.base import BaseRequest, BaseRouter
+from src.shared.helpers.cbv import clean_cbv
+from src.shared.middlewares.auth_middlewares import AuthContext, auth
+
+from .auth_schemas import LoginRequest, RegisterRequest
+from .auth_services import AuthenticationServices
 
 TAG = "auth"
 router = BaseRouter(controller=TAG, tags=[TAG])
@@ -20,13 +22,16 @@ class AuthenticationController:
     def login_view(
         self,
         req: BaseRequest,
-        redirect: Optional[str] = None,
-        auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
+        redirect: str | None = None,
+        auth: AuthContext = auth(is_required_auth=False),
     ):
         if auth.is_valid:
             target = redirect or "/"
             lower = target.lower()
-            if any(bad in lower for bad in ["404", "error", "/auth/login", "/auth/register"]):
+            if any(
+                bad in lower
+                for bad in ["404", "error", "/auth/login", "/auth/register"]
+            ):
                 target = "/"
             return auth.redirect_with(target)
         return req.response_html(
@@ -34,7 +39,7 @@ class AuthenticationController:
         )
 
     @router.get("forgot-password", name="forgot_password_view", include_in_schema=False)
-    def forgot_password_view(self, req: BaseRequest, redirect: Optional[str] = None):
+    def forgot_password_view(self, req: BaseRequest, redirect: str | None = None):
         req.response_html(
             name="modules/authentication/views/forgot_password.j2",
             context={"redirect": redirect},
@@ -59,6 +64,6 @@ class AuthenticationController:
     def logout(
         self,
         response: Response,
-        auth: AuthContext = Depends(RequireAuth(is_required_auth=True)),
+        auth: AuthContext = auth(is_required_auth=True),
     ):
         return self.services.logout(response)
