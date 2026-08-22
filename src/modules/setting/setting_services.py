@@ -1,13 +1,17 @@
+from typing import Annotated
+
+from fastapi import Depends, HTTPException
 from pydantic import BaseModel
-from typing import Any, Annotated, Optional
+
 from database.models.app_db import SessionDep
 from database.models.settings import Settings
 from src.shared.base.base_crud import BaseCrud
-from src.shared.services.redis_services import RedisDep
-from .setting_constants import AppConfigKey
 from src.shared.base.base_response import BaseResponse
 from src.shared.constants.cache_tags import CacheTags
-from fastapi import Depends, HTTPException
+from src.shared.services.redis_services import RedisDep
+
+from .setting_constants import AppConfigKey
+from .setting_schemas import UpdateSettingSchema
 
 
 class AppSettingServices:
@@ -16,7 +20,7 @@ class AppSettingServices:
         self.redis = redis
         self.crud = BaseCrud(session, Settings)
 
-    async def get_raw_app_setting(self, id: AppConfigKey) -> Optional[Settings]:
+    async def get_raw_app_setting(self, id: AppConfigKey) -> Settings | None:
         result = await self.redis.get_or_set_async(
             key=f"{CacheTags.SETTING}:{id}",
             tags=[CacheTags.SETTING],
@@ -30,7 +34,7 @@ class AppSettingServices:
 
     async def get_setting_value[T: BaseModel](
         self, id: AppConfigKey, model_cls: type[T]
-    ) -> Optional[T]:
+    ) -> T | None:
         result = await self.get_raw_app_setting(id=id)
         if result:
             return model_cls(**result.value or {})
@@ -41,11 +45,14 @@ class AppSettingServices:
         return BaseResponse.ok(await self.get_raw_app_setting(id=id))
 
     async def update_app_setting(
-        self, id: AppConfigKey, payload: Any
-    ) -> Settings | None:
-        return await self.crud.update(
+        self, id: AppConfigKey, payload: UpdateSettingSchema
+    ) -> BaseResponse[Settings]:
+        result = await self.crud.update(
             condition=lambda model: model.id == id, data=payload
         )
+        if not result:
+            return BaseResponse.not_found()
+        return BaseResponse.ok(result)
 
 
 AppSettingServicesDep = Annotated[AppSettingServices, Depends()]

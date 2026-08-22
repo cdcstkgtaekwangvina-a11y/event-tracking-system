@@ -6,3 +6,4 @@ class PageSchema(BaseSchema):
     name: str
     icon: str
     path: str
+    include_roles: list[str] | None = []

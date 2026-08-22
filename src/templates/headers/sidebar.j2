@@ -11,7 +11,7 @@
     currentPath: window.location.pathname,
     openDropdown: false,
     isActivePage(pageId, currentPath){
-        const adminPages = {{ ADMIN_PAGES_DICT}}
+        const adminPages = {{ ADMIN_PAGES_DICT }}
         const currentPage = adminPages.find(x => x.id === pageId)
         const cleanPath = currentPath.split('?')[0];
         if (!cleanPath.startsWith('/admin')) return false;
@@ -114,6 +114,7 @@
 
         <div class="sidebar-body">
             {% for page in ADMIN_PAGES %}
+            {% if not page.include_roles or page.include_roles | length == 0%}
             <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
                 hx-push-url="true" :data-active="isActivePage('{{ page.id }}', currentPath)"
                 @click="closeSidebarOnMobile()">
@@ -127,6 +128,23 @@
                     {{ page.name }}
                 </span>
             </div>
+            {% else %}
+            {% if auth.user.role in page.include_roles %}
+            <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
+                hx-push-url="true" :data-active="isActivePage('{{ page.id }}', currentPath)"
+                @click="closeSidebarOnMobile()">
+
+                <span class="material-symbols-outlined">
+                    {{ page.icon }}
+                </span>
+
+                <span class="menu-text" x-show="isSidebar || $store.screen.isMobile"
+                    x-transition.opacity.duration.200ms>
+                    {{ page.name }}
+                </span>
+            </div>
+            {% endif %}
+            {% endif%}
             {% endfor %}
         </div>
 
