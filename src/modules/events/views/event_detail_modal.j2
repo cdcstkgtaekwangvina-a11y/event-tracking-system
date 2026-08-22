@@ -8,14 +8,258 @@
   }
 </script>
 
+<script>
+function eventDetailModalApp() {
+    return {
+        isOpen: false,
+        selectedEvent: null,
+        activeTab: 'info', // 'info' or 'attendees'
+
+        // Attendees state
+        attendees: [],
+        attendeesLoading: false,
+        attendeesTotal: 0,
+        attendeesPage: 1,
+        attendeesLimit: 10,
+        attendeesTotalPages: 1,
+        attendeesSearch: '',
+        selectedAttendeeIds: [],
+
+        // Add Employees Modal state
+        addModalOpen: false,
+        unassignedLoading: false,
+        unassignedEmployees: [],
+        unassignedTotal: 0,
+        unassignedPage: 1,
+        unassignedLimit: 10,
+        unassignedTotalPages: 1,
+        unassignedSearch: '',
+        selectedUnassignedIds: [],
+        isSubmittingRegisters: false,
+
+        init() {
+            window.eventDetailModal = this;
+        },
+
+        open(eventData) {
+            this.selectedEvent = eventData;
+            this.activeTab = 'info';
+            this.isOpen = true;
+            this.selectedAttendeeIds = [];
+            this.attendeesSearch = '';
+            this.attendeesPage = 1;
+            if (this.selectedEvent?.id) {
+                this.loadAttendees();
+            }
+        },
+
+        close() {
+            this.isOpen = false;
+            this.selectedEvent = null;
+            this.addModalOpen = false;
+        },
+
+        async loadAttendees(page = this.attendeesPage) {
+            if (!this.selectedEvent?.id) return;
+            this.attendeesLoading = true;
+            this.attendeesPage = page;
+            try {
+                const params = new URLSearchParams({
+                    event_id: this.selectedEvent.id,
+                    page: this.attendeesPage,
+                    limit: this.attendeesLimit,
+                    search: this.attendeesSearch.trim()
+                });
+                const res = await fetch(`/api/employees?${params.toString()}`);
+                const json = await res.json();
+                if (res.ok && json?.data) {
+                    this.attendees = json.data.data || [];
+                    this.attendeesTotal = json.data.total || 0;
+                    this.attendeesPage = json.data.page || 1;
+                    this.attendeesTotalPages = Math.ceil(this.attendeesTotal / this.attendeesLimit) || 1;
+                }
+            } catch (e) {
+                console.error('Lỗi khi tải danh sách khách mời trong modal:', e);
+            } finally {
+                this.attendeesLoading = false;
+            }
+        },
+
+        goToAttendeePage(val) {
+            let p = parseInt(val, 10);
+            if (isNaN(p) || p < 1) p = 1;
+            if (p > this.attendeesTotalPages) p = this.attendeesTotalPages;
+            if (p !== this.attendeesPage) {
+                this.loadAttendees(p);
+            }
+        },
+
+        toggleSelectAllAttendees() {
+            const currentIds = this.attendees.map(a => a.id);
+            const allSelected = currentIds.length > 0 && currentIds.every(id => this.selectedAttendeeIds.includes(id));
+            if (allSelected) {
+                this.selectedAttendeeIds = this.selectedAttendeeIds.filter(id => !currentIds.includes(id));
+            } else {
+                const toAdd = currentIds.filter(id => !this.selectedAttendeeIds.includes(id));
+                this.selectedAttendeeIds = [...this.selectedAttendeeIds, ...toAdd];
+            }
+        },
+
+        toggleAttendee(id) {
+            const idx = this.selectedAttendeeIds.indexOf(id);
+            if (idx > -1) {
+                this.selectedAttendeeIds.splice(idx, 1);
+            } else {
+                this.selectedAttendeeIds.push(id);
+            }
+        },
+
+        async removeAttendees(ids) {
+            if (!this.selectedEvent?.id || !ids || ids.length === 0) return;
+            const count = ids.length;
+            const confirmed = await (window.notify?.modal?.confirm ? window.notify.modal.confirm(
+                'Xóa khách mời khỏi sự kiện?',
+                `Bạn có chắc muốn xóa ${count > 1 ? count + ' khách mời này' : 'khách mời này'} khỏi sự kiện không?`,
+                { icon: 'warning', confirmText: 'Xóa', cancelText: 'Hủy' }
+            ) : Promise.resolve(confirm(`Bạn có chắc muốn xóa ${count} khách mời khỏi sự kiện không?`)));
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`/api/events/${this.selectedEvent.id}/remove-registers`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ employee_ids: ids })
+                });
+                if (res.ok || res.status === 204) {
+                    window.notify?.toast?.success?.('Thành công', `Đã xóa ${count} khách mời khỏi sự kiện`);
+                    this.selectedAttendeeIds = this.selectedAttendeeIds.filter(id => !ids.includes(id));
+                    await this.loadAttendees();
+                    window.dispatchEvent(new CustomEvent('event-employees-updated', { detail: { eventId: this.selectedEvent.id } }));
+                } else {
+                    const resData = await res.json();
+                    window.notify?.toast?.error?.('Lỗi', resData?.message || 'Không thể xóa khách mời');
+                }
+            } catch (e) {
+                window.notify?.toast?.error?.('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+            }
+        },
+
+        async openAddEmployeesModal() {
+            this.addModalOpen = true;
+            this.unassignedPage = 1;
+            this.unassignedSearch = '';
+            this.selectedUnassignedIds = [];
+            await this.loadUnassignedEmployees();
+        },
+
+        closeAddEmployeesModal() {
+            this.addModalOpen = false;
+            this.selectedUnassignedIds = [];
+        },
+
+        async loadUnassignedEmployees(page = this.unassignedPage) {
+            if (!this.selectedEvent?.id) return;
+            this.unassignedLoading = true;
+            this.unassignedPage = page;
+            try {
+                const params = new URLSearchParams({
+                    ignore_event: this.selectedEvent.id,
+                    page: this.unassignedPage,
+                    limit: this.unassignedLimit,
+                    search: this.unassignedSearch.trim()
+                });
+                const res = await fetch(`/api/employees?${params.toString()}`);
+                const json = await res.json();
+                if (res.ok && json?.data) {
+                    this.unassignedEmployees = json.data.data || [];
+                    this.unassignedTotal = json.data.total || 0;
+                    this.unassignedPage = json.data.page || 1;
+                    this.unassignedTotalPages = Math.ceil(this.unassignedTotal / this.unassignedLimit) || 1;
+                }
+            } catch (e) {
+                console.error('Lỗi khi tải danh sách nhân viên chưa thêm:', e);
+            } finally {
+                this.unassignedLoading = false;
+            }
+        },
+
+        goToUnassignedPage(val) {
+            let p = parseInt(val, 10);
+            if (isNaN(p) || p < 1) p = 1;
+            if (p > this.unassignedTotalPages) p = this.unassignedTotalPages;
+            if (p !== this.unassignedPage) {
+                this.loadUnassignedEmployees(p);
+            }
+        },
+
+        toggleSelectAllUnassigned() {
+            const currentIds = this.unassignedEmployees.map(e => e.id);
+            const allSelected = currentIds.length > 0 && currentIds.every(id => this.selectedUnassignedIds.includes(id));
+            if (allSelected) {
+                this.selectedUnassignedIds = this.selectedUnassignedIds.filter(id => !currentIds.includes(id));
+            } else {
+                const toAdd = currentIds.filter(id => !this.selectedUnassignedIds.includes(id));
+                this.selectedUnassignedIds = [...this.selectedUnassignedIds, ...toAdd];
+            }
+        },
+
+        toggleUnassigned(id) {
+            const idx = this.selectedUnassignedIds.indexOf(id);
+            if (idx > -1) {
+                this.selectedUnassignedIds.splice(idx, 1);
+            } else {
+                this.selectedUnassignedIds.push(id);
+            }
+        },
+
+        async addSelectedEmployees() {
+            if (!this.selectedEvent?.id || this.selectedUnassignedIds.length === 0 || this.isSubmittingRegisters) return;
+            this.isSubmittingRegisters = true;
+            try {
+                const res = await fetch(`/api/events/${this.selectedEvent.id}/registers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ employee_ids: this.selectedUnassignedIds })
+                });
+                const resData = await res.json();
+                if (res.ok) {
+                    window.notify?.toast?.success?.('Thành công', `Đã thêm ${this.selectedUnassignedIds.length} khách mời vào sự kiện`);
+                    this.closeAddEmployeesModal();
+                    await this.loadAttendees();
+                    window.dispatchEvent(new CustomEvent('event-employees-updated', { detail: { eventId: this.selectedEvent.id } }));
+                } else {
+                    window.notify?.toast?.error?.('Lỗi', resData?.message || 'Không thể thêm khách mời');
+                }
+            } catch (e) {
+                window.notify?.toast?.error?.('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+            } finally {
+                this.isSubmittingRegisters = false;
+            }
+        },
+
+        openImportModal() {
+            if (!this.selectedEvent?.id) return;
+            if (window.employeeImportModal) {
+                window.employeeImportModal.open({ eventId: this.selectedEvent.id });
+            } else {
+                window.dispatchEvent(new CustomEvent('emp-import-open', { detail: { eventId: this.selectedEvent.id } }));
+            }
+        }
+    };
+}
+</script>
+
 <div id="event-detail-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[99999] flex items-center justify-center p-4"
+     x-data="eventDetailModalApp()"
      x-show="isOpen"
      x-cloak
      style="display: none;"
-     @keydown.escape.window="isOpen = false"
-     @click.self="isOpen = false">
+     @open-event-detail-modal.window="open($event.detail)"
+     @event-employees-updated.window="loadAttendees()"
+     @keydown.escape.window="close()"
+     @click.self="close()">
      
-    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-[640px] max-h-[90vh] flex flex-col overflow-y-auto relative shadow-2xl transition-all duration-300 transform"
+    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-[760px] max-h-[90vh] flex flex-col overflow-y-auto relative shadow-2xl transition-all duration-300 transform"
          x-show="isOpen"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
@@ -27,13 +271,13 @@
         <!-- Floating Close Button -->
         <button type="button" 
                 class="absolute top-4 right-4 z-50 bg-slate-900/60 hover:bg-slate-900/80 text-white rounded-full p-2 flex items-center justify-center transition-all duration-200 backdrop-blur-sm cursor-pointer border-none outline-none" 
-                @click="isOpen = false" 
+                @click="close()" 
                 aria-label="Đóng">
             <span class="material-symbols-outlined text-[20px] font-bold">close</span>
         </button>
 
         <!-- Banner Image / Gradient Header -->
-        <div :class="selectedEvent?.url_image ? 'relative w-full h-[280px] bg-center bg-no-repeat bg-cover flex-shrink-0' : 'relative w-full h-[280px] bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center flex-shrink-0'"
+        <div :class="selectedEvent?.url_image ? 'relative w-full h-[220px] bg-center bg-no-repeat bg-cover flex-shrink-0' : 'relative w-full h-[220px] bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center flex-shrink-0'"
              :style="selectedEvent?.url_image ? 'background-image: url(' + selectedEvent.url_image + ')' : ''">
             
             <!-- Status Badge -->
@@ -43,134 +287,292 @@
             </span>
 
             <!-- Placeholder icon when no image -->
-            <span x-show="!selectedEvent?.url_image" class="material-symbols-outlined text-white/80 text-[72px]" x-cloak>
+            <span x-show="!selectedEvent?.url_image" class="material-symbols-outlined text-white/80 text-[64px]" x-cloak>
                 calendar_today
             </span>
         </div>
 
-        <!-- Modal Body -->
-        <div class="p-6 sm:p-8 flex flex-col text-left">
+        <!-- Tab Header Bar -->
+        <div class="modal-tab-bar">
+            <button type="button" class="modal-tab-btn" :class="{ 'modal-tab-active': activeTab === 'info' }"
+                @click="activeTab = 'info'">
+                <span class="material-symbols-outlined text-[18px]">info</span>
+                Thông tin sự kiện
+            </button>
+            <button type="button" class="modal-tab-btn" :class="{ 'modal-tab-active': activeTab === 'attendees' }"
+                @click="activeTab = 'attendees'">
+                <span class="material-symbols-outlined text-[18px]">group</span>
+                Khách mời tham dự
+                <span class="tab-count-badge" x-text="attendeesTotal"></span>
+            </button>
+        </div>
+
+        <!-- Modal Body: Tab 1 (Event Info) -->
+        <div class="p-6 sm:p-8 flex flex-col text-left" x-show="activeTab === 'info'">
             <!-- Event Title -->
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight mb-5" x-text="selectedEvent?.name"></h2>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight mb-4" x-text="selectedEvent?.name"></h2>
 
-            {#
-            === ĐOẠN CODE CŨ (Ngày tổ chức / Thời gian / Địa điểm hiển thị thành 3 ô riêng trong grid, comment lại để giữ tham khảo) ===
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div class="flex items-center gap-4 bg-slate-50 border border-slate-100 p-3 px-4 rounded-xl">
-                    <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span class="material-symbols-outlined text-[20px]">calendar_today</span>
-                    </div>
-                    <div class="flex flex-col min-w-0">
-                        <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Ngày tổ chức</span>
-                        <span class="text-sm font-bold text-slate-800" x-text="selectedEvent?.start_at || 'Chưa xác định'"></span>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-4 bg-slate-50 border border-slate-100 p-3 px-4 rounded-xl">
-                    <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span class="material-symbols-outlined text-[20px]">schedule</span>
-                    </div>
-                    <div class="flex flex-col min-w-0">
-                        <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Thời gian</span>
-                        <span class="text-sm font-bold text-slate-800" x-text="selectedEvent?.start_time || '00:00'"></span>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-4 bg-slate-50 border border-slate-100 p-3 px-4 rounded-xl">
-                    <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span class="material-symbols-outlined text-[20px]">location_on</span>
-                    </div>
-                    <div class="flex flex-col min-w-0 flex-1">
-                        <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Địa điểm</span>
-                        <span class="text-sm font-bold text-slate-800 break-words" x-text="selectedEvent?.location || 'Chưa xác định'"></span>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-4 bg-slate-50 border border-slate-100 p-3 px-4 rounded-xl">
-                    <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span class="material-symbols-outlined text-[20px]">group</span>
-                    </div>
-                    <div class="flex flex-col min-w-0">
-                        <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Người tham dự</span>
-                        <span class="text-sm font-bold text-slate-800" x-text="(selectedEvent?.employee_count || 0) + ' người đã đăng ký'"></span>
-                    </div>
-                </div>
-            </div>
-            =======================================================================================
-            #}
-            <!-- Ngày/Giờ/Địa điểm được gộp vào khối Mô tả bên dưới; ở đây chỉ còn "Người tham dự" -->
-            {#<div class="flex items-center gap-4 bg-slate-50 dark-surface border border-slate-100 dark-border p-3 px-4 rounded-xl mb-6">
-                <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span class="material-symbols-outlined text-[20px]">group</span>
-                </div>
-                <div class="flex flex-col min-w-0">
-                    <span class="text-[10px] uppercase tracking-wider text-slate-400 dark-label font-bold">Người tham dự</span>
-                    <span class="text-sm font-bold text-slate-800 dark-strong" x-text="(selectedEvent?.employee_count || 0) + ' người đã đăng ký'"></span>
-                </div>
-            </div>
-
-            <!-- Divider Line -->
-            <hr class="border-0 border-t border-slate-100 dark-border mb-6">
-            #}
-            <!-- Description / Content (gộp chung Ngày tổ chức, Thời gian, Địa điểm vào đây) -->
-            <div class="flex flex-col">
-                <h3 class="text-lg font-extrabold text-slate-900 dark-strong mb-3">Mục tiêu & Nội dung</h3>
-
-                <div class="event-meta-inline">
+            <!-- Meta info chips -->
+            <div class="event-meta-inline">
+                <span class="event-meta-chip">
+                    <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                    <span x-text="selectedEvent?.start_at || 'Chưa xác định'"></span>
+                </span>
+                <span class="event-meta-chip">
+                    <span class="material-symbols-outlined text-[18px]">schedule</span>
+                    <span x-text="(selectedEvent?.start_time || '00:00') + ' - ' + (selectedEvent?.end_time || '00:00')"></span>
+                </span>
+                <template x-if="selectedEvent?.url_map">
+                    <a class="event-meta-chip event-meta-link" :href="selectedEvent.url_map" target="_blank" rel="noopener noreferrer">
+                        <span class="material-symbols-outlined text-[18px]">location_on</span>
+                        <span x-text="selectedEvent?.location || ''"></span>
+                    </a>
+                </template>
+                <template x-if="!selectedEvent?.url_map">
                     <span class="event-meta-chip">
-                        <span class="material-symbols-outlined text-[18px]">calendar_today</span>
-                        <span x-text="selectedEvent?.start_at || 'Chưa xác định'"></span>
-                    </span>
-                    <span class="event-meta-chip">
-                        <span class="material-symbols-outlined text-[18px]">schedule</span>
-                        <span x-text="(selectedEvent?.start_time || '00:00') + ' - ' + (selectedEvent?.end_time || '00:00')"></span>
-                    </span>
-                    {#
-                    === ĐOẠN CODE CŨ (tự tạo link Google Maps từ tên địa chỉ khi không có url_map -> comment lại):
-                    === Không đúng ý: chỉ nên click được khi ADMIN thực sự nhập Link Google Maps (url_map).
-                    === Nếu không nhập url_map thì không cho nhảy sang dù có tên địa chỉ.
-                    <a class="event-meta-chip event-meta-link"
-                       :href="selectedEvent?.url_map || ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(selectedEvent?.location || ''))"
-                       target="_blank" rel="noopener noreferrer"
-                       @click="if (!selectedEvent?.url_map && !selectedEvent?.location) $event.preventDefault()">
                         <span class="material-symbols-outlined text-[18px]">location_on</span>
                         <span x-text="selectedEvent?.location || 'Chưa xác định'"></span>
-                    </a>
-                    =======================================================================================
-                    #}
-                    <!-- Chỉ click được (mở Google Maps) khi có url_map. Tên địa chỉ chỉ dùng để HIỂN THỊ:
-                         có url_map + có tên -> hiện tên, bấm được; có url_map + không có tên -> không hiện
-                         tên (chỉ icon), vẫn bấm được; không có url_map -> không phải link, không bấm được. -->
-                    <template x-if="selectedEvent?.url_map">
-                        <a class="event-meta-chip event-meta-link" :href="selectedEvent.url_map" target="_blank" rel="noopener noreferrer">
-                            <span class="material-symbols-outlined text-[18px]">location_on</span>
-                            <span x-text="selectedEvent?.location || ''"></span>
-                        </a>
-                    </template>
-                    <template x-if="!selectedEvent?.url_map">
-                        <span class="event-meta-chip">
-                            <span class="material-symbols-outlined text-[18px]">location_on</span>
-                            <span x-text="selectedEvent?.location || 'Chưa xác định'"></span>
-                        </span>
-                    </template>
-                </div>
+                    </span>
+                </template>
+            </div>
 
+            <!-- Description / Content -->
+            <div class="flex flex-col mt-3">
+                <h3 class="text-base font-bold text-slate-900 dark-strong mb-2">Mục tiêu & Nội dung</h3>
                 <div class="text-sm sm:text-base text-slate-600 dark-muted leading-relaxed description-content"
                      x-html="selectedEvent?.description || '<p>Không có mô tả chi tiết cho sự kiện này.</p>'"></div>
             </div>
         </div>
 
+        <!-- Modal Body: Tab 2 (Attendees Management) -->
+        <div class="p-6 sm:p-8 flex flex-col text-left gap-4" x-show="activeTab === 'attendees'" x-cloak>
+            <!-- Actions Toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="relative flex-1 min-w-[200px] max-w-[320px]">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                    <input type="text" placeholder="Tìm kiếm khách mời..." x-model="attendeesSearch"
+                        @input.debounce.300ms="loadAttendees(1)"
+                        class="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark-border text-xs bg-slate-50 dark-surface text-slate-800 dark-strong outline-none" />
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button type="button" class="btn-sm-danger" x-show="selectedAttendeeIds.length > 0"
+                        @click="removeAttendees(selectedAttendeeIds)" x-transition>
+                        <span class="material-symbols-outlined text-[16px]">person_remove</span>
+                        Xóa (<span x-text="selectedAttendeeIds.length"></span>)
+                    </button>
+
+                    <button type="button" class="btn-sm-secondary" @click="openImportModal()">
+                        <span class="material-symbols-outlined text-[16px]">upload_file</span>
+                        Import
+                    </button>
+
+                    <button type="button" class="btn-sm-primary" @click="openAddEmployeesModal()">
+                        <span class="material-symbols-outlined text-[16px]">person_add</span>
+                        Thêm khách mời
+                    </button>
+                </div>
+            </div>
+
+            <!-- Attendees Table -->
+            <div class="border border-slate-200 dark-border rounded-xl overflow-x-auto bg-white dark-card">
+                <template x-if="attendeesLoading">
+                    <div class="flex flex-col items-center justify-center p-8 gap-2 text-slate-400 text-sm">
+                        <div class="spinner-sm"></div>
+                        <p>Đang tải danh sách...</p>
+                    </div>
+                </template>
+
+                <template x-if="!attendeesLoading && attendees.length === 0">
+                    <div class="flex flex-col items-center justify-center p-8 gap-2 text-center text-slate-400 text-sm">
+                        <span class="material-symbols-outlined text-[36px] opacity-60">person_off</span>
+                        <p class="font-medium text-slate-700 dark-strong">Chưa có khách mời nào trong sự kiện này</p>
+                        <p class="text-xs">Bấm <b>"Thêm khách mời"</b> hoặc <b>"Import"</b> để thêm người vào sự kiện.</p>
+                    </div>
+                </template>
+
+                <template x-if="!attendeesLoading && attendees.length > 0">
+                    <table class="w-full text-xs text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 dark-surface text-slate-500 border-b border-slate-200 dark-border">
+                                <th class="p-2.5 text-center w-8">
+                                    <input type="checkbox"
+                                        :checked="attendees.length > 0 && attendees.every(a => selectedAttendeeIds.includes(a.id))"
+                                        @change="toggleSelectAllAttendees()"
+                                        class="rounded accent-blue-600 cursor-pointer" />
+                                </th>
+                                <th class="p-2.5">Mã NV</th>
+                                <th class="p-2.5">Họ và tên</th>
+                                <th class="p-2.5">Phòng ban</th>
+                                <th class="p-2.5">Chức vụ</th>
+                                <th class="p-2.5 text-center w-10">Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="emp in attendees" :key="emp.id">
+                                <tr class="border-b border-slate-100 dark-border hover:bg-slate-50/50"
+                                    :class="{ 'bg-blue-50/40': selectedAttendeeIds.includes(emp.id) }">
+                                    <td class="p-2.5 text-center">
+                                        <input type="checkbox" :checked="selectedAttendeeIds.includes(emp.id)"
+                                            @change="toggleAttendee(emp.id)"
+                                            class="rounded accent-blue-600 cursor-pointer" />
+                                    </td>
+                                    <td class="p-2.5 font-mono text-slate-500" x-text="'#' + String(emp.id).padStart(8, '0')"></td>
+                                    <td class="p-2.5 font-bold text-slate-800 dark-strong" x-text="emp.name"></td>
+                                    <td class="p-2.5 text-slate-600 dark-muted" x-text="emp.department || '—'"></td>
+                                    <td class="p-2.5 text-slate-600 dark-muted" x-text="emp.position || '—'"></td>
+                                    <td class="p-2.5 text-center">
+                                        <button type="button" class="text-slate-400 hover:text-red-500 p-1 rounded"
+                                            @click="removeAttendees([emp.id])" title="Xóa khỏi sự kiện">
+                                            <span class="material-symbols-outlined text-[16px]">delete</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </template>
+            </div>
+
+            <!-- Pagination -->
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-1" x-show="!attendeesLoading && attendeesTotalPages > 1">
+                <button type="button" class="btn-page-sm" :disabled="attendeesPage <= 1"
+                    @click="loadAttendees(attendeesPage - 1)">Trước</button>
+                <span class="inline-flex items-center gap-1">
+                    Trang 
+                    <input type="number" min="1" :max="attendeesTotalPages" :value="attendeesPage"
+                        @keydown.enter.prevent="goToAttendeePage($event.target.value)"
+                        @blur="goToAttendeePage($event.target.value)"
+                        class="w-12 h-6 text-center border border-slate-200 dark-border rounded bg-white dark-card text-slate-800 dark-strong font-bold text-xs outline-none" title="Nhập số trang và nhấn Enter" />
+                    / <span x-text="attendeesTotalPages"></span> (<span x-text="attendeesTotal"></span> người)
+                </span>
+                <button type="button" class="btn-page-sm" :disabled="attendeesPage >= attendeesTotalPages"
+                    @click="loadAttendees(attendeesPage + 1)">Sau</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============================================================
+         SUB-MODAL: THÊM KHÁCH MỜI (Add Unassigned Employees)
+         ============================================================ -->
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100000] flex items-center justify-center p-4"
+        x-show="addModalOpen" x-cloak style="display: none;" @keydown.escape.window="closeAddEmployeesModal()">
+        <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-[600px] max-h-[80vh] flex flex-col overflow-hidden shadow-2xl"
+            @click.outside="closeAddEmployeesModal()">
+            
+            <div class="flex items-center justify-between p-4 border-b border-slate-200 dark-border">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-600 text-[20px]">person_add</span>
+                    <h3 class="font-bold text-base text-slate-900 dark-strong">Thêm khách mời vào sự kiện</h3>
+                </div>
+                <button type="button" class="text-slate-400 hover:text-slate-600 p-1 rounded" @click="closeAddEmployeesModal()">
+                    <span class="material-symbols-outlined text-[18px]">close</span>
+                </button>
+            </div>
+
+            <!-- Search -->
+            <div class="p-3 border-b border-slate-200 dark-border bg-slate-50 dark-surface">
+                <input type="text" placeholder="Tìm kiếm nhân viên chưa tham gia sự kiện..."
+                    x-model="unassignedSearch" @input.debounce.300ms="loadUnassignedEmployees(1)"
+                    class="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark-border text-xs bg-white dark-card text-slate-800 dark-strong outline-none" />
+            </div>
+
+            <!-- Body -->
+            <div class="flex-1 overflow-y-auto p-0">
+                <template x-if="unassignedLoading">
+                    <div class="flex flex-col items-center justify-center p-8 gap-2 text-slate-400 text-sm">
+                        <div class="spinner-sm"></div>
+                        <p>Đang tìm kiếm...</p>
+                    </div>
+                </template>
+
+                <template x-if="!unassignedLoading && unassignedEmployees.length === 0">
+                    <div class="flex flex-col items-center justify-center p-8 gap-2 text-slate-400 text-sm text-center">
+                        <span class="material-symbols-outlined text-[32px] opacity-60">group_off</span>
+                        <p class="font-medium text-slate-700 dark-strong">Không tìm thấy nhân viên phù hợp</p>
+                    </div>
+                </template>
+
+                <template x-if="!unassignedLoading && unassignedEmployees.length > 0">
+                    <table class="w-full text-xs text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 dark-surface text-slate-500 border-b border-slate-200 dark-border sticky top-0">
+                                <th class="p-2.5 text-center w-8">
+                                    <input type="checkbox"
+                                        :checked="unassignedEmployees.length > 0 && unassignedEmployees.every(e => selectedUnassignedIds.includes(e.id))"
+                                        @change="toggleSelectAllUnassigned()"
+                                        class="rounded accent-blue-600 cursor-pointer" />
+                                </th>
+                                <th class="p-2.5">Mã NV</th>
+                                <th class="p-2.5">Họ và tên</th>
+                                <th class="p-2.5">Phòng ban</th>
+                                <th class="p-2.5">Chức vụ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="emp in unassignedEmployees" :key="emp.id">
+                                <tr class="border-b border-slate-100 dark-border hover:bg-slate-50/50 cursor-pointer"
+                                    :class="{ 'bg-blue-50/40': selectedUnassignedIds.includes(emp.id) }"
+                                    @click="toggleUnassigned(emp.id)">
+                                    <td class="p-2.5 text-center" @click.stop>
+                                        <input type="checkbox" :checked="selectedUnassignedIds.includes(emp.id)"
+                                            @change="toggleUnassigned(emp.id)"
+                                            class="rounded accent-blue-600 cursor-pointer" />
+                                    </td>
+                                    <td class="p-2.5 font-mono text-slate-500" x-text="'#' + String(emp.id).padStart(8, '0')"></td>
+                                    <td class="p-2.5 font-bold text-slate-800 dark-strong" x-text="emp.name"></td>
+                                    <td class="p-2.5 text-slate-600 dark-muted" x-text="emp.department || '—'"></td>
+                                    <td class="p-2.5 text-slate-600 dark-muted" x-text="emp.position || '—'"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </template>
+            </div>
+
+            <!-- Footer -->
+            <div class="flex items-center justify-between p-3 border-t border-slate-200 dark-border bg-slate-50 dark-surface gap-2">
+                <div class="flex items-center gap-2 text-xs" x-show="!unassignedLoading && unassignedTotalPages > 1">
+                    <button type="button" class="btn-page-sm" :disabled="unassignedPage <= 1"
+                        @click="loadUnassignedEmployees(unassignedPage - 1)">Trước</button>
+                    <span class="inline-flex items-center gap-1">
+                        Trang 
+                        <input type="number" min="1" :max="unassignedTotalPages" :value="unassignedPage"
+                            @keydown.enter.prevent="goToUnassignedPage($event.target.value)"
+                            @blur="goToUnassignedPage($event.target.value)"
+                            class="w-12 h-6 text-center border border-slate-200 dark-border rounded bg-white dark-card text-slate-800 dark-strong font-bold text-xs outline-none" title="Nhập số trang và nhấn Enter" />
+                        / <span x-text="unassignedTotalPages"></span>
+                    </span>
+                    <button type="button" class="btn-page-sm" :disabled="unassignedPage >= unassignedTotalPages"
+                        @click="loadUnassignedEmployees(unassignedPage + 1)">Sau</button>
+                </div>
+
+                <div class="flex items-center gap-2 ml-auto">
+                    <span class="text-xs text-slate-500" x-show="selectedUnassignedIds.length > 0">
+                        Đã chọn: <b x-text="selectedUnassignedIds.length"></b>
+                    </span>
+                    <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-200 dark-border text-xs font-semibold text-slate-700 dark-strong"
+                        @click="closeAddEmployeesModal()">Hủy</button>
+                    <button type="button" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+                        :disabled="selectedUnassignedIds.length === 0 || isSubmittingRegisters"
+                        @click="addSelectedEmployees()">
+                        <span x-text="isSubmittingRegisters ? 'Đang thêm...' : ('Thêm (' + selectedUnassignedIds.length + ')')"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <style>
-    /* Các class "dark-*" + tuỳ biến bổ sung để modal chi tiết sự kiện theo đúng theme sáng/tối của app,
-       thay cho màu Tailwind cứng (slate/white) không tự đổi theo data-theme.
-       Chỉ override khi ở dark mode, giữ nguyên màu Tailwind gốc ở light mode. */
-    :root[data-theme="dark"] #event-detail-modal .bg-white {
+    /* Theme overrides */
+    :root[data-theme="dark"] #event-detail-modal .bg-white,
+    :root[data-theme="dark"] #event-detail-modal .dark-card {
         background-color: var(--card);
     }
     :root[data-theme="dark"] #event-detail-modal .border-slate-200,
+    :root[data-theme="dark"] #event-detail-modal .border-slate-100,
     :root[data-theme="dark"] #event-detail-modal .dark-border {
         border-color: var(--border);
     }
@@ -181,11 +583,122 @@
     :root[data-theme="dark"] #event-detail-modal .dark-surface {
         background-color: var(--bg-home-page);
     }
-    :root[data-theme="dark"] #event-detail-modal .dark-label {
-        color: var(--text-secondary);
-    }
     :root[data-theme="dark"] #event-detail-modal .dark-muted {
         color: var(--text-secondary);
+    }
+
+    .modal-tab-bar {
+        display: flex;
+        border-bottom: 1px solid var(--border, #e2e8f0);
+        padding: 0 24px;
+        background: var(--bg-home-page, #f8fafc);
+        gap: 8px;
+    }
+
+    .modal-tab-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 12px 14px;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--text-secondary, #64748b);
+        border: none;
+        background: transparent;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .modal-tab-btn:hover {
+        color: var(--foreground, #0f172a);
+    }
+
+    .modal-tab-btn.modal-tab-active {
+        color: #3b82f6;
+        border-bottom-color: #3b82f6;
+    }
+
+    .tab-count-badge {
+        padding: 1px 7px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: var(--card, #ffffff);
+        border: 1px solid var(--border, #cbd5e1);
+        color: var(--text-secondary, #64748b);
+    }
+
+    .btn-sm-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        border-radius: 7px;
+        background: #3b82f6;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: opacity 0.18s ease;
+    }
+
+    .btn-sm-primary:hover {
+        opacity: 0.9;
+    }
+
+    .btn-sm-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        border-radius: 7px;
+        background: var(--bg-home-page, #f1f5f9);
+        color: var(--foreground, #1e293b);
+        border: 1px solid var(--border, #cbd5e1);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.18s ease;
+    }
+
+    .btn-sm-secondary:hover {
+        background: var(--border, #e2e8f0);
+    }
+
+    .btn-sm-danger {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        border-radius: 7px;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.18s ease;
+    }
+
+    .btn-sm-danger:hover {
+        background: rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-page-sm {
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--border, #e2e8f0);
+        background: var(--card, #ffffff);
+        color: var(--foreground, #0f172a);
+        font-size: 11.5px;
+        cursor: pointer;
+    }
+
+    .btn-page-sm:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
     }
 
     .event-meta-inline {
@@ -201,15 +714,15 @@
         gap: 6px;
         padding: 6px 12px;
         border-radius: 999px;
-        background: var(--bg-home-page);
-        border: 1px solid var(--border);
-        color: var(--text-secondary);
+        background: var(--bg-home-page, #f8fafc);
+        border: 1px solid var(--border, #e2e8f0);
+        color: var(--text-secondary, #64748b);
         font-size: 13px;
         font-weight: 600;
     }
 
     .event-meta-link {
-        color: var(--login-bg);
+        color: #3b82f6;
         text-decoration: none;
         cursor: pointer;
     }

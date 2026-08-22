@@ -5,7 +5,24 @@
 
 {% block admin_body %}
 <link rel="stylesheet" href="/static/css/admin_events.css">
-<script src="/static/js/admin_events.js"></script>
+<script>
+(function() {
+    if (!window.adminEventsApp) {
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/static/js/admin_events.js?v=20260820-1', false);
+            xhr.send(null);
+            if (xhr.status === 200) {
+                const script = document.createElement('script');
+                script.text = xhr.responseText;
+                document.head.appendChild(script);
+            }
+        } catch (e) {
+            console.error('Không thể tải admin_events.js:', e);
+        }
+    }
+})();
+</script>
 
 <div class="admin-events-container" x-data="adminEventsApp()" @open-edit-modal.window="openEditModal($event.detail)"
     @delete-event.window="deleteEventById($event.detail.id, $event.detail.name)"

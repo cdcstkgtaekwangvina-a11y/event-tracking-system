@@ -8,6 +8,13 @@
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@media (max-width: 768px) {
+    .admin-main-content {
+        margin-left: 0 !important;
+        padding-top: 50px;
+    }
+}
+
 /* ĐOẠN CODE CŨ (không có): body toàn site (index.css) dùng justify-content:center; align-items:center;
    để căn giữa các trang đơn giản (login...). Nhưng layout admin (sidebar + #admin-main-content) là con
    trực tiếp của body, nên khi nội dung admin thấp hơn viewport (VD: không có sự kiện) body sẽ CĂN GIỮA

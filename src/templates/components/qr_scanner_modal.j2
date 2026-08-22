@@ -609,9 +609,8 @@
 </div>
 
 <script>
-document.addEventListener('alpine:init', () => {
-
-    Alpine.data('qrScannerModal', () => ({
+function qrScannerModalComponent() {
+    return {
         isOpen: false,
         tab: 'camera',          // 'camera' | 'image'
         result: null,           // decoded QR data string
@@ -867,31 +866,42 @@ document.addEventListener('alpine:init', () => {
                 this.$nextTick(() => this._scanFrame());
             }
         },
-    }));
-
-    /* ─── Global API ─── */
-    const getModalData = () => {
-        const el = document.getElementById('qrs-modal-root');
-        return el && window.Alpine ? window.Alpine.$data(el) : null;
     };
+}
 
-    window.qrScanner = {
-        open(opts) {
-            const data = getModalData();
-            if (data) data.open(opts);
-        },
-        close() {
-            const data = getModalData();
-            if (data) data.close();
-        },
-        /**
-         * Promise-based API: const result = await window.qrScanner.scanQR()
-         */
-        scanQR() {
-            const data = getModalData();
-            if (data) return data.scanQR();
-            return Promise.reject(new Error('QR Scanner component chưa sẵn sàng'));
-        },
-    };
-});
+window.qrScannerModal = qrScannerModalComponent;
+
+function initQrScannerModal() {
+    if (!window.Alpine) return;
+    if (typeof window.Alpine.data === 'function') {
+        window.Alpine.data('qrScannerModal', qrScannerModalComponent);
+    }
+}
+
+const getQrModalData = () => {
+    const el = document.getElementById('qrs-modal-root');
+    return el && window.Alpine ? window.Alpine.$data(el) : null;
+};
+
+window.qrScanner = {
+    open(opts) {
+        const data = getQrModalData();
+        if (data) data.open(opts);
+    },
+    close() {
+        const data = getQrModalData();
+        if (data) data.close();
+    },
+    scanQR() {
+        const data = getQrModalData();
+        if (data) return data.scanQR();
+        return Promise.reject(new Error('QR Scanner component chưa sẵn sàng'));
+    },
+};
+
+if (window.Alpine) {
+    initQrScannerModal();
+} else {
+    document.addEventListener('alpine:init', initQrScannerModal);
+}
 </script>
