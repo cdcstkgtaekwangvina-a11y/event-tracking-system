@@ -231,7 +231,7 @@ class BaseCrud(Generic[T]):
         statement: SelectOfScalar[Any] | Select[Any] | None = None,
         soft_delete: bool = True,
         dto_class: type[BaseModel] | None = None,
-    ) -> T | None:
+    ) -> Any | None:
 
         if statement is not None:
             self.statement = statement
@@ -239,9 +239,24 @@ class BaseCrud(Generic[T]):
         if self.is_has_soft_delete(self.model) and soft_delete:
             self.statement = self.statement.where(self.model.deleted_at == None)
 
+        target_dto = dto_class or self.dto_class
+
         result = await self.session.exec(self.statement)
+
+        row = result.first()
+
         self.statement = select(self.model)
-        return result.one()
+        self.dto_class = None
+
+        if not row:
+            return None
+
+        if target_dto:
+            if hasattr(row, "_mapping"):
+                return target_dto.model_validate(row._mapping)
+            return target_dto.model_validate(row)
+
+        return row
 
     async def find_by_id(self, id: Any, soft_delete: bool = True) -> T | None:
         statement = self.statement if self.statement is not None else select(self.model)
@@ -268,7 +283,7 @@ class BaseCrud(Generic[T]):
         self,
         statement: SelectOfScalar[Any] | Select[Any] | None = None,
         soft_delete: bool = True,
-    ) -> Sequence[T]:
+    ) -> Sequence[Any]:
         if statement is not None:
             self.statement = statement
         if self.is_has_soft_delete(self.model) and soft_delete:

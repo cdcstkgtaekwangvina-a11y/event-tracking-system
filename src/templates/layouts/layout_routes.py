@@ -12,8 +12,7 @@ def layouts_routes(app: FastAPI) -> FastAPI:
         auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
     ):
         return req.response_html(
-            name="/templates/layouts/main.j2",
-            context={},
+            name="/templates/layouts/main.j2", context={}, cache_time=3600
         )
 
     @app.get(
@@ -28,8 +27,7 @@ def layouts_routes(app: FastAPI) -> FastAPI:
     ):
 
         return req.response_html(
-            name="/templates/layouts/admin_home.j2",
-            context={},
+            name="/templates/layouts/admin_home.j2", context={}, cache_time=3600
         )
 
     @app.get("/.well-known/appspecific/com.chrome.devtools.json")

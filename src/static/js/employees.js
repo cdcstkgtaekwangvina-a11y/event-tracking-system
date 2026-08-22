@@ -56,62 +56,12 @@ window.employeeActions = {
     },
 };
 
-/**
- * Bootstrap Alpine.js-based modal open helpers.
- */
-window.employeeFormModal = {
-    open(options = {}) {
-        window.dispatchEvent(new CustomEvent('emp-form-open', { detail: options }));
-        const el = document.getElementById('emp-form-modal-backdrop');
-        if (el) {
-            el.classList.remove('hidden');
-            el.style.display = 'flex';
-            if (window.Alpine && window.Alpine.$data) {
-                try {
-                    const data = window.Alpine.$data(el);
-                    if (data && typeof data.open === 'function') data.open(options);
-                } catch(e) {}
-            }
-        }
-    },
-};
+/* ============================================================
+   Component Factory Functions for Alpine.js
+   ============================================================ */
 
-window.employeeDeleteModal = {
-    open(options = {}) {
-        window.dispatchEvent(new CustomEvent('emp-delete-open', { detail: options }));
-        const el = document.getElementById('emp-delete-modal-backdrop');
-        if (el) {
-            el.classList.remove('hidden');
-            el.style.display = 'flex';
-            if (window.Alpine && window.Alpine.$data) {
-                try {
-                    const data = window.Alpine.$data(el);
-                    if (data && typeof data.open === 'function') data.open(options);
-                } catch(e) {}
-            }
-        }
-    },
-};
-
-window.employeeImportModal = {
-    open() {
-        window.dispatchEvent(new CustomEvent('emp-import-open'));
-        const el = document.getElementById('emp-import-modal-backdrop');
-        if (el) {
-            el.classList.remove('hidden');
-            el.style.display = 'flex';
-            if (window.Alpine && window.Alpine.$data) {
-                try {
-                    const data = window.Alpine.$data(el);
-                    if (data && typeof data.open === 'function') data.open();
-                } catch(e) {}
-            }
-        }
-    },
-};
-
-document.addEventListener('alpine:init', () => {
-    Alpine.data('employeeDeleteModal', () => ({
+function employeeDeleteModalComponent() {
+    return {
         isOpen: false,
         mode: 'single',
         employeeId: null,
@@ -119,7 +69,7 @@ document.addEventListener('alpine:init', () => {
         employeeName: '',
         loading: false,
         init() {
-            window.employeeDeleteModal = this;
+            window.employeeDeleteModalInstance = this;
         },
         open(options = {}) {
             this.mode = options.mode || (options.ids ? 'bulk' : 'single');
@@ -169,9 +119,11 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false;
             }
         }
-    }));
+    };
+}
 
-    Alpine.data('employeeFormModal', () => ({
+function employeeFormModalComponent() {
+    return {
         isOpen: false,
         mode: 'create',
         employee: null,
@@ -186,7 +138,7 @@ document.addEventListener('alpine:init', () => {
             starting_date: ''
         },
         init() {
-            window.employeeFormModal = this;
+            window.employeeFormModalInstance = this;
         },
         open(options = {}) {
             this.mode = options.mode || 'create';
@@ -263,11 +215,13 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false;
             }
         }
-    }));
+    };
+}
 
-    /* ===== Employee Import Modal ===== */
-    Alpine.data('employeeImportModal', () => ({
+function employeeImportModalComponent() {
+    return {
         isOpen: false,
+        eventId: null,
         step: 'url',
         fileUrl: '',
         headerRow: 1,
@@ -292,7 +246,10 @@ document.addEventListener('alpine:init', () => {
         },
         loading: false,
         init() {
-            window.employeeImportModal = this;
+            window.employeeImportModalInstance = this;
+            window.addEventListener('emp-import-open', (e) => {
+                this.open(e.detail || {});
+            });
             window.addEventListener('emp-media-picked', (e) => {
                 this.fileUrl = e.detail.url;
                 this.$nextTick(() => {
@@ -300,94 +257,98 @@ document.addEventListener('alpine:init', () => {
                 });
             });
         },
-        open() {
+        open(options = {}) {
+            this.eventId = (typeof options === 'object' && options?.eventId) ? options.eventId : (typeof options === 'number' ? options : null);
             this.step = 'url';
             this.fileUrl = '';
             this.headerRow = 1;
             this.rowCount = 20;
             this.previewData = null;
             this.columnMap = {};
-            this.resetFileValidation();
+            this.fileValidation = { url: '', status: 'idle', type: '', message: '' };
             this.isOpen = true;
+            const el = document.getElementById('emp-import-modal-backdrop');
+            if (el) {
+                el.classList.remove('hidden');
+                el.style.display = 'flex';
+            }
         },
         close() {
             this.isOpen = false;
-        },
-        resetFileValidation() {
-            this.fileValidation = {
-                url: '',
-                status: 'idle',
-                type: '',
-                message: ''
-            };
+            const el = document.getElementById('emp-import-modal-backdrop');
+            if (el) {
+                el.style.display = 'none';
+            }
         },
         onFileUrlChanged() {
-            this.previewData = null;
-            this.columnMap = {};
-            const value = String(this.fileUrl || '').trim();
-            if (!value) {
-                this.resetFileValidation();
+            const val = (this.fileUrl || '').trim();
+            if (!val) {
+                this.fileValidation = { url: '', status: 'idle', type: '', message: '' };
                 return;
             }
-            this.validateFileUrl(value, { silent: true });
+            this.validateFileUrl(val);
         },
         async previewFile() {
-            if (!this.fileUrl.trim()) {
-                window.notify?.toast?.error?.('Lỗi', 'Vui lòng nhập hoặc chọn URL file');
+            const val = (this.fileUrl || '').trim();
+            if (!val) {
+                window.notify?.toast?.error?.('Lỗi', 'Vui lòng nhập đường dẫn file');
                 return;
             }
-            const currentUrl = String(this.fileUrl || '').trim();
-            const canContinue = (
-                this.fileValidation.url === currentUrl &&
-                ['valid', 'unknown'].includes(this.fileValidation.status)
-            ) || await this.validateFileUrl(currentUrl);
-            if (!canContinue) return;
+
+            const isValid = await this.validateFileUrl(val, { silent: false });
+            if (!isValid && this.fileValidation.status === 'invalid') {
+                return;
+            }
+
             this.loading = true;
             try {
-                const res = await window.fetchHelper.post('employees/read-import-file', {
-                    url: this.fileUrl,
-                    header_row: this.headerRow,
-                    row_count: this.rowCount
+                const query = new URLSearchParams({
+                    file_url: val,
+                    header_row: String(this.headerRow || 1),
+                    row_count: String(this.rowCount || 20)
                 });
-                if (res.status_code === 200) {
+                const res = await window.fetchHelper.get('employees/preview-import?' + query.toString());
+                if (res.status_code === 200 && res.data) {
                     this.previewData = res.data;
                     this.columnMap = {};
+                    const headers = res.data.headers || [];
+                    const normalizedHeaders = headers.map(h => ({
+                        original: h,
+                        normalized: String(h).toLowerCase().trim().replace(/[^a-z0-9]/g, '')
+                    }));
 
-                    /* Auto-map headers nếu khớp từ khóa thông dụng */
-                    const headers = res.data?.headers || [];
-                    const keywordsMap = {
-                        id: ['mã số', 'ma so', 'mã nhân viên', 'ma nhan vien', 'mã nv', 'ma nv', 'id', 'code', 'emp_id', 'employee_id'],
-                        name: ['họ và tên', 'ho va ten', 'họ tên', 'ho ten', 'tên', 'name', 'full name'],
-                        email: ['email', 'thu dien tu', 'thư điện tử'],
-                        position: ['chức vụ', 'chuc vu', 'position', 'vị trí', 'vi tri'],
-                        department: ['phòng ban', 'phong ban', 'khoa', 'bộ phận', 'bo phan', 'department'],
-                        gender: ['giới tính', 'gioi tinh', 'giưới tính', 'giuoi tinh', 'gender', 'sex', 'nam/nữ', 'nam/nu', 'nam nu', 'phái', 'phai', 'gt', 'male', 'female'],
-                        starting_date: ['ngày bắt đầu', 'ngay bat dau', 'ngày vào công ty', 'ngay vao cong ty', 'starting_date', 'start_date']
+                    const fieldAliases = {
+                        id: ['id', 'ma', 'manv', 'manhanvien', 'code', 'employeecode', 'employeeid', 'maso', 'stt'],
+                        name: ['name', 'hoten', 'ten', 'fullname', 'hovaten', 'tennhanvien', 'displayname', 'employee_name'],
+                        email: ['email', 'mail', 'thu', 'diachiemail', 'useremail'],
+                        position: ['position', 'chucvu', 'vitri', 'jobtitle', 'chucdanh', 'role'],
+                        department: ['department', 'phongban', 'bophan', 'dept', 'team', 'donvi'],
+                        gender: ['gender', 'gioitinh', 'sex', 'namnu'],
+                        starting_date: ['startingdate', 'ngaybatdau', 'startdate', 'ngayvao', 'ngayvaolam', 'hiredate', 'joineddate', 'ngaynhanviec']
                     };
 
-                    headers.forEach(h => {
-                        const normalized = String(h).trim().toLowerCase();
-                        for (const [field, keywords] of Object.entries(keywordsMap)) {
-                            if (!this.columnMap[field] && keywords.some(k => normalized.includes(k))) {
-                                this.columnMap[field] = h;
-                            }
+                    this.requiredFields.forEach(field => {
+                        const aliases = fieldAliases[field] || [field];
+                        const match = normalizedHeaders.find(h =>
+                            aliases.some(alias => h.normalized === alias || h.normalized.includes(alias) || alias.includes(h.normalized))
+                        );
+                        if (match) {
+                            this.columnMap[field] = match.original;
                         }
                     });
 
                     this.step = 'map';
                 } else {
-                    window.notify?.toast?.error?.('Lỗi', res.message || 'Không thể đọc file');
+                    window.notify?.toast?.error?.('Lỗi', res.message || 'Không thể đọc file preview');
                 }
             } catch (e) {
-                window.notify?.toast?.error?.('Lỗi', 'Lỗi kết nối');
+                window.notify?.toast?.error?.('Lỗi', 'Không thể kết nối máy chủ để xem trước file');
             } finally {
                 this.loading = false;
             }
         },
-        async validateFileUrl(url, options = {}) {
-            const value = String(url || '').trim();
+        async validateFileUrl(value, options = { silent: true }) {
             if (!value) return false;
-
             this.fileValidation = {
                 url: value,
                 status: 'checking',
@@ -475,8 +436,6 @@ document.addEventListener('alpine:init', () => {
                 };
                 return true;
             }
-
-            return false;
         },
         async importData() {
             if (!this.columnMap.id || !this.columnMap.name) {
@@ -484,7 +443,6 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            /* Đảo ngược columnMap: { dbField: excelHeader } -> { excelHeader: dbField } */
             const formattedColumnMap = {};
             for (const [dbField, excelHeader] of Object.entries(this.columnMap)) {
                 if (excelHeader && String(excelHeader).trim()) {
@@ -494,21 +452,29 @@ document.addEventListener('alpine:init', () => {
 
             this.loading = true;
             try {
-                const res = await window.fetchHelper.post('employees/import', {
+                const payload = {
                     file_url: this.fileUrl,
                     header_row: this.headerRow,
                     column_map: formattedColumnMap
-                });
+                };
+                if (this.eventId) {
+                    payload.event_id = this.eventId;
+                }
+                const res = await window.fetchHelper.post('employees/import', payload);
                 if (res.status_code === 200) {
                     window.notify?.toast?.success?.('Thành công', res.message || 'Import thành công, đang xử lý...');
                     this.close();
+                    window.dispatchEvent(new CustomEvent('event-employees-updated', { detail: { eventId: this.eventId } }));
                     setTimeout(() => {
-                        const tableUrl = new URL(window.EMP_URLS.employeesTable, window.location.origin);
-                        const curParams = new URLSearchParams(window.location.search);
-                        ['page', 'limit', 'search', 'sort_field', 'is_desc'].forEach(k => {
-                            if (curParams.has(k)) tableUrl.searchParams.set(k, curParams.get(k));
-                        });
-                        htmx.ajax('GET', tableUrl.toString(), { target: '#emp-table-container', swap: 'innerHTML' });
+                        window.dispatchEvent(new CustomEvent('event-employees-updated', { detail: { eventId: this.eventId } }));
+                        if (window.EMP_URLS?.employeesTable && document.getElementById('emp-table-container')) {
+                            const tableUrl = new URL(window.EMP_URLS.employeesTable, window.location.origin);
+                            const curParams = new URLSearchParams(window.location.search);
+                            ['page', 'limit', 'search', 'sort_field', 'is_desc'].forEach(k => {
+                                if (curParams.has(k)) tableUrl.searchParams.set(k, curParams.get(k));
+                            });
+                            htmx.ajax('GET', tableUrl.toString(), { target: '#emp-table-container', swap: 'innerHTML' });
+                        }
                     }, 2000);
                 } else {
                     window.notify?.toast?.error?.('Lỗi', res.message || 'Import thất bại');
@@ -519,21 +485,18 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false;
             }
         }
-    }));
+    };
+}
 
-    /* ===== Employee Import Media Picker ===== */
-    Alpine.data('empImportMediaPicker', () => ({
+function empImportMediaPickerComponent() {
+    return {
+        isOpen: false,
         open: false,
         loading: false,
         uploading: false,
         folderId: '',
         folderStack: [],
         search: '',
-
-        /*
-         * BẮT BUỘC có viewMode + mediaPicker đủ cấu trúc
-         * để items_grid.j2 (load qua fetch) resolve Alpine scope đúng
-         */
         viewMode: 'grid',
         mediaPicker: {
             selected: null,
@@ -549,25 +512,20 @@ document.addEventListener('alpine:init', () => {
             sortOpen: false,
             sortDir: 'desc',
         },
-
         allowedExts: ['xlsx', 'xls', 'csv', 'json'],
-
         isAllowedExt(ext) {
             if (!ext) return false;
             return this.allowedExts.includes(ext.toLowerCase().replace(/^\./, ''));
         },
-
         getExtFromNameOrUrl(name = '', url = '') {
             const source = String(name || '').includes('.')
                 ? String(name || '')
                 : String(url || '').split('?')[0];
             return source.includes('.') ? source.split('.').pop().toLowerCase() : '';
         },
-
         init() {
-            window.empImportMediaPicker = this;
+            window.empImportMediaPickerInstance = this;
         },
-
         openPicker() {
             this.folderId = '';
             this.folderStack = [];
@@ -576,26 +534,24 @@ document.addEventListener('alpine:init', () => {
             this.mediaPicker.folderId = '';
             this.mediaPicker.folderStack = [];
             this.mediaPicker.search = '';
+            this.isOpen = true;
             this.open = true;
             this.loadItems('');
         },
-
         closePicker() {
+            this.isOpen = false;
             this.open = false;
         },
-
         goRoot() {
             this.folderStack = [];
             this.mediaPicker.folderStack = [];
             this.loadItems('');
         },
-
         goBack() {
             const prev = this.folderStack.pop();
             this.mediaPicker.folderStack = [...this.folderStack];
             this.loadItems(prev || '');
         },
-
         async loadItems(folderId = '', pushHistory = false) {
             const container = document.getElementById('emp-import-media-items');
             if (!container) return;
@@ -625,10 +581,6 @@ document.addEventListener('alpine:init', () => {
                 const html = await res.text();
                 container.innerHTML = html;
 
-                /*
-                 * Dùng $nextTick để đợi Alpine init xong các node mới
-                 * rồi mới gắn click handler JS
-                 */
                 this.$nextTick(() => {
                     container.querySelectorAll('.media-row, .media-grid-card').forEach(el => {
                         el.style.cursor = 'pointer';
@@ -647,7 +599,6 @@ document.addEventListener('alpine:init', () => {
                 this.mediaPicker.loading = false;
             }
         },
-
         handleItemClick(el) {
             const kind = el.dataset.mediaKind || el.dataset.type || 'file';
             const id = el.dataset.id;
@@ -661,7 +612,6 @@ document.addEventListener('alpine:init', () => {
             const url = el.dataset.mediaUrl || '';
             const ext = this.getExtFromNameOrUrl(name, url);
 
-            /* Gán vào mediaPicker.selected để Alpine `:class` trong items_grid reactive */
             this.mediaPicker.selected = {
                 id: parseInt(id, 10),
                 name,
@@ -672,7 +622,6 @@ document.addEventListener('alpine:init', () => {
             };
             this.syncClasses();
         },
-
         syncClasses() {
             const container = document.getElementById('emp-import-media-items');
             if (!container) return;
@@ -681,7 +630,6 @@ document.addEventListener('alpine:init', () => {
                 el.classList.toggle('selected', !!selId && parseInt(el.dataset.id, 10) === selId);
             });
         },
-
         confirmSelect() {
             const sel = this.mediaPicker.selected;
             if (!sel || sel.kind === 'folder' || !sel.url) return;
@@ -693,7 +641,6 @@ document.addEventListener('alpine:init', () => {
             window.notify?.toast?.success?.('Thành công', 'Đã chọn: ' + sel.name);
             window.dispatchEvent(new CustomEvent('emp-media-picked', { detail: { url: sel.url, name: sel.name } }));
         },
-
         formatBytes(bytes) {
             const n = parseInt(bytes, 10);
             if (!n || n <= 0) return '—';
@@ -701,7 +648,6 @@ document.addEventListener('alpine:init', () => {
             if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
             return (n / 1048576).toFixed(1) + ' MB';
         },
-
         async onFileSelected(event) {
             const file = event.target?.files?.[0];
             if (!file) return;
@@ -714,7 +660,6 @@ document.addEventListener('alpine:init', () => {
             await this.uploadFile(file);
             event.target.value = '';
         },
-
         async uploadFile(file) {
             if (!file || this.uploading) return;
             this.uploading = true;
@@ -741,5 +686,64 @@ document.addEventListener('alpine:init', () => {
                 this.mediaPicker.uploading = false;
             }
         }
-    }));
-});
+    };
+}
+
+/* ============================================================
+   Global Exports & Helper Attachments
+   ============================================================ */
+
+// Attach .open helpers directly to the function objects
+employeeFormModalComponent.open = function(options = {}) {
+    window.dispatchEvent(new CustomEvent('emp-form-open', { detail: options }));
+    const el = document.getElementById('emp-form-modal-backdrop');
+    if (el) {
+        el.classList.remove('hidden');
+        el.style.display = 'flex';
+    }
+};
+
+employeeDeleteModalComponent.open = function(options = {}) {
+    window.dispatchEvent(new CustomEvent('emp-delete-open', { detail: options }));
+    const el = document.getElementById('emp-delete-modal-backdrop');
+    if (el) {
+        el.classList.remove('hidden');
+        el.style.display = 'flex';
+    }
+};
+
+employeeImportModalComponent.open = function(options = {}) {
+    window.dispatchEvent(new CustomEvent('emp-import-open', { detail: options }));
+    const el = document.getElementById('emp-import-modal-backdrop');
+    if (el) {
+        el.classList.remove('hidden');
+        el.style.display = 'flex';
+    }
+};
+
+empImportMediaPickerComponent.open = function(options = {}) {
+    window.dispatchEvent(new CustomEvent('emp-media-picker-open', { detail: options }));
+};
+
+// Make sure global window properties are defined as constructors
+window.employeeDeleteModal = employeeDeleteModalComponent;
+window.employeeFormModal = employeeFormModalComponent;
+window.employeeImportModal = employeeImportModalComponent;
+window.empImportMediaPicker = empImportMediaPickerComponent;
+
+// Register with Alpine.data
+function initAlpineEmployees() {
+    if (!window.Alpine) return;
+    if (typeof window.Alpine.data === 'function') {
+        window.Alpine.data('employeeDeleteModal', employeeDeleteModalComponent);
+        window.Alpine.data('employeeFormModal', employeeFormModalComponent);
+        window.Alpine.data('employeeImportModal', employeeImportModalComponent);
+        window.Alpine.data('empImportMediaPicker', empImportMediaPickerComponent);
+    }
+}
+
+if (window.Alpine) {
+    initAlpineEmployees();
+} else {
+    document.addEventListener('alpine:init', initAlpineEmployees);
+}

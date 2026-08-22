@@ -128,9 +128,10 @@
 <!-- ============================================================
      Media Picker — standalone component at document level
      ============================================================ -->
-<div id="emp-import-media-picker-root" x-data="empImportMediaPicker()" x-show="open" x-cloak
-    :style="{ display: open ? 'flex' : 'none' }" @emp-media-picker-open.window="openPicker()"
-    @keydown.escape.window="open && closePicker()">
+<div id="emp-import-media-picker-root" x-data="empImportMediaPicker()" x-show="isOpen" x-cloak
+    style="display: none;"
+    :style="{ display: isOpen ? 'flex' : 'none' }" @emp-media-picker-open.window="openPicker()"
+    @keydown.escape.window="isOpen && closePicker()">
     <!-- Backdrop -->
     <div class="emp-mp-backdrop" @click="closePicker()"></div>
     <!-- Dialog — tất cả layout-critical styles qua CSS id-scoped bên trên -->

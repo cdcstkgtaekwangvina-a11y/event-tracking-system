@@ -1,12 +1,13 @@
 # from __future__ import annotations
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Optional, cast
+
+from sqlmodel import DateTime, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from database.models.events import Events
     from database.models.employees import Employees
+    from database.models.events import Events
 
 
 class EVENT_EMPLOYEE_STATUS(str, Enum):
@@ -21,9 +22,15 @@ class EventsEmployees(SQLModel, table=True):
         default=EVENT_EMPLOYEE_STATUS.PENDING, nullable=False, max_length=50
     )
 
-    join_at: datetime | None = Field(default=None, nullable=True)
-    check_in_at: datetime | None = Field(default=None, nullable=True)
-    send_at: datetime | None = Field(default=None, nullable=True)
+    join_at: datetime | None = Field(
+        default=None, nullable=True, sa_type=cast(Any, DateTime(timezone=True))
+    )
+    check_in_at: datetime | None = Field(
+        default=None, nullable=True, sa_type=cast(Any, DateTime(timezone=True))
+    )
+    send_at: datetime | None = Field(
+        default=None, nullable=True, sa_type=cast(Any, DateTime(timezone=True))
+    )
 
     event_id: int | None = Field(
         default=None, primary_key=True, foreign_key="events.id"
