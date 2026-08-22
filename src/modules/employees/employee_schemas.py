@@ -1,10 +1,12 @@
 from datetime import date
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from fastapi import Depends, Query
 from pydantic import Field, field_validator
 
 from src.shared.base.base_schema import BaseSchema
+from src.shared.schemas.pagination_schemas import PaginationQuery, PaginationRequest
 
 
 class EmployeeCreateRequest(BaseSchema):
@@ -24,6 +26,28 @@ class EmployeeCreateRequest(BaseSchema):
         if isinstance(v, str) and not v.strip():
             return None
         return v
+
+
+class EmployeesPagination(PaginationRequest):
+    event_id: int | None = Field(default=None)
+    ignore_event: int | None = Field(default=None)
+
+
+def parse_employees_pagination(
+    pagination: PaginationQuery,
+    event_id: int | None = Query(default=None),
+    ignore_event: int | None = Query(default=None),
+) -> EmployeesPagination:
+    return EmployeesPagination(
+        **pagination.model_dump(),
+        event_id=event_id,
+        ignore_event=ignore_event,
+    )
+
+
+EmployeesPaginationQuery = Annotated[
+    EmployeesPagination, Depends(parse_employees_pagination)
+]
 
 
 class EmployeeUpdateRequest(BaseSchema):
@@ -48,6 +72,7 @@ class BulkUpsertEmployeeRequest(BaseSchema):
     file_url: str
     column_map: dict[str, str] | None = None
     header_row: int | None = Field(default=None, ge=0)
+    event_id: int | None = Field(default=None)
 
 
 class BulkUpsertResponse(BaseSchema):

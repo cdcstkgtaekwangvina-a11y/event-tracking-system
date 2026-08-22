@@ -1,6 +1,17 @@
+from datetime import datetime, timezone
+
 from fastapi import Depends
+from fastapi.responses import HTMLResponse
+
+from src.shared.base import BaseRouter
+from src.shared.base.base_request import BaseRequest
+from src.shared.helpers.cbv import clean_cbv
+from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagination
+
 from .event_schemas import (
     AdminEventQuery,
+    CheckInEmployeeRequest,
+    EmployeeIdsSchema,
     EventCreateRequest,
     EventUpdateRequest,
     PublicEventQuery,
@@ -8,12 +19,6 @@ from .event_schemas import (
     parse_public_event_query,
 )
 from .event_services import EventServices
-from src.shared.base import BaseRouter
-from src.shared.helpers.cbv import clean_cbv
-from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagination
-from src.shared.base.base_request import BaseRequest
-from fastapi.responses import HTMLResponse
-from datetime import datetime, timezone
 
 TAG_NAME = "events"
 router = BaseRouter(controller=TAG_NAME, tags=[TAG_NAME])
@@ -121,6 +126,18 @@ class EventController:
     async def delete_event(self, event_id: int):
         return await self.service.delete_event(event_id)
 
-    @router.post_api("{event_id}/register")
-    async def register_event(self, event_id: int, employee_id: int):
-        return await self.service.register_employee(event_id, employee_id)
+    @router.get_api("{event_id}/employee/{employee_id}")
+    async def get_employee_in_event(self, event_id: int, employee_id: int):
+        return await self.service.get_employee_in_event(event_id, employee_id)
+
+    @router.post_api("{event_id}/registers")
+    async def register_event(self, event_id: int, schema: EmployeeIdsSchema):
+        return await self.service.register_employee(event_id, schema)
+
+    @router.delete_api("{event_id}/remove-registers")
+    async def remove_registers_event(self, event_id: int, schema: EmployeeIdsSchema):
+        return await self.service.remove_employee_froms_event(event_id, schema)
+
+    @router.post_api("check-in")
+    async def check_in_event(self, schema: CheckInEmployeeRequest):
+        return await self.service.check_in_employee(schema)

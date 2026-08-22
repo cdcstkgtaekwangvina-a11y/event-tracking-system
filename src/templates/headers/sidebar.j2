@@ -1,5 +1,9 @@
 <div x-data="{
-    isSidebar: localStorage.getItem('isSidebar') == 'false' ? false : true,
+    isSidebar: (() => {
+        const isMob = window.matchMedia('(max-width: 767px)').matches;
+        if (isMob) return false;
+        return localStorage.getItem('isSidebar') == 'false' ? false : true;
+    })(),
     lightModeText: 'Chế độ sáng', 
     darkModeText: 'Chế độ tối', 
     expandedStyle: 'box-shadow: none; border-radius: 10px; width: 90%; display: flex; align-items: center; gap: 5px; border: 0px;',
@@ -41,6 +45,13 @@
             }
         }
     },
+    closeSidebarOnMobile() {
+        if (this.$store.screen && this.$store.screen.isMobile && this.isSidebar) {
+            this.isSidebar = false;
+            this.customStyle = 'box-shadow: none; border: 0; border-radius: 25%;';
+            this.updateMainMargin();
+        }
+    },
     init() {
     this.customStyle = this.isSidebar ? this.expandedStyle : 'box-shadow: none; border: 0; border-radius: 25%;';
     this.updateMainMargin();
@@ -52,6 +63,11 @@
         });
         window.addEventListener('popstate', () => { 
             this.currentPath = window.location.pathname; 
+        });
+        document.addEventListener('htmx:afterRequest', (evt) => {
+            if (evt.detail.target && evt.detail.target.id === 'admin-main-content') {
+                this.closeSidebarOnMobile();
+            }
         });
     },
     updateMainMargin() {
@@ -66,7 +82,9 @@
     toggle_sidebar(){
     this.isSidebar = !this.isSidebar;
     this.customStyle = this.isSidebar ? this.expandedStyle : 'box-shadow: none; border: 0; border-radius: 25%;';
-    localStorage.setItem('isSidebar', this.isSidebar);
+    if (!(this.$store.screen && this.$store.screen.isMobile)) {
+        localStorage.setItem('isSidebar', this.isSidebar);
+    }
     this.updateMainMargin();
     }
     }">
@@ -97,7 +115,8 @@
         <div class="sidebar-body">
             {% for page in ADMIN_PAGES %}
             <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
-                hx-push-url="true" :data-active="isActivePage('{{ page.id }}', currentPath)">
+                hx-push-url="true" :data-active="isActivePage('{{ page.id }}', currentPath)"
+                @click="closeSidebarOnMobile()">
 
                 <span class="material-symbols-outlined">
                     {{ page.icon }}

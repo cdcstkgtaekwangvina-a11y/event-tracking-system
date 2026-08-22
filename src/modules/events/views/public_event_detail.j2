@@ -1,0 +1,398 @@
+{% extends "templates/index.j2" %}
+{% block title %}Chi tiết sự kiện{% endblock %}
+
+{% block body %}
+{% include "templates/headers/index.j2" %}
+<main class="site-main">
+    <script>
+        function publicEventDetailApp(eventId) {
+            return {
+                eventId: eventId,
+                isLoading: true,
+                event: null,
+                error: '',
+
+                async init() {
+                    this.isLoading = true;
+                    this.error = '';
+                    try {
+                        const response = await fetch('/api/events/' + this.eventId);
+                        const result = await response.json();
+                        const data = result?.data || result;
+                        if (response.ok && data && data.id) {
+                            this.event = data;
+                            document.title = (data.name || 'Chi tiết sự kiện') + ' - Event tracking system';
+                        } else {
+                            this.error = result?.message || result?.detail || 'Không tìm thấy thông tin sự kiện.';
+                        }
+                    } catch (err) {
+                        console.error('Lỗi khi lấy chi tiết sự kiện:', err);
+                        this.error = err.message || 'Không thể kết nối đến máy chủ.';
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                formatDate(isoString) {
+                    if (!isoString) return 'Chưa xác định';
+                    const date = new Date(isoString);
+                    if (isNaN(date.getTime())) return 'Chưa xác định';
+                    const pad = (n) => n.toString().padStart(2, '0');
+                    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+                },
+
+                formatTime(isoString) {
+                    if (!isoString) return '00:00';
+                    const date = new Date(isoString);
+                    if (isNaN(date.getTime())) return '00:00';
+                    const pad = (n) => n.toString().padStart(2, '0');
+                    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+                },
+
+                getStatusText(startAt, endAt) {
+                    if (!startAt) return 'Sắp diễn ra';
+                    const now = new Date();
+                    const start = new Date(startAt);
+                    const end = endAt ? new Date(endAt) : null;
+                    if (start <= now && (!end || end >= now)) {
+                        return 'Đang diễn ra';
+                    }
+                    if (end && end < now) {
+                        return 'Đã kết thúc';
+                    }
+                    return 'Sắp diễn ra';
+                },
+
+                getStatusClass(startAt, endAt) {
+                    const status = this.getStatusText(startAt, endAt);
+                    if (status === 'Đang diễn ra') return 'status-ongoing';
+                    if (status === 'Đã kết thúc') return 'status-ended';
+                    return 'status-upcoming';
+                }
+            };
+        }
+    </script>
+
+    <div class="public-detail-page" x-data="publicEventDetailApp({{ event_id }})">
+        <!-- Back Navigation Button -->
+        <div class="detail-top-nav">
+            <a href="/" class="btn-back-link">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Trang chủ sự kiện
+            </a>
+        </div>
+
+        <!-- Loading State -->
+        <template x-if="isLoading">
+            <div class="detail-loading-box">
+                <div class="spinner"></div>
+                <p>Đang tải nội dung sự kiện...</p>
+            </div>
+        </template>
+
+        <!-- Error State -->
+        <template x-if="!isLoading && error">
+            <div class="detail-error-box">
+                <span class="material-symbols-outlined icon-huge">event_busy</span>
+                <h3>Không thể xem sự kiện</h3>
+                <p x-text="error"></p>
+                <a href="/" class="btn-home-return">Quay lại trang chủ</a>
+            </div>
+        </template>
+
+        <!-- Content Loaded -->
+        <template x-if="!isLoading && event">
+            <article class="detail-card">
+                <!-- Header Banner -->
+                <div class="detail-banner"
+                    :style="event.url_image ? 'background-image: url(' + event.url_image + ')' : ''"
+                    :class="{ 'has-image': !!event.url_image, 'default-banner': !event.url_image }">
+                    <template x-if="!event.url_image">
+                        <span class="material-symbols-outlined banner-placeholder-icon">calendar_today</span>
+                    </template>
+                    <span class="detail-status-badge" :class="getStatusClass(event.start_at, event.end_at)"
+                        x-text="getStatusText(event.start_at, event.end_at)">
+                    </span>
+                </div>
+
+                <!-- Event Details Body -->
+                <div class="detail-body">
+                    <h1 class="detail-title" x-text="event.name"></h1>
+
+                    <!-- Metadata Chips Bar -->
+                    <div class="detail-meta-bar">
+                        <!-- Date & Time -->
+                        <div class="meta-chip">
+                            <span class="material-symbols-outlined">calendar_month</span>
+                            <span x-text="formatDate(event.start_at)"></span>
+                            <template x-if="event.start_at">
+                                <span class="meta-time-range"
+                                    x-text="'· ' + formatTime(event.start_at) + (event.end_at ? ' - ' + formatTime(event.end_at) : '')"></span>
+                            </template>
+                        </div>
+
+                        <!-- Location & Map -->
+                        <template x-if="event.url_map">
+                            <a :href="event.url_map" target="_blank" rel="noopener noreferrer"
+                                class="meta-chip meta-chip-link" title="Mở địa chỉ trên Google Maps">
+                                <span class="material-symbols-outlined">location_on</span>
+                                <span class="location-text" x-text="event.location || 'Xem bản đồ'"></span>
+                                <span class="material-symbols-outlined icon-external">open_in_new</span>
+                            </a>
+                        </template>
+                        <template x-if="!event.url_map && event.location">
+                            <div class="meta-chip">
+                                <span class="material-symbols-outlined">location_on</span>
+                                <span x-text="event.location"></span>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="detail-divider"></div>
+
+                    <!-- Event Content Section -->
+                    <section class="detail-content-section">
+                        <div class="event-rich-description"
+                            x-html="event.description || '<p>Sự kiện này chưa có mô tả chi tiết.</p>'">
+                        </div>
+                    </section>
+                </div>
+            </article>
+        </template>
+    </div>
+</main>
+{% include "templates/footers/index.j2" %}
+
+<style>
+    .site-main {
+        min-height: calc(100vh - 200px);
+        background: var(--bg-home-page);
+    }
+
+    .public-detail-page {
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 90px 20px 60px;
+        box-sizing: border-box;
+    }
+
+    .detail-top-nav {
+        margin-bottom: 20px;
+    }
+
+    .btn-back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        padding: 8px 14px;
+        border-radius: 8px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        transition: all 0.2s ease;
+    }
+
+    .btn-back-link:hover {
+        color: var(--foreground);
+        border-color: var(--foreground);
+    }
+
+    .detail-loading-box,
+    .detail-error-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 80px 20px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        text-align: center;
+        color: var(--text-secondary);
+        gap: 16px;
+    }
+
+    .detail-error-box h3 {
+        margin: 0;
+        font-size: 22px;
+        color: var(--foreground);
+    }
+
+    .btn-home-return {
+        display: inline-block;
+        padding: 10px 20px;
+        background: var(--login-bg);
+        color: var(--background);
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        margin-top: 8px;
+    }
+
+    /* Detail Card */
+    .detail-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+    }
+
+    .detail-banner {
+        position: relative;
+        width: 100%;
+        height: 320px;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+    }
+
+    .detail-banner.default-banner {
+        background: linear-gradient(135deg, #6366f1, #3b82f6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .banner-placeholder-icon {
+        font-size: 80px;
+        color: rgba(255, 255, 255, 0.85);
+    }
+
+    .detail-status-badge {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        padding: 7px 16px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .status-ongoing {
+        background: #10b981;
+    }
+
+    .status-upcoming {
+        background: #3b82f6;
+    }
+
+    .status-ended {
+        background: #64748b;
+    }
+
+    .detail-body {
+        padding: 32px 36px 40px;
+    }
+
+    .detail-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--foreground);
+        margin: 0 0 20px 0;
+        line-height: 1.35;
+    }
+
+    .detail-meta-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 10px;
+        background: var(--bg-home-page);
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .meta-chip .material-symbols-outlined {
+        font-size: 20px;
+        color: var(--text-secondary);
+    }
+
+    .meta-chip-link {
+        color: #2563eb;
+        border-color: rgba(37, 99, 235, 0.3);
+        background: rgba(37, 99, 235, 0.05);
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+
+    .meta-chip-link .material-symbols-outlined {
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .meta-chip-link:hover {
+        background: rgba(37, 99, 235, 0.12);
+        text-decoration: none;
+    }
+
+    .meta-chip-link:hover .location-text {
+        text-decoration: underline;
+    }
+
+    .icon-external {
+        font-size: 16px !important;
+        opacity: 0.8;
+    }
+
+    .detail-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 28px 0;
+    }
+
+    .section-subheading {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--foreground);
+        margin: 0 0 16px 0;
+    }
+
+    .event-rich-description {
+        font-size: 15px;
+        line-height: 1.7;
+        color: var(--foreground);
+    }
+
+    .event-rich-description img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin: 12px 0;
+    }
+
+    @media (max-width: 640px) {
+        .public-detail-page {
+            padding: 76px 14px 40px;
+        }
+
+        .detail-banner {
+            height: 220px;
+        }
+
+        .detail-body {
+            padding: 22px 20px 28px;
+        }
+
+        .detail-title {
+            font-size: 22px;
+        }
+    }
+</style>
+{% endblock %}

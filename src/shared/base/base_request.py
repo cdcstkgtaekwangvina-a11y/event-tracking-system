@@ -1,7 +1,9 @@
+from collections.abc import Mapping
+from typing import Any
+
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from typing import Any, Mapping
 from starlette.background import BackgroundTask
 
 
@@ -17,6 +19,7 @@ class BaseRequest(Request):
         headers: Mapping[str, str] | None = None,
         media_type: str | None = None,
         background: BackgroundTask | None = None,
+        cache_time: int = 0,
     ) -> HTMLResponse:
         templates = self.get_templates()
         if context is None:
@@ -30,7 +33,7 @@ class BaseRequest(Request):
         )
         context.setdefault("request", self)
         context.setdefault("req", self)
-        return templates.TemplateResponse(
+        response = templates.TemplateResponse(
             request=self,
             name=name,
             context=context,
@@ -39,3 +42,6 @@ class BaseRequest(Request):
             media_type=media_type,
             background=background,
         )
+        if cache_time > 0:
+            response.headers["Cache-Control"] = f"public, max-age={cache_time}"
+        return response

@@ -26,8 +26,14 @@
 
     <!-- Table Container -->
     <div class="acc-table-wrapper">
-        <div id="acc-table-container">
-            {% include "modules/user/views/admin/account_table.j2" %}
+        <div id="acc-table-container"
+             hx-get="{{ url_for('accounts_table') }}"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="acc-empty">
+                <div class="acc-spinner acc-spinner-sm"></div>
+                <p class="acc-empty-text">Đang tải danh sách tài khoản...</p>
+            </div>
         </div>
     </div>
 </div>
@@ -36,28 +42,9 @@
 
 <link rel="stylesheet" href="/static/css/account.css">
 <script>
-    window.accountActions = {
-        async toggleActive(id, isActive) {
-            const actionLabel = isActive ? 'chặn' : 'bỏ chặn';
-            const approved = await window.notify.modal.confirm(
-                'Xác nhận',
-                `Bạn có chắc muốn ${actionLabel} tài khoản này?`
-            );
-            if (!approved) return;
-
-            const res = await window.fetchHelper.put('Account/' + id, { is_active: !isActive });
-            if (res.status_code === 200) {
-                window.notify?.toast?.success?.('Thành công', res.message || 'Cập nhật trạng thái thành công');
-                const tableUrl = new URL('{{ url_for("accounts_table") }}', window.location.origin);
-                const curParams = new URLSearchParams(window.location.search);
-                ['page', 'limit', 'search', 'sort_field', 'is_desc'].forEach(k => {
-                    if (curParams.has(k)) tableUrl.searchParams.set(k, curParams.get(k));
-                });
-                htmx.ajax('GET', tableUrl.toString(), { target: '#acc-table-container', swap: 'innerHTML' });
-            } else {
-                window.notify?.toast?.error?.('Lỗi', res.message || 'Cập nhật trạng thái thất bại');
-            }
-        }
+    window.ACCOUNT_URLS = {
+        accountsTable: "{{ url_for('accounts_table') }}"
     };
 </script>
+<script src="/static/js/account.js"></script>
 {% endblock %}

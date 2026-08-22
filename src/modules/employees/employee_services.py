@@ -7,13 +7,14 @@ from database.models.employees import Employees
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.constants.cache_tags import CacheTags
 from src.shared.helpers.file_handel import FileHandelHelper
-from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
+from src.shared.schemas.pagination_schemas import PaginationResponse
 from src.shared.services.redis_services import RedisDep
 
 from .employee_schemas import (
     BulkUpsertEmployeeRequest,
     BulkUpsertResponse,
     EmployeeCreateRequest,
+    EmployeesPagination,
     EmployeeUpdateRequest,
     ExportEmployeeRequest,
     ReadSheetFile,
@@ -88,12 +89,31 @@ class EmployeeServices:
         )
 
     async def get_employees_raw(
-        self, pagination: PaginationRequest
+        self, pagination: EmployeesPagination
     ) -> PaginationResponse:
-        cache_key = self.redis.get_pagination_key(CacheTags.EMPLOYEE, pagination)
+        cache_key = (
+            self.redis.get_pagination_key(CacheTags.EMPLOYEE, pagination)
+            + f"-ignore_event:{pagination.ignore_event}-event_id:{pagination.event_id}"
+        )
+        from sqlmodel import col, select as sql_select
+
+        from database.models.events_employees import EventsEmployees
 
         async def get_data_async():
-            return await self.crud.pagination_async(
+            crud = BaseCrud(self.session, Employees)
+            if pagination.ignore_event:
+                subquery = sql_select(EventsEmployees.employee_id).where(
+                    EventsEmployees.event_id == pagination.ignore_event
+                )
+                crud.select(Employees).where(col(Employees.id).not_in(subquery))
+            elif pagination.event_id:
+                crud.select(Employees).join(EventsEmployees).where(
+                    EventsEmployees.event_id == pagination.event_id
+                )
+            else:
+                crud.select(Employees)
+
+            return await crud.pagination_async(
                 pagination,
                 search_fields=["name", "email", "department", "position"],
             )
@@ -106,7 +126,7 @@ class EmployeeServices:
         )
 
     async def get_employees(
-        self, pagination: PaginationRequest
+        self, pagination: EmployeesPagination
     ) -> BaseResponse[PaginationResponse]:
         result = await self.get_employees_raw(pagination)
         return BaseResponse.ok(result, message="Lấy danh sách nhân viên thành công")

@@ -5,11 +5,11 @@
         align-items: center;
         gap: 2px;
         padding: 4px 6px;
-        background: var(--background, #fff);
+        background: var(--card, #fff);
         border: 1px solid var(--border, #e2e8f0);
         color: var(--foreground);
         border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
+        box-shadow: var(--nc-shadow-toast, 0 4px 12px rgba(0, 0, 0, 0.08));
         z-index: 50;
         animation: floatingMenuIn 0.15s ease-out;
     }
@@ -28,7 +28,7 @@
 
     .floating-menu .fm-btn,
     .media-floating-menu .fm-btn {
-        background: var(--background);
+        background: var(--card);
         border: 1px solid var(--border);
         box-shadow: 1px 1px 0px 1px var(--border);
         padding: 5px 8px;
@@ -64,10 +64,10 @@
         align-items: center;
         gap: 2px;
         padding: 4px 6px;
-        background: var(--background, #fff);
+        background: var(--card, #fff);
         border: 1px solid var(--border, #e2e8f0);
         border-radius: 8px;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.06);
+        box-shadow: var(--nc-shadow-toast, 0 4px 14px rgba(0, 0, 0, 0.10));
         z-index: 50;
         animation: floatingMenuIn 0.15s ease-out;
     }
