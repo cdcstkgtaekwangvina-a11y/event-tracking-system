@@ -1,5 +1,11 @@
+from fastapi import Depends
+
+from src.shared.base.base_response import BaseResponse
 from src.shared.base.base_route import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
+from src.shared.middlewares.auth_middlewares import AuthContext, auth
+from src.shared.schemas.pagination_schemas import PaginationQuery
+
 from .role_constants import ROLE
 from .user_schemas import (
     ChangePasswordRequest,
@@ -9,10 +15,6 @@ from .user_schemas import (
     UpdateProfileRequest,
 )
 from .user_services import UserServices
-from fastapi import Depends
-from src.shared.middlewares.auth_middlewares import RequireAuth, AuthContext
-from src.shared.base.base_response import BaseResponse
-from src.shared.schemas.pagination_schemas import PaginationQuery
 
 TAG = "User"
 router = BaseRouter(tags=[TAG], controller=TAG)
@@ -23,20 +25,20 @@ class UserApis:
     def __init__(self, services: UserServices = Depends()):
         self.services = services
 
-    @router.get_api("profile", dependencies=[Depends(RequireAuth())])
-    async def get_profile(self, auth_context: AuthContext = Depends(RequireAuth())):
+    @router.get_api("profile")
+    async def get_profile(self, auth_context: AuthContext = auth()):
         if not auth_context.is_valid:
             return BaseResponse.unauthorized()
 
         return BaseResponse.ok(auth_context.payload.user)
 
-    @router.put_api("profile", dependencies=[Depends(RequireAuth())])
+    @router.put_api("profile")
     async def update_profile(
         self,
         payload: UpdateProfileRequest,
-        auth_context: AuthContext = Depends(RequireAuth()),
+        auth_context: AuthContext = auth(),
     ):
-        if not auth_context.is_valid:
+        if not auth_context.is_valid or not auth_context.payload.id:
             return BaseResponse.unauthorized()
 
         return await self.services.update_profile(
@@ -45,26 +47,26 @@ class UserApis:
             requester_role=auth_context.payload.role,
         )
 
-    @router.put_api("profile/avatar/media", dependencies=[Depends(RequireAuth())])
+    @router.put_api("profile/avatar/media")
     async def set_avatar_from_media(
         self,
         payload: SetAvatarFromMediaRequest,
-        auth_context: AuthContext = Depends(RequireAuth()),
+        auth_context: AuthContext = auth(),
     ):
-        if not auth_context.is_valid:
+        if not auth_context.is_valid or not auth_context.payload.id:
             return BaseResponse.unauthorized()
 
         return await self.services.set_avatar_from_media(
             id=auth_context.payload.id, media_id=payload.media_id
         )
 
-    @router.put_api("profile/password", dependencies=[Depends(RequireAuth())])
+    @router.put_api("profile/password")
     async def change_password(
         self,
         payload: ChangePasswordRequest,
-        auth_context: AuthContext = Depends(RequireAuth()),
+        auth_context: AuthContext = auth(),
     ):
-        if not auth_context.is_valid:
+        if not auth_context.is_valid or not auth_context.payload.id:
             return BaseResponse.unauthorized()
 
         return await self.services.change_password(
@@ -76,13 +78,13 @@ ACCOUNT_TAG = "Account"
 account_router = BaseRouter(
     controller=ACCOUNT_TAG,
     tags=[ACCOUNT_TAG],
-    dependencies=[Depends(RequireAuth(roles=[ROLE.ADMIN]))],
+    dependencies=[Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN]))],
 )
 
 
 @clean_cbv(account_router)
 class AccountApis:
-    """Admin-facing account management (`/api/Account`) — ADMIN/SUPER_ADMIN
+    """Admin-facing account management (`/api/Account`) — SUPER_ADMIN
     only. Reuses `UserServices` (see its `list_accounts`/`create_account`/
     `update_account`) rather than a separate service class, since both this
     and the self-service `/api/User/profile` endpoints above operate on the
@@ -104,8 +106,11 @@ class AccountApis:
         self,
         account_id: str,
         payload: UpdateAccountRequest,
-        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.ADMIN])),
+        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN])),
     ):
         return await self.service.update_account(
-            id=account_id, payload=payload, requester_role=auth.payload.role
+            id=account_id,
+            payload=payload,
+            requester_role=auth.payload.role,
+            requester_id=auth.payload.id,
         )

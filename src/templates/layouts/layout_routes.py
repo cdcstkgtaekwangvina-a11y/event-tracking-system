@@ -1,15 +1,15 @@
-from fastapi import Depends, FastAPI, status
+from fastapi import FastAPI, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from src.shared.base import BaseRequest
-from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth
+from src.shared.middlewares.auth_middlewares import AuthContext, auth
 
 
 def layouts_routes(app: FastAPI) -> FastAPI:
     @app.get("/", include_in_schema=False, response_class=HTMLResponse, name="home")
     def root(
         req: BaseRequest,
-        auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
+        auth: AuthContext = auth(is_required_auth=False),
     ):
         return req.response_html(name="/templates/layouts/main.j2", context={})
 
@@ -21,7 +21,7 @@ def layouts_routes(app: FastAPI) -> FastAPI:
     )
     def admin(
         req: BaseRequest,
-        auth: AuthContext = Depends(RequireAuth(is_required_auth=True)),
+        auth: AuthContext = auth(is_required_auth=True),
     ):
 
         return req.response_html(
@@ -37,7 +37,7 @@ def layouts_routes(app: FastAPI) -> FastAPI:
     )
     def not_found(
         req: BaseRequest,
-        auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
+        auth: AuthContext = auth(is_required_auth=False),
     ):
         return req.response_html(
             name="/templates/not_found.j2",
@@ -50,7 +50,7 @@ def layouts_routes(app: FastAPI) -> FastAPI:
     )
     def error(
         req: BaseRequest,
-        auth: AuthContext = Depends(RequireAuth(is_required_auth=False)),
+        auth: AuthContext = auth(is_required_auth=False),
     ):
         if not req.cookies.get("error_permitted"):
             return RedirectResponse(url="/404", status_code=status.HTTP_302_FOUND)
