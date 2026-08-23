@@ -4,7 +4,6 @@ from typing import Any, cast
 from dotenv import load_dotenv
 from fastapi.templating import Jinja2Templates
 
-from src.modules.user.role_constants import ROLE
 from src.shared.schemas.page_schemas import PageSchema
 
 
@@ -26,7 +25,6 @@ def global_values(templates: Jinja2Templates) -> Jinja2Templates:
             icon="deployed_code_account",
             id="account",
             path="/admin/account",
-            include_roles=[ROLE.SUPER_ADMIN.value],
         ),
     ]
     cast(dict[str, Any], templates.env.globals)["ADMIN_PAGES"] = ADMIN_PAGES

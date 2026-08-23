@@ -4,14 +4,14 @@ from src.modules.user.role_constants import ROLE
 from src.modules.user.user_services import UserServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.middlewares.auth_middlewares import AuthContext, auth
+from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth
 from src.shared.schemas.pagination_schemas import PaginationQuery
 
 TAG_NAME = "admin/account"
 router = BaseRouter(
     controller=TAG_NAME,
     tags=[TAG_NAME],
-    dependencies=[Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN]))],
+    dependencies=[Depends(RequireAuth(roles=[ROLE.ADMIN]))],
 )
 base_path = "modules/user/views/admin/"
 
@@ -25,7 +25,7 @@ class AccountAdminViews:
     def accounts(
         self,
         req: BaseRequest,
-        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN])),
+        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.ADMIN])),
     ):
         return req.response_html(
             name=f"{base_path}index.j2",
@@ -37,7 +37,7 @@ class AccountAdminViews:
         self,
         req: BaseRequest,
         pagination: PaginationQuery,
-        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN])),
+        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.ADMIN])),
     ):
         if "limit" not in req.query_params:
             pagination.limit = 20

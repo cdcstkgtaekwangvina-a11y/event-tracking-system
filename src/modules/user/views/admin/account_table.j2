@@ -43,7 +43,7 @@
         {% for account in accounts %}
         <tr class="acc-tr" id="acc-row-{{ account.id }}">
             <td class="acc-td acc-td-name">{{ account.name }}</td>
-            <td class="acc-td acc-td-username">{{ account.username }}</td>
+            <td class="acc-td acc-td-username">@{{ account.username }}</td>
             <td class="acc-td">{{ account.email }}</td>
             <td class="acc-td">
                 {% if account.is_active %}
@@ -54,10 +54,7 @@
             </td>
             <td class="acc-td">{{ (account.created_at | string)[:10] if account.created_at else '—' }}</td>
             <td class="acc-td acc-td-action">
-                {% set is_self = (account.id | string) == (auth.user.id | string) %}
-                {% set target_super_admin = account.role == 'SUPPER_ADMIN' %}
-
-                {% if target_super_admin and not can_edit_email %}
+                {% if account.role == 'SUPPER_ADMIN' and not can_edit_email %}
                 <span class="acc-td-locked-hint" title="Chỉ Super Admin mới có quyền chỉnh sửa tài khoản Super Admin">
                     <span class="material-symbols-outlined">lock</span>
                 </span>
@@ -68,19 +65,12 @@
                         onclick='window.accountFormModal?.open({ mode: "edit", account: {{ (account.model_dump(mode="json") if account.model_dump is defined else account) | tojson | forceescape }} })'>
                     <span class="material-symbols-outlined">edit</span>
                 </button>
-                {% if is_self or target_super_admin %}
-                <span class="acc-td-locked-hint"
-                      title="{{ 'Không thể tự khóa tài khoản đang đăng nhập' if is_self else 'Không thể khóa tài khoản Super Admin' }}">
-                    <span class="material-symbols-outlined">lock</span>
-                </span>
-                {% else %}
                 <button type="button"
                         class="acc-action-btn {{ 'acc-action-unblock' if not account.is_active else 'acc-action-block' }}"
                         title="{{ 'Bỏ chặn' if not account.is_active else 'Chặn' }}"
                         onclick='window.accountActions?.toggleActive("{{ account.id }}", {{ account.is_active | tojson }})'>
                     <span class="material-symbols-outlined">{{ 'lock_open' if not account.is_active else 'block' }}</span>
                 </button>
-                {% endif %}
                 {% endif %}
             </td>
         </tr>

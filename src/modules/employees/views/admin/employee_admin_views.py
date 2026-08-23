@@ -1,16 +1,16 @@
 from fastapi import Depends
 
-from src.modules.employees.employee_schemas import EmployeesPaginationQuery
 from src.modules.employees.employee_services import EmployeeServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.middlewares.auth_middlewares import auth
+from src.shared.middlewares.auth_middlewares import RequireAuth
+from src.shared.schemas.pagination_schemas import PaginationQuery
 
 TAG_NAME = "admin/employees"
 router = BaseRouter(
     controller=TAG_NAME,
     tags=[TAG_NAME],
-    dependencies=[auth()],
+    dependencies=[Depends(RequireAuth(is_required_auth=True))],
 )
 base_path = "modules/employees/views/admin/"
 
@@ -32,7 +32,7 @@ class EmployeeAdminViews:
     async def employees_table_html(
         self,
         req: BaseRequest,
-        pagination: EmployeesPaginationQuery,
+        pagination: PaginationQuery,
     ):
         if "limit" not in req.query_params:
             pagination.limit = 20

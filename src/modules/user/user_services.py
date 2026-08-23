@@ -270,21 +270,12 @@ class UserServices:
         id: UUID | str,
         payload: UpdateAccountRequest,
         requester_role: str | None,
-        requester_id: UUID | str | None = None,
     ) -> BaseResponse[AccountSelect]:
         from database.models.users import Users
 
         target = await self.crud.find_by_id(id)
         if not target:
             return BaseResponse.not_found(message="Không tìm thấy tài khoản")
-
-        if payload.is_active is False and (
-            target.role == ROLE.SUPER_ADMIN or str(target.id) == str(requester_id)
-        ):
-            return BaseResponse.fail(
-                message="Không thể khóa tài khoản này",
-                status_code=403,
-            )
 
         if target.role == ROLE.SUPER_ADMIN and requester_role != ROLE.SUPER_ADMIN:
             return BaseResponse.fail(
@@ -305,8 +296,6 @@ class UserServices:
             update_data["password"] = PasswordHash.recommended().hash(
                 payload.password
             )
-
-        if payload.password or payload.is_active is False:
             update_data["token_version"] = target.token_version + 1
 
         if not update_data:

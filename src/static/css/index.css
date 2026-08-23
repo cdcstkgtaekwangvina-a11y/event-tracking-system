@@ -116,13 +116,6 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Global Alpine.js x-cloak — loaded in <head> so it's active before any
-   page-specific CSS (often placed at the end of <body>) finishes loading,
-   preventing unstyled Alpine components from flashing visible. */
-[x-cloak] {
-  display: none !important;
-}
-
 body {
   min-height: 100vh;
   margin: 0;
