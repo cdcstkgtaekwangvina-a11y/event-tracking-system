@@ -5,7 +5,7 @@ from src.shared.base.base_route import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import AuthContext, auth
 from src.shared.schemas.pagination_schemas import PaginationQuery
-
+from src.shared.middlewares.auth_middlewares import RequireAuth
 from .role_constants import ROLE
 from .user_schemas import (
     ChangePasswordRequest,

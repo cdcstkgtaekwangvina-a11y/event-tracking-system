@@ -6,7 +6,7 @@ from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import AuthContext, auth
 from src.shared.schemas.pagination_schemas import PaginationQuery
-
+from src.shared.middlewares.auth_middlewares import RequireAuth
 TAG_NAME = "admin/account"
 router = BaseRouter(
     controller=TAG_NAME,

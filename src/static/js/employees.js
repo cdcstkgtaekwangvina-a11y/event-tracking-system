@@ -177,6 +177,11 @@ function employeeFormModalComponent() {
                 window.notify?.toast?.error?.('Lỗi', 'Tên nhân viên không được để trống');
                 return;
             }
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (this.form.email?.trim() && !emailPattern.test(this.form.email.trim())) {
+                window.notify?.toast?.error?.('Lỗi', 'Email không đúng định dạng');
+                return;
+            }
             this.loading = true;
             try {
                 const payload = { ...this.form };

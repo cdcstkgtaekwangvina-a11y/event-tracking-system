@@ -140,6 +140,11 @@ document.addEventListener('alpine:init', () => {
                 window.notify?.toast?.error?.('Lỗi', 'Họ tên và tên đăng nhập không được để trống');
                 return;
             }
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (this.isSuperAdmin && this.form.email?.trim() && !emailPattern.test(this.form.email.trim())) {
+                window.notify?.toast?.error?.('Lỗi', 'Email không đúng định dạng');
+                return;
+            }
             this.savingProfile = true;
             try {
                 const payload = { name: this.form.name, username: this.form.username };
