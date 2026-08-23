@@ -11,7 +11,7 @@ TAG_NAME = "admin/account"
 router = BaseRouter(
     controller=TAG_NAME,
     tags=[TAG_NAME],
-    dependencies=[Depends(RequireAuth(roles=[ROLE.ADMIN]))],
+    dependencies=[Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN]))],
 )
 base_path = "modules/user/views/admin/"
 
@@ -25,7 +25,7 @@ class AccountAdminViews:
     def accounts(
         self,
         req: BaseRequest,
-        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.ADMIN])),
+        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN])),
     ):
         return req.response_html(
             name=f"{base_path}index.j2",
@@ -37,7 +37,7 @@ class AccountAdminViews:
         self,
         req: BaseRequest,
         pagination: PaginationQuery,
-        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.ADMIN])),
+        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN])),
     ):
         if "limit" not in req.query_params:
             pagination.limit = 20
