@@ -3,12 +3,12 @@ from fastapi import Depends
 from src.shared.base import BaseRouter
 from src.shared.base.base_response import BaseResponse
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.schemas.pagination_schemas import PaginationQuery
 
 from .employee_schemas import (
     BulkUpsertEmployeeRequest,
     EmployeeBulkDeleteRequest,
     EmployeeCreateRequest,
+    EmployeesPaginationQuery,
     EmployeeUpdateRequest,
     ExportEmployeeRequest,
     ReadSheetFile,
@@ -25,7 +25,7 @@ class EmployeeController:
         self.service = service
 
     @router.get_api()
-    async def get_employees(self, pagination: PaginationQuery):
+    async def get_employees(self, pagination: EmployeesPaginationQuery):
         return await self.service.get_employees(pagination)
 
     @router.get_api("{employee_id}")

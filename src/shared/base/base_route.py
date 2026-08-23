@@ -1,6 +1,7 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from fastapi import APIRouter, Request, Response
+from fastapi.params import Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.routing import APIRoute
 
@@ -51,10 +52,14 @@ class BaseRouter(APIRouter):
         self,
         path: str | None = None,
         response_class: type[Response] = JSONResponse,
+        dependencies: Sequence[Depends] | None = None,
         **kwargs,
     ):
         return super().get(
-            self.__get_api_path__(path), response_class=response_class, **kwargs
+            self.__get_api_path__(path),
+            response_class=response_class,
+            dependencies=dependencies,
+            **kwargs,
         )
 
     def get(
@@ -62,15 +67,28 @@ class BaseRouter(APIRouter):
         path: str | None = None,
         name: str | None = None,
         response_class=HTMLResponse,
+        dependencies: Sequence[Depends] | None = None,
         **kwargs,
     ):
         return super().get(
-            self.__get_path__(path), name=name, response_class=response_class, **kwargs
+            self.__get_path__(path),
+            name=name,
+            response_class=response_class,
+            dependencies=dependencies,
+            **kwargs,
         )
 
-    def post_api(self, path: str | None = None, **kwargs):
+    def post_api(
+        self,
+        path: str | None = None,
+        dependencies: Sequence[Depends] | None = None,
+        **kwargs,
+    ):
         return super().post(
-            self.__get_api_path__(path), response_class=JSONResponse, **kwargs
+            self.__get_api_path__(path),
+            response_class=JSONResponse,
+            dependencies=dependencies,
+            **kwargs,
         )
 
     def post(
@@ -78,15 +96,28 @@ class BaseRouter(APIRouter):
         path: str | None = None,
         name: str | None = None,
         response_class=HTMLResponse,
+        dependencies: Sequence[Depends] | None = None,
         **kwargs,
     ):
         return super().post(
-            self.__get_path__(path), name=name, response_class=response_class, **kwargs
+            self.__get_path__(path),
+            name=name,
+            response_class=response_class,
+            dependencies=dependencies,
+            **kwargs,
         )
 
-    def put_api(self, path: str | None = None, **kwargs):
+    def put_api(
+        self,
+        path: str | None = None,
+        dependencies: Sequence[Depends] | None = None,
+        **kwargs,
+    ):
         return super().put(
-            self.__get_api_path__(path), response_class=JSONResponse, **kwargs
+            self.__get_api_path__(path),
+            response_class=JSONResponse,
+            dependencies=dependencies,
+            **kwargs,
         )
 
     def put(
@@ -94,15 +125,28 @@ class BaseRouter(APIRouter):
         path: str | None = None,
         name: str | None = None,
         response_class=HTMLResponse,
+        dependencies: Sequence[Depends] | None = None,
         **kwargs,
     ):
         return super().put(
-            self.__get_path__(path), name=name, response_class=response_class, **kwargs
+            self.__get_path__(path),
+            name=name,
+            response_class=response_class,
+            dependencies=dependencies,
+            **kwargs,
         )
 
-    def patch_api(self, path: str | None = None, **kwargs):
+    def patch_api(
+        self,
+        path: str | None = None,
+        dependencies: Sequence[Depends] | None = None,
+        **kwargs,
+    ):
         return super().patch(
-            self.__get_api_path__(path), response_class=JSONResponse, **kwargs
+            self.__get_api_path__(path),
+            response_class=JSONResponse,
+            dependencies=dependencies,
+            **kwargs,
         )
 
     def patch(
@@ -110,15 +154,28 @@ class BaseRouter(APIRouter):
         path: str | None = None,
         name: str | None = None,
         response_class=HTMLResponse,
+        dependencies: Sequence[Depends] | None = None,
         **kwargs,
     ):
         return super().patch(
-            self.__get_path__(path), name=name, response_class=response_class, **kwargs
+            self.__get_path__(path),
+            name=name,
+            response_class=response_class,
+            dependencies=dependencies,
+            **kwargs,
         )
 
-    def delete_api(self, path: str | None = None, **kwargs):
+    def delete_api(
+        self,
+        path: str | None = None,
+        dependencies: Sequence[Depends] | None = None,
+        **kwargs,
+    ):
         return super().delete(
-            self.__get_api_path__(path), response_class=JSONResponse, **kwargs
+            self.__get_api_path__(path),
+            response_class=JSONResponse,
+            dependencies=dependencies,
+            **kwargs,
         )
 
     def delete(
@@ -126,8 +183,13 @@ class BaseRouter(APIRouter):
         path: str | None = None,
         name: str | None = None,
         response_class=HTMLResponse,
+        dependencies: Sequence[Depends] | None = None,
         **kwargs,
     ):
         return super().delete(
-            self.__get_path__(path), name=name, response_class=response_class, **kwargs
+            self.__get_path__(path),
+            name=name,
+            response_class=response_class,
+            dependencies=dependencies,
+            **kwargs,
         )

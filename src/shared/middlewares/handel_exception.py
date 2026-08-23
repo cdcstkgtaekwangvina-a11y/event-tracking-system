@@ -37,6 +37,10 @@ def handle_exceptions(app: FastAPI, templates: Jinja2Templates) -> FastAPI:
             status_code = 500
             detail = getattr(exc, "message", str(exc))
 
+        # Bỏ qua request favicon.ico — trình duyệt tự động request
+        if req.url.path == "/favicon.ico" and status_code == 404:
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
         route = req.scope.get("route")
         route_path = getattr(route, "path", None) or req.url.path
 

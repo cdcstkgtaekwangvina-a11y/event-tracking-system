@@ -4,10 +4,12 @@
 {% block admin_title %}Chi tiết sự kiện{% endblock %}
 
 {% block admin_body %}
+<link rel="stylesheet" href="/static/css/employees.css">
 <script>
     function adminEventDetailApp(eventId) {
         return {
             eventId: eventId,
+            currentTab: 'description', // 'description' | 'attendees' | 'analytics'
             isLoading: true,
             isSaving: false,
             event: null,
@@ -29,10 +31,41 @@
                 url_map: ''
             },
 
+            // Attendees state (Tab 2)
+            attendeesLoaded: false,
+            attendees: [],
+            attendeesLoading: false,
+            attendeesTotal: 0,
+            attendeesPage: 1,
+            attendeesLimit: 10,
+            attendeesTotalPages: 1,
+            attendeesSearch: '',
+            selectedAttendeeIds: [],
+
+            // Add Employees Modal state
+            addModalOpen: false,
+            unassignedLoading: false,
+            unassignedEmployees: [],
+            unassignedTotal: 0,
+            unassignedPage: 1,
+            unassignedLimit: 10,
+            unassignedTotalPages: 1,
+            unassignedSearch: '',
+            selectedUnassignedIds: [],
+            isSubmittingRegisters: false,
+
+            // Check-in State
+            checkInModalOpen: false,
+            checkInLoading: false,
+            checkInEmployee: null,
+            isSubmittingCheckIn: false,
+            checkInSuccess: false,
+
             async init() {
                 this.isLoading = true;
                 this.error = '';
                 try {
+                    // Only call event details API for the initial Tab 1 (Mô tả)
                     const response = await fetch('/api/events/' + this.eventId);
                     const result = await response.json();
                     const data = result?.data || result;
@@ -63,12 +96,20 @@
                 }
             },
 
+            switchTab(tab) {
+                this.currentTab = tab;
+                if (tab === 'attendees') {
+                    // Only call attendees API when switching to Tab 2
+                    if (!this.attendeesLoaded || this.attendees.length === 0) {
+                        this.loadAttendees();
+                    }
+                }
+            },
+
             setEditorContent(html) {
                 const content = html !== undefined ? html : this.form.description;
                 const self = this;
 
-                // Check that the editor exists AND its rendered DOM is live in the current page.
-                // This prevents using a stale editor instance left over from a previous HTMX-swapped page.
                 const isEditorReady = () => {
                     if (!window.myEditor) return false;
                     try {
@@ -85,8 +126,6 @@
                     return;
                 }
 
-                // Editor not ready yet (module script hasn't run or is still initialising).
-                // Poll until the NEW editor instance mounts into the live DOM.
                 let attempts = 0;
                 const interval = setInterval(() => {
                     attempts++;
@@ -94,7 +133,7 @@
                         window.myEditor.commands.setContent(content || '');
                         self.saveSnapshot();
                         clearInterval(interval);
-                    } else if (attempts > 100) { // ~10 seconds max
+                    } else if (attempts > 100) {
                         clearInterval(interval);
                         console.warn('TipTap editor không sẵn sàng sau 10 giây');
                     }
@@ -212,6 +251,310 @@
                     console.error('Lỗi khi xóa sự kiện:', err);
                     notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
                 }
+            },
+
+            // --- Attendee Management Functions (Tab 2) ---
+            async loadAttendees(page = this.attendeesPage) {
+                this.attendeesLoading = true;
+                this.attendeesPage = page;
+                try {
+                    const params = new URLSearchParams({
+                        event_id: this.eventId,
+                        page: this.attendeesPage,
+                        limit: this.attendeesLimit,
+                        search: this.attendeesSearch.trim()
+                    });
+                    const res = await fetch(`/api/employees?${params.toString()}`);
+                    const json = await res.json();
+                    if (res.ok && json?.data) {
+                        this.attendees = json.data.data || [];
+                        this.attendeesTotal = json.data.total || 0;
+                        this.attendeesPage = json.data.page || 1;
+                        this.attendeesTotalPages = Math.ceil(this.attendeesTotal / this.attendeesLimit) || 1;
+                        this.attendeesLoaded = true;
+                    }
+                } catch (e) {
+                    console.error('Lỗi khi tải danh sách khách mời:', e);
+                } finally {
+                    this.attendeesLoading = false;
+                }
+            },
+
+            goToAttendeePage(val) {
+                let p = parseInt(val, 10);
+                if (isNaN(p) || p < 1) p = 1;
+                if (p > this.attendeesTotalPages) p = this.attendeesTotalPages;
+                if (p !== this.attendeesPage) {
+                    this.loadAttendees(p);
+                }
+            },
+
+            toggleSelectAllAttendees() {
+                const currentIds = this.attendees.map(a => a.id);
+                const allSelected = currentIds.length > 0 && currentIds.every(id => this.selectedAttendeeIds.includes(id));
+                if (allSelected) {
+                    this.selectedAttendeeIds = this.selectedAttendeeIds.filter(id => !currentIds.includes(id));
+                } else {
+                    const toAdd = currentIds.filter(id => !this.selectedAttendeeIds.includes(id));
+                    this.selectedAttendeeIds = [...this.selectedAttendeeIds, ...toAdd];
+                }
+            },
+
+            toggleAttendee(id) {
+                const idx = this.selectedAttendeeIds.indexOf(id);
+                if (idx > -1) {
+                    this.selectedAttendeeIds.splice(idx, 1);
+                } else {
+                    this.selectedAttendeeIds.push(id);
+                }
+            },
+
+            async removeAttendees(ids) {
+                if (!ids || ids.length === 0) return;
+                const count = ids.length;
+                const confirmed = await notify.modal.confirm(
+                    'Xóa khách mời khỏi sự kiện?',
+                    `Bạn có chắc chắn muốn xóa ${count > 1 ? count + ' khách mời này' : 'khách mời này'} khỏi sự kiện không?`,
+                    { icon: 'warning', confirmText: 'Xóa', cancelText: 'Hủy' }
+                );
+                if (!confirmed) return;
+
+                try {
+                    const res = await fetch(`/api/events/${this.eventId}/remove-registers`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ employee_ids: ids })
+                    });
+                    if (res.ok || res.status === 204) {
+                        notify.toast.success('Thành công', `Đã xóa ${count} khách mời khỏi sự kiện`);
+                        this.selectedAttendeeIds = this.selectedAttendeeIds.filter(id => !ids.includes(id));
+                        await this.loadAttendees();
+                    } else {
+                        const resData = await res.json();
+                        notify.toast.error('Lỗi', resData?.message || 'Không thể xóa khách mời');
+                    }
+                } catch (e) {
+                    notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+                }
+            },
+
+            // --- Add Unassigned Employees Modal (Tab 2) ---
+            async openAddEmployeesModal() {
+                this.addModalOpen = true;
+                this.unassignedPage = 1;
+                this.unassignedSearch = '';
+                this.selectedUnassignedIds = [];
+                await this.loadUnassignedEmployees();
+            },
+
+            closeAddEmployeesModal() {
+                this.addModalOpen = false;
+                this.selectedUnassignedIds = [];
+            },
+
+            async loadUnassignedEmployees(page = this.unassignedPage) {
+                this.unassignedLoading = true;
+                this.unassignedPage = page;
+                try {
+                    const params = new URLSearchParams({
+                        ignore_event: this.eventId,
+                        page: this.unassignedPage,
+                        limit: this.unassignedLimit,
+                        search: this.unassignedSearch.trim()
+                    });
+                    const res = await fetch(`/api/employees?${params.toString()}`);
+                    const json = await res.json();
+                    if (res.ok && json?.data) {
+                        this.unassignedEmployees = json.data.data || [];
+                        this.unassignedTotal = json.data.total || 0;
+                        this.unassignedPage = json.data.page || 1;
+                        this.unassignedTotalPages = Math.ceil(this.unassignedTotal / this.unassignedLimit) || 1;
+                    }
+                } catch (e) {
+                    console.error('Lỗi khi tải danh sách nhân viên chưa thêm:', e);
+                } finally {
+                    this.unassignedLoading = false;
+                }
+            },
+
+            goToUnassignedPage(val) {
+                let p = parseInt(val, 10);
+                if (isNaN(p) || p < 1) p = 1;
+                if (p > this.unassignedTotalPages) p = this.unassignedTotalPages;
+                if (p !== this.unassignedPage) {
+                    this.loadUnassignedEmployees(p);
+                }
+            },
+
+            toggleSelectAllUnassigned() {
+                const currentIds = this.unassignedEmployees.map(e => e.id);
+                const allSelected = currentIds.length > 0 && currentIds.every(id => this.selectedUnassignedIds.includes(id));
+                if (allSelected) {
+                    this.selectedUnassignedIds = this.selectedUnassignedIds.filter(id => !currentIds.includes(id));
+                } else {
+                    const toAdd = currentIds.filter(id => !this.selectedUnassignedIds.includes(id));
+                    this.selectedUnassignedIds = [...this.selectedUnassignedIds, ...toAdd];
+                }
+            },
+
+            toggleUnassigned(id) {
+                const idx = this.selectedUnassignedIds.indexOf(id);
+                if (idx > -1) {
+                    this.selectedUnassignedIds.splice(idx, 1);
+                } else {
+                    this.selectedUnassignedIds.push(id);
+                }
+            },
+
+            async addSelectedEmployees() {
+                if (this.selectedUnassignedIds.length === 0 || this.isSubmittingRegisters) return;
+                this.isSubmittingRegisters = true;
+                try {
+                    const res = await fetch(`/api/events/${this.eventId}/registers`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ employee_ids: this.selectedUnassignedIds })
+                    });
+                    const resData = await res.json();
+                    if (res.ok) {
+                        notify.toast.success('Thành công', `Đã thêm ${this.selectedUnassignedIds.length} khách mời vào sự kiện`);
+                        this.closeAddEmployeesModal();
+                        await this.loadAttendees();
+                    } else {
+                        notify.toast.error('Lỗi', resData?.message || 'Không thể thêm khách mời');
+                    }
+                } catch (e) {
+                    notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+                } finally {
+                    this.isSubmittingRegisters = false;
+                }
+            },
+
+            openImportModal() {
+                if (window.employeeImportModal) {
+                    window.employeeImportModal.open({ eventId: this.eventId });
+                } else {
+                    window.dispatchEvent(new CustomEvent('emp-import-open', { detail: { eventId: this.eventId } }));
+                }
+            },
+
+            // --- QR Check-in Functions ---
+            startQrCheckIn() {
+                if (!window.qrScanner) {
+                    notify.toast.error('Lỗi', 'Tính năng quét mã QR chưa sẵn sàng');
+                    return;
+                }
+                window.qrScanner.open({
+                    onResult: (qrData) => {
+                        this.handleQrScanResult(qrData);
+                    }
+                });
+            },
+
+            parseEmployeeIdFromQR(qrData) {
+                if (!qrData) return null;
+                let raw = String(qrData).trim();
+                
+                // Nếu là JSON string: {"employee_id": 123} hoặc {"id": 123}
+                if (raw.startsWith('{') && raw.endsWith('}')) {
+                    try {
+                        const obj = JSON.parse(raw);
+                        if (obj.employee_id) return parseInt(obj.employee_id, 10);
+                        if (obj.id) return parseInt(obj.id, 10);
+                    } catch(e) {}
+                }
+
+                // Nếu là URL hoặc chứa param: /employee/123 hoặc employee_id=123 hoặc id=123
+                const matchUrl = raw.match(/\/employee\/(\d+)/i) || raw.match(/employee_id=(\d+)/i) || raw.match(/[?&]id=(\d+)/i);
+                if (matchUrl && matchUrl[1]) {
+                    return parseInt(matchUrl[1], 10);
+                }
+
+                // Nếu là số thuần túy hoặc dạng #00000123
+                const cleanNum = raw.replace(/^#+/, '');
+                const parsed = parseInt(cleanNum, 10);
+                if (!isNaN(parsed) && parsed > 0) {
+                    return parsed;
+                }
+                return null;
+            },
+
+            async handleQrScanResult(qrData) {
+                if (window.qrScanner) {
+                    window.qrScanner.close();
+                }
+                const empId = this.parseEmployeeIdFromQR(qrData);
+                if (!empId) {
+                    notify.toast.error('Mã QR không hợp lệ', 'Không thể nhận diện mã nhân viên từ mã QR vừa quét');
+                    return;
+                }
+
+                this.checkInModalOpen = true;
+                this.checkInLoading = true;
+                this.checkInEmployee = null;
+                this.checkInSuccess = false;
+
+                try {
+                    const res = await fetch(`/api/events/${this.eventId}/employee/${empId}`);
+                    const json = await res.json();
+                    if (res.ok && json?.data) {
+                        this.checkInEmployee = json.data;
+                    } else {
+                        notify.toast.error('Không tìm thấy', json?.message || 'Khách mời không tồn tại hoặc chưa được thêm vào sự kiện này');
+                        this.checkInModalOpen = false;
+                    }
+                } catch(e) {
+                    console.error('Lỗi khi lấy thông tin khách mời:', e);
+                    notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+                    this.checkInModalOpen = false;
+                } finally {
+                    this.checkInLoading = false;
+                }
+            },
+
+            async confirmCheckIn() {
+                if (!this.checkInEmployee || this.isSubmittingCheckIn) return;
+                this.isSubmittingCheckIn = true;
+                try {
+                    const res = await fetch('/api/events/check-in', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            employee_id: this.checkInEmployee.employee_id,
+                            event_id: this.eventId
+                        })
+                    });
+                    const resData = await res.json();
+                    if (res.ok) {
+                        notify.toast.success('Check-in thành công', `Đã check-in cho khách mời ${this.checkInEmployee.name || ''}`);
+                        this.checkInSuccess = true;
+                        if (this.checkInEmployee) {
+                            this.checkInEmployee.status = 'check_in';
+                            this.checkInEmployee.check_in_at = new Date().toISOString();
+                        }
+                        await this.loadAttendees();
+                    } else {
+                        notify.toast.error('Check-in thất bại', resData?.message || 'Có lỗi xảy ra khi check-in');
+                    }
+                } catch(e) {
+                    console.error('Lỗi khi check-in:', e);
+                    notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+                } finally {
+                    this.isSubmittingCheckIn = false;
+                }
+            },
+
+            closeCheckInModal() {
+                this.checkInModalOpen = false;
+                this.checkInEmployee = null;
+                this.checkInSuccess = false;
+            },
+
+            scanNextGuest() {
+                this.closeCheckInModal();
+                this.$nextTick(() => {
+                    this.startQrCheckIn();
+                });
             }
         };
     }
@@ -219,6 +562,7 @@
 
 <div class="admin-event-detail-page" x-data="adminEventDetailApp({{ event_id }})"
     @event-image-media-selected.window="useMediaImage($event.detail)"
+    @event-employees-updated.window="if (currentTab === 'attendees') loadAttendees()"
     @tiptap-selection-change.window="checkDirty()">
     
     <!-- Top Bar Navigation & Main Actions -->
@@ -229,7 +573,7 @@
         </a>
 
         <div class="admin-detail-actions" x-show="!isLoading && event">
-            <button type="button" class="btn-admin-save" :disabled="!isDirty || isSaving" @click="saveEvent()">
+            <button type="button" class="btn-admin-save" :disabled="!isDirty || isSaving" @click="saveEvent()" x-show="currentTab === 'description'">
                 <span class="material-symbols-outlined" x-show="!isSaving">save</span>
                 <span class="spinner-sm" x-show="isSaving"></span>
                 <span x-text="isSaving ? 'Đang lưu...' : 'Lưu thông tin'"></span>
@@ -239,6 +583,28 @@
                 Xóa sự kiện
             </button>
         </div>
+    </div>
+
+    <!-- Navigation Tabs Bar -->
+    <div class="admin-detail-tabs-bar" x-show="!isLoading && !error" x-cloak>
+        <button type="button" class="admin-tab-btn" :class="{ 'admin-tab-btn--active': currentTab === 'description' }"
+            @click="switchTab('description')">
+            <span class="material-symbols-outlined">description</span>
+            Mô tả
+        </button>
+
+        <button type="button" class="admin-tab-btn" :class="{ 'admin-tab-btn--active': currentTab === 'attendees' }"
+            @click="switchTab('attendees')">
+            <span class="material-symbols-outlined">group</span>
+            Khách mời
+            <span class="tab-badge" x-show="attendeesLoaded" x-text="attendeesTotal"></span>
+        </button>
+
+        <button type="button" class="admin-tab-btn" :class="{ 'admin-tab-btn--active': currentTab === 'analytics' }"
+            @click="switchTab('analytics')">
+            <span class="material-symbols-outlined">analytics</span>
+            Phân tích
+        </button>
     </div>
 
     <!-- Loading State -->
@@ -255,87 +621,463 @@
         <a href="/admin/events" hx-get="/admin/events" hx-target="#admin-main-content" class="btn-admin-back">Quay lại danh sách</a>
     </div>
 
-    <!-- Editable Content Form -->
-    <div class="admin-detail-edit-card" x-show="!isLoading && !error" x-cloak>
-            <!-- Form Body -->
-            <form @submit.prevent="saveEvent()" class="admin-detail-form">
-                <!-- Title Field -->
+    <!-- ============================================================
+         TAB 1: MÔ TẢ (Description & Event Form)
+         ============================================================ -->
+    <div class="admin-detail-edit-card" x-show="!isLoading && !error && currentTab === 'description'" x-cloak>
+        <!-- Form Body -->
+        <form @submit.prevent="saveEvent()" class="admin-detail-form">
+            <!-- Title Field -->
+            <div class="detail-form-group">
+                <label for="detail-event-name" class="form-label">Tên sự kiện <span class="required-star">*</span></label>
+                <input type="text" id="detail-event-name" x-model="form.name" @input="checkDirty()"
+                    class="detail-form-input title-input" placeholder="Nhập tên sự kiện..." required />
+            </div>
+
+            <!-- Rich Description Field -->
+            <div class="detail-form-group">
+                <label class="form-label">Mô tả chi tiết sự kiện</label>
+                <div class="detail-editor-wrapper" @keyup="checkDirty()" @click="checkDirty()">
+                    {% include "templates/components/editor/editor.j2" %}
+                </div>
+            </div>
+
+            <!-- Time & Location Grid -->
+            <div class="detail-form-grid">
                 <div class="detail-form-group">
-                    <label for="detail-event-name" class="form-label">Tên sự kiện <span class="required-star">*</span></label>
-                    <input type="text" id="detail-event-name" x-model="form.name" @input="checkDirty()"
-                        class="detail-form-input title-input" placeholder="Nhập tên sự kiện..." required />
+                    <label for="detail-start-at" class="form-label">Thời gian bắt đầu</label>
+                    <input type="datetime-local" id="detail-start-at" x-model="form.start_at" @change="checkDirty()" class="detail-form-input" />
                 </div>
 
-                <!-- Rich Description Field -->
                 <div class="detail-form-group">
-                    <label class="form-label">Mô tả chi tiết sự kiện</label>
-                    <div class="detail-editor-wrapper" @keyup="checkDirty()" @click="checkDirty()">
-                        {% include "templates/components/editor/editor.j2" %}
-                    </div>
+                    <label for="detail-end-at" class="form-label">Thời gian kết thúc</label>
+                    <input type="datetime-local" id="detail-end-at" x-model="form.end_at" @change="checkDirty()" class="detail-form-input" />
                 </div>
 
-                <!-- Time & Location Grid -->
-                <div class="detail-form-grid">
-                    <div class="detail-form-group">
-                        <label for="detail-start-at" class="form-label">Thời gian bắt đầu</label>
-                        <input type="datetime-local" id="detail-start-at" x-model="form.start_at" @change="checkDirty()" class="detail-form-input" />
-                    </div>
-
-                    <div class="detail-form-group">
-                        <label for="detail-end-at" class="form-label">Thời gian kết thúc</label>
-                        <input type="datetime-local" id="detail-end-at" x-model="form.end_at" @change="checkDirty()" class="detail-form-input" />
-                    </div>
-
-                    <div class="detail-form-group">
-                        <label for="detail-location" class="form-label">Địa điểm</label>
-                        <input type="text" id="detail-location" x-model="form.location" @input="checkDirty()" class="detail-form-input" placeholder="Nhập tên địa điểm..." />
-                    </div>
-
-                    <div class="detail-form-group">
-                        <label for="detail-url-map" class="form-label">Link Google Maps</label>
-                        <input type="url" id="detail-url-map" x-model="form.url_map" @input="checkDirty()" class="detail-form-input" placeholder="https://maps.google.com/?q=..." />
-                    </div>
+                <div class="detail-form-group">
+                    <label for="detail-location" class="form-label">Địa điểm</label>
+                    <input type="text" id="detail-location" x-model="form.location" @input="checkDirty()" class="detail-form-input" placeholder="Nhập tên địa điểm..." />
                 </div>
 
-                <!-- WordPress Style Featured Image Box (Placed at the bottom row) -->
-                <div class="detail-featured-image-box">
-                    <h3 class="featured-image-title">
-                        <span class="material-symbols-outlined">image</span>
-                        Ảnh đại diện sự kiện (Cover Image)
-                    </h3>
-                    
-                    <div class="featured-image-container">
-                        <template x-if="imagePreview">
-                            <div class="featured-image-preview-wrapper">
-                                <img :src="imagePreview" alt="Ảnh sự kiện" class="featured-image-img" />
-                                <div class="featured-image-overlay">
-                                    <button type="button" class="btn-change-image" @click="openEventMediaPicker()">
-                                        <span class="material-symbols-outlined">photo_library</span>
-                                        Đổi ảnh từ Thư viện Media
-                                    </button>
-                                    <button type="button" class="btn-remove-image" @click="removeEventImage()">
-                                        <span class="material-symbols-outlined">delete</span>
-                                        Xóa ảnh
-                                    </button>
-                                </div>
-                            </div>
-                        </template>
+                <div class="detail-form-group">
+                    <label for="detail-url-map" class="form-label">Link Google Maps</label>
+                    <input type="url" id="detail-url-map" x-model="form.url_map" @input="checkDirty()" class="detail-form-input" placeholder="https://maps.google.com/?q=..." />
+                </div>
+            </div>
 
-                        <template x-if="!imagePreview">
-                            <div class="featured-image-empty-placeholder" @click="openEventMediaPicker()">
-                                <span class="material-symbols-outlined placeholder-icon">add_photo_alternate</span>
-                                <p>Chưa có ảnh đại diện sự kiện</p>
-                                <button type="button" class="btn-select-media">
+            <!-- WordPress Style Featured Image Box (Placed at the bottom row) -->
+            <div class="detail-featured-image-box">
+                <h3 class="featured-image-title">
+                    <span class="material-symbols-outlined">image</span>
+                    Ảnh đại diện sự kiện (Cover Image)
+                </h3>
+                
+                <div class="featured-image-container">
+                    <template x-if="imagePreview">
+                        <div class="featured-image-preview-wrapper">
+                            <img :src="imagePreview" alt="Ảnh sự kiện" class="featured-image-img" />
+                            <div class="featured-image-overlay">
+                                <button type="button" class="btn-change-image" @click="openEventMediaPicker()">
                                     <span class="material-symbols-outlined">photo_library</span>
-                                    Chọn ảnh từ Thư viện Media
+                                    Đổi ảnh từ Thư viện Media
+                                </button>
+                                <button type="button" class="btn-remove-image" @click="removeEventImage()">
+                                    <span class="material-symbols-outlined">delete</span>
+                                    Xóa ảnh
                                 </button>
                             </div>
-                        </template>
-                    </div>
+                        </div>
+                    </template>
+
+                    <template x-if="!imagePreview">
+                        <div class="featured-image-empty-placeholder" @click="openEventMediaPicker()">
+                            <span class="material-symbols-outlined placeholder-icon">add_photo_alternate</span>
+                            <p>Chưa có ảnh đại diện sự kiện</p>
+                            <button type="button" class="btn-select-media">
+                                <span class="material-symbols-outlined">photo_library</span>
+                                Chọn ảnh từ Thư viện Media
+                            </button>
+                        </div>
+                    </template>
                 </div>
-            </form>
+            </div>
+        </form>
+    </div>
+
+    <!-- ============================================================
+         TAB 2: KHÁCH MỜI (Attendees Management)
+         ============================================================ -->
+    <div class="admin-detail-attendees-card" x-show="!isLoading && !error && currentTab === 'attendees'" x-cloak>
+        <div class="attendees-header">
+            <div class="attendees-title-wrap">
+                <h2 class="attendees-title">
+                    <span class="material-symbols-outlined attendees-icon">group</span>
+                    Khách mời tham dự
+                </h2>
+                <span class="attendees-badge" x-text="attendeesTotal + ' khách mời'"></span>
+            </div>
+
+            <div class="attendees-actions">
+                <button type="button" class="btn-attendee-delete" x-show="selectedAttendeeIds.length > 0"
+                    @click="removeAttendees(selectedAttendeeIds)" x-transition>
+                    <span class="material-symbols-outlined">person_remove</span>
+                    Xóa đã chọn (<span x-text="selectedAttendeeIds.length"></span>)
+                </button>
+
+                <button type="button" class="btn-attendee-checkin" @click="startQrCheckIn()">
+                    <span class="material-symbols-outlined">qr_code_scanner</span>
+                    Check in
+                </button>
+
+                <button type="button" class="btn-attendee-import" @click="openImportModal()">
+                    <span class="material-symbols-outlined">upload_file</span>
+                    Import Excel / CSV
+                </button>
+
+                <button type="button" class="btn-attendee-add" @click="openAddEmployeesModal()">
+                    <span class="material-symbols-outlined">person_add</span>
+                    Thêm khách mời
+                </button>
+            </div>
         </div>
+
+        <!-- Search Bar for Attendees -->
+        <div class="attendees-search-row">
+            <div class="attendees-search-wrapper">
+                <span class="material-symbols-outlined attendees-search-icon">search</span>
+                <input type="text" class="attendees-search-input" placeholder="Tìm kiếm khách mời trong sự kiện..."
+                    x-model="attendeesSearch" @input.debounce.400ms="loadAttendees(1)" />
+            </div>
+        </div>
+
+        <!-- Attendees Table -->
+        <div class="attendees-table-container">
+            <template x-if="attendeesLoading">
+                <div class="attendees-loading">
+                    <div class="spinner-sm"></div>
+                    <p>Đang tải danh sách khách mời...</p>
+                </div>
+            </template>
+
+            <template x-if="!attendeesLoading && attendees.length === 0">
+                <div class="attendees-empty">
+                    <span class="material-symbols-outlined attendees-empty-icon">person_off</span>
+                    <h4>Chưa có khách mời nào tham gia sự kiện</h4>
+                    <p>Hãy bấm <b>"Thêm khách mời"</b> hoặc <b>"Import Excel / CSV"</b> để thêm người vào sự kiện.</p>
+                </div>
+            </template>
+
+            <template x-if="!attendeesLoading && attendees.length > 0">
+                <table class="attendees-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">
+                                <input type="checkbox" class="attendee-checkbox"
+                                    :checked="attendees.length > 0 && attendees.every(a => selectedAttendeeIds.includes(a.id))"
+                                    @change="toggleSelectAllAttendees()" />
+                            </th>
+                            <th style="width: 100px;">Mã NV</th>
+                            <th>Họ và tên</th>
+                            <th>Email</th>
+                            <th>Phòng ban</th>
+                            <th>Chức vụ</th>
+                            <th>Giới tính</th>
+                            <th style="width: 70px; text-align: center;">Xóa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="emp in attendees" :key="emp.id">
+                            <tr :class="{ 'row-selected': selectedAttendeeIds.includes(emp.id) }">
+                                <td style="text-align: center;">
+                                    <input type="checkbox" class="attendee-checkbox"
+                                        :checked="selectedAttendeeIds.includes(emp.id)"
+                                        @change="toggleAttendee(emp.id)" />
+                                </td>
+                                <td>
+                                    <span class="emp-code-chip" x-text="'#' + String(emp.id).padStart(8, '0')"></span>
+                                </td>
+                                <td>
+                                    <strong class="emp-name-text" x-text="emp.name"></strong>
+                                </td>
+                                <td>
+                                    <span class="emp-meta-text" x-text="emp.email || '—'"></span>
+                                </td>
+                                <td>
+                                    <span class="emp-tag" x-text="emp.department || '—'"></span>
+                                </td>
+                                <td>
+                                    <span class="emp-meta-text" x-text="emp.position || '—'"></span>
+                                </td>
+                                <td>
+                                    <span class="emp-meta-text" x-text="emp.gender || '—'"></span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <button type="button" class="btn-remove-single-emp" title="Xóa khỏi sự kiện"
+                                        @click="removeAttendees([emp.id])">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+        </div>
+
+        <!-- Attendees Pagination -->
+        <div class="attendees-pagination" x-show="!attendeesLoading && attendeesTotalPages > 1">
+            <button type="button" class="attendees-page-btn" :disabled="attendeesPage <= 1"
+                @click="loadAttendees(attendeesPage - 1)">
+                <span class="material-symbols-outlined">chevron_left</span>
+                Trước
+            </button>
+            <span class="attendees-page-info">
+                Trang 
+                <input type="number" min="1" :max="attendeesTotalPages" :value="attendeesPage"
+                    @keydown.enter.prevent="goToAttendeePage($event.target.value)"
+                    @blur="goToAttendeePage($event.target.value)"
+                    class="page-jump-input" title="Nhập số trang và nhấn Enter" />
+                / <span x-text="attendeesTotalPages"></span> (<span x-text="attendeesTotal"></span> người)
+            </span>
+            <button type="button" class="attendees-page-btn" :disabled="attendeesPage >= attendeesTotalPages"
+                @click="loadAttendees(attendeesPage + 1)">
+                Sau
+                <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         TAB 3: PHÂN TÍCH (Analytics Placeholder)
+         ============================================================ -->
+    <div class="admin-detail-analytics-card" x-show="!isLoading && !error && currentTab === 'analytics'" x-cloak>
+        <div class="analytics-placeholder">
+            <div class="analytics-icon-wrap">
+                <span class="material-symbols-outlined analytics-placeholder-icon">analytics</span>
+            </div>
+            <h3 class="analytics-placeholder-title">Phân tích & Thống kê sự kiện</h3>
+            <p class="analytics-placeholder-desc">
+                Tính năng phân tích đang được xây dựng. Các biểu đồ thống kê người tham gia, tỷ lệ check-in và báo cáo chi tiết sự kiện sẽ được cập nhật tại đây.
+            </p>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: THÊM KHÁCH MỜI VÀO SỰ KIỆN (Add Unassigned Employees)
+         ============================================================ -->
+    <div class="event-add-emp-overlay" x-show="addModalOpen" x-cloak style="display: none;"
+        @keydown.escape.window="closeAddEmployeesModal()">
+        <div class="event-add-emp-modal" role="dialog" aria-modal="true" @click.outside="closeAddEmployeesModal()">
+            <div class="event-add-emp-header">
+                <div class="add-emp-header-left">
+                    <span class="material-symbols-outlined add-emp-icon">person_add</span>
+                    <h3>Thêm khách mời vào sự kiện</h3>
+                </div>
+                <button type="button" class="btn-add-emp-close" @click="closeAddEmployeesModal()">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <!-- Search inside Modal -->
+            <div class="event-add-emp-search-box">
+                <span class="material-symbols-outlined">search</span>
+                <input type="text" placeholder="Tìm kiếm nhân viên chưa tham gia sự kiện..."
+                    x-model="unassignedSearch" @input.debounce.300ms="loadUnassignedEmployees(1)" />
+            </div>
+
+            <!-- Table of Unassigned Employees -->
+            <div class="event-add-emp-body">
+                <template x-if="unassignedLoading">
+                    <div class="attendees-loading" style="padding: 40px 0;">
+                        <div class="spinner-sm"></div>
+                        <p>Đang tìm kiếm nhân viên...</p>
+                    </div>
+                </template>
+
+                <template x-if="!unassignedLoading && unassignedEmployees.length === 0">
+                    <div class="attendees-empty" style="padding: 40px 0;">
+                        <span class="material-symbols-outlined attendees-empty-icon">group_off</span>
+                        <h4>Không tìm thấy nhân viên nào</h4>
+                        <p>Tất cả nhân viên đã tham gia sự kiện này hoặc không khớp với từ khóa tìm kiếm.</p>
+                    </div>
+                </template>
+
+                <template x-if="!unassignedLoading && unassignedEmployees.length > 0">
+                    <table class="attendees-table unassigned-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;">
+                                    <input type="checkbox" class="attendee-checkbox"
+                                        :checked="unassignedEmployees.length > 0 && unassignedEmployees.every(e => selectedUnassignedIds.includes(e.id))"
+                                        @change="toggleSelectAllUnassigned()" />
+                                </th>
+                                <th style="width: 90px;">Mã NV</th>
+                                <th>Họ và tên</th>
+                                <th>Phòng ban</th>
+                                <th>Chức vụ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="emp in unassignedEmployees" :key="emp.id">
+                                <tr :class="{ 'row-selected': selectedUnassignedIds.includes(emp.id) }"
+                                    @click="toggleUnassigned(emp.id)" style="cursor: pointer;">
+                                    <td style="text-align: center;" @click.stop>
+                                        <input type="checkbox" class="attendee-checkbox"
+                                            :checked="selectedUnassignedIds.includes(emp.id)"
+                                            @change="toggleUnassigned(emp.id)" />
+                                    </td>
+                                    <td>
+                                        <span class="emp-code-chip" x-text="'#' + String(emp.id).padStart(8, '0')"></span>
+                                    </td>
+                                    <td>
+                                        <strong class="emp-name-text" x-text="emp.name"></strong>
+                                    </td>
+                                    <td>
+                                        <span class="emp-tag" x-text="emp.department || '—'"></span>
+                                    </td>
+                                    <td>
+                                        <span class="emp-meta-text" x-text="emp.position || '—'"></span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </template>
+            </div>
+
+            <!-- Modal Pagination & Footer -->
+            <div class="event-add-emp-footer">
+                <div class="add-emp-footer-pagination" x-show="!unassignedLoading && unassignedTotalPages > 1">
+                    <button type="button" class="attendees-page-btn" :disabled="unassignedPage <= 1"
+                        @click="loadUnassignedEmployees(unassignedPage - 1)">
+                        <span class="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    <span class="attendees-page-info">
+                        Trang 
+                        <input type="number" min="1" :max="unassignedTotalPages" :value="unassignedPage"
+                            @keydown.enter.prevent="goToUnassignedPage($event.target.value)"
+                            @blur="goToUnassignedPage($event.target.value)"
+                            class="page-jump-input" title="Nhập số trang và nhấn Enter" />
+                        / <span x-text="unassignedTotalPages"></span>
+                    </span>
+                    <button type="button" class="attendees-page-btn" :disabled="unassignedPage >= unassignedTotalPages"
+                        @click="loadUnassignedEmployees(unassignedPage + 1)">
+                        <span class="material-symbols-outlined">chevron_right</span>
+                    </button>
+                </div>
+
+                <div class="add-emp-footer-actions">
+                    <span class="selected-count-label" x-show="selectedUnassignedIds.length > 0">
+                        Đã chọn: <b x-text="selectedUnassignedIds.length"></b>
+                    </span>
+                    <button type="button" class="btn-modal-cancel" @click="closeAddEmployeesModal()">Hủy</button>
+                    <button type="button" class="btn-modal-submit" :disabled="selectedUnassignedIds.length === 0 || isSubmittingRegisters"
+                        @click="addSelectedEmployees()">
+                        <span x-show="!isSubmittingRegisters" class="material-symbols-outlined">add</span>
+                        <span x-show="isSubmittingRegisters" class="spinner-sm"></span>
+                        <span x-text="isSubmittingRegisters ? 'Đang thêm...' : ('Thêm vào sự kiện (' + selectedUnassignedIds.length + ')')"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: XÁC NHẬN THÔNG TIN CHECK-IN KHÁCH MỜI
+         ============================================================ -->
+    <div class="event-checkin-overlay" x-show="checkInModalOpen" x-cloak style="display: none;"
+        @keydown.escape.window="closeCheckInModal()">
+        <div class="event-checkin-modal" role="dialog" aria-modal="true" @click.outside="closeCheckInModal()">
+            <div class="event-checkin-header">
+                <div class="checkin-header-left">
+                    <span class="material-symbols-outlined checkin-icon">how_to_reg</span>
+                    <h3>Xác nhận thông tin Check-in</h3>
+                </div>
+                <button type="button" class="btn-checkin-close" @click="closeCheckInModal()" aria-label="Đóng">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="event-checkin-body">
+                <template x-if="checkInLoading">
+                    <div class="checkin-loading">
+                        <div class="spinner-sm"></div>
+                        <p>Đang tải thông tin khách mời...</p>
+                    </div>
+                </template>
+
+                <template x-if="!checkInLoading && checkInEmployee">
+                    <div class="checkin-card">
+                        <!-- Employee Header Top -->
+                        <div class="checkin-emp-top">
+                            <div class="checkin-avatar">
+                                <span class="material-symbols-outlined" style="font-size: 32px;">account_circle</span>
+                            </div>
+                            <div class="checkin-emp-identity">
+                                <h4 class="checkin-emp-name" x-text="checkInEmployee.name"></h4>
+                                <span class="checkin-code-chip" x-text="'#' + String(checkInEmployee.employee_id).padStart(8, '0')"></span>
+                            </div>
+                        </div>
+
+                        <!-- Check-in Status Banner -->
+                        <div class="checkin-status-banner" :class="checkInEmployee.status === 'check_in' ? 'banner-checked-in' : 'banner-pending'">
+                            <span class="material-symbols-outlined" x-text="checkInEmployee.status === 'check_in' ? 'check_circle' : 'pending'"></span>
+                            <div>
+                                <strong x-text="checkInEmployee.status === 'check_in' ? 'Đã check-in' : 'Chưa check-in'"></strong>
+                                <span x-show="checkInEmployee.check_in_at" x-text="' (Thời gian: ' + new Date(checkInEmployee.check_in_at).toLocaleTimeString('vi-VN') + ' ' + new Date(checkInEmployee.check_in_at).toLocaleDateString('vi-VN') + ')'"></span>
+                            </div>
+                        </div>
+
+                        <!-- Employee Details Grid -->
+                        <div class="checkin-details-grid">
+                            <div class="checkin-info-item">
+                                <span class="info-label">Phòng ban</span>
+                                <span class="info-val" x-text="checkInEmployee.department || '—'"></span>
+                            </div>
+                            <div class="checkin-info-item">
+                                <span class="info-label">Chức vụ</span>
+                                <span class="info-val" x-text="checkInEmployee.position || '—'"></span>
+                            </div>
+                            <div class="checkin-info-item">
+                                <span class="info-label">Email</span>
+                                <span class="info-val" x-text="checkInEmployee.email || '—'"></span>
+                            </div>
+                            <div class="checkin-info-item">
+                                <span class="info-label">Giới tính</span>
+                                <span class="info-val" x-text="checkInEmployee.gender || '—'"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="event-checkin-footer">
+                <button type="button" class="btn-modal-cancel" @click="closeCheckInModal()">Đóng</button>
+                
+                <template x-if="!checkInSuccess">
+                    <button type="button" class="btn-checkin-confirm" :disabled="checkInLoading || isSubmittingCheckIn"
+                        @click="confirmCheckIn()">
+                        <span x-show="!isSubmittingCheckIn" class="material-symbols-outlined">check_circle</span>
+                        <span x-show="isSubmittingCheckIn" class="spinner-sm"></span>
+                        <span x-text="isSubmittingCheckIn ? 'Đang check-in...' : 'Xác nhận Check-in'"></span>
+                    </button>
+                </template>
+
+                <template x-if="checkInSuccess">
+                    <button type="button" class="btn-checkin-next" @click="scanNextGuest()">
+                        <span class="material-symbols-outlined">qr_code_scanner</span>
+                        Quét người tiếp theo
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
 </div>
+
+{% include "templates/components/qr_scanner_modal.j2" %}
+<script src="/static/js/employees.js"></script>
+{% include "modules/employees/views/admin/modals/employee_import_modal.j2" %}
 
 <style>
     .admin-event-detail-page {
@@ -427,7 +1169,69 @@
         background: rgba(239, 68, 68, 0.22);
     }
 
-    .admin-detail-edit-card {
+    /* Tabs Navigation Bar */
+    .admin-detail-tabs-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 2px;
+    }
+
+    .admin-tab-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: transparent;
+        border: none;
+        border-bottom: 2.5px solid transparent;
+        color: var(--text-secondary);
+        font-size: 14.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-radius: 6px 6px 0 0;
+    }
+
+    .admin-tab-btn .material-symbols-outlined {
+        font-size: 20px;
+    }
+
+    .admin-tab-btn:hover {
+        color: var(--foreground);
+        background: var(--bg-home-page);
+    }
+
+    .admin-tab-btn--active {
+        color: var(--login-bg, #3b82f6);
+        border-bottom-color: var(--login-bg, #3b82f6);
+    }
+
+    .tab-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: var(--bg-home-page);
+        border: 1px solid var(--border);
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--text-secondary);
+    }
+
+    .admin-tab-btn--active .tab-badge {
+        background: rgba(59, 130, 246, 0.15);
+        color: #3b82f6;
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .admin-detail-edit-card,
+    .admin-detail-attendees-card,
+    .admin-detail-analytics-card {
         background: var(--card);
         border: 1px solid var(--border);
         border-radius: 16px;
@@ -617,6 +1421,855 @@
         margin: 0;
         font-size: 14px;
         color: var(--text-secondary);
+    }
+
+    /* ============================================================
+       ATTENDEES SECTION STYLES (Tab 2)
+       ============================================================ */
+    .admin-detail-attendees-card {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .attendees-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 14px;
+    }
+
+    .attendees-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .attendees-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--foreground);
+        margin: 0;
+    }
+
+    .attendees-icon {
+        font-size: 22px;
+        color: var(--login-bg);
+    }
+
+    .attendees-badge {
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--bg-home-page);
+        border: 1px solid var(--border);
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .attendees-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-attendee-add {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: var(--login-bg);
+        color: var(--background);
+        border: none;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+    }
+
+    .btn-attendee-add:hover {
+        opacity: 0.9;
+    }
+
+    .btn-attendee-import {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: var(--card);
+        color: var(--foreground);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-attendee-import:hover {
+        background: var(--border);
+    }
+
+    .btn-attendee-delete {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: rgba(239, 68, 68, 0.12);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-attendee-delete:hover {
+        background: rgba(239, 68, 68, 0.2);
+    }
+
+    .attendees-search-row {
+        width: 100%;
+    }
+
+    .attendees-search-wrapper {
+        position: relative;
+        width: 100%;
+        max-width: 420px;
+    }
+
+    .attendees-search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 20px;
+        color: var(--text-secondary);
+        pointer-events: none;
+    }
+
+    .attendees-search-input {
+        width: 100%;
+        height: 38px;
+        padding: 8px 12px 8px 40px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background-color: var(--bg-home-page);
+        color: var(--foreground);
+        font-size: 13.5px;
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.2s ease;
+    }
+
+    .attendees-search-input:focus {
+        border-color: var(--foreground);
+    }
+
+    .attendees-table-container {
+        width: 100%;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card);
+    }
+
+    .attendees-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 13.5px;
+    }
+
+    .attendees-table th {
+        padding: 12px 14px;
+        background: var(--bg-home-page);
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 12.5px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+    }
+
+    .attendees-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        color: var(--foreground);
+        vertical-align: middle;
+    }
+
+    .attendees-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .attendees-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .attendees-table tbody tr.row-selected {
+        background: rgba(59, 130, 246, 0.08);
+    }
+
+    .attendee-checkbox {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        accent-color: var(--login-bg);
+    }
+
+    .emp-code-chip {
+        font-family: monospace;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        background: var(--bg-home-page);
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+    }
+
+    .emp-name-text {
+        color: var(--foreground);
+        font-weight: 600;
+    }
+
+    .emp-meta-text {
+        color: var(--text-secondary);
+    }
+
+    .emp-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        background: var(--bg-home-page);
+        border-radius: 6px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+    }
+
+    .btn-remove-single-emp {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-remove-single-emp:hover {
+        background: rgba(239, 68, 68, 0.12);
+        color: #ef4444;
+    }
+
+    .btn-remove-single-emp .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    .attendees-empty,
+    .attendees-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 20px;
+        gap: 10px;
+        text-align: center;
+        color: var(--text-secondary);
+    }
+
+    .attendees-empty-icon {
+        font-size: 42px;
+        opacity: 0.6;
+    }
+
+    .attendees-empty h4 {
+        margin: 0;
+        font-size: 15px;
+        color: var(--foreground);
+    }
+
+    .attendees-empty p {
+        margin: 0;
+        font-size: 13.5px;
+    }
+
+    .attendees-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 6px;
+    }
+
+    .attendees-page-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--foreground);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.18s ease;
+    }
+
+    .attendees-page-btn:hover:not(:disabled) {
+        background: var(--border);
+    }
+
+    .attendees-page-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .attendees-page-btn .material-symbols-outlined {
+        font-size: 16px;
+    }
+
+    .attendees-page-info {
+        font-size: 13px;
+        color: var(--text-secondary);
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .page-jump-input {
+        width: 52px;
+        height: 28px;
+        text-align: center;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--foreground);
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 13px;
+        padding: 2px 4px;
+        margin: 0 4px;
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        -moz-appearance: textfield;
+    }
+
+    .page-jump-input::-webkit-outer-spin-button,
+    .page-jump-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .page-jump-input:focus {
+        border-color: var(--login-bg, #3b82f6);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    /* ============================================================
+       ANALYTICS SECTION STYLES (Tab 3 Placeholder)
+       ============================================================ */
+    .admin-detail-analytics-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 360px;
+    }
+
+    .analytics-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        max-width: 480px;
+        padding: 40px 20px;
+        gap: 12px;
+    }
+
+    .analytics-icon-wrap {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 6px;
+    }
+
+    .analytics-placeholder-icon {
+        font-size: 32px;
+        color: var(--login-bg, #3b82f6);
+    }
+
+    .analytics-placeholder-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--foreground);
+        margin: 0;
+    }
+
+    .analytics-placeholder-desc {
+        font-size: 13.5px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    /* ============================================================
+       ADD EMPLOYEES MODAL STYLES
+       ============================================================ */
+    .event-add-emp-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .event-add-emp-modal {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 720px;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+    }
+
+    .event-add-emp-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .add-emp-header-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .add-emp-header-left h3 {
+        margin: 0;
+        font-size: 16.5px;
+        font-weight: 700;
+        color: var(--foreground);
+    }
+
+    .add-emp-icon {
+        font-size: 22px;
+        color: var(--login-bg);
+    }
+
+    .btn-add-emp-close {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .btn-add-emp-close:hover {
+        background: var(--border);
+        color: var(--foreground);
+    }
+
+    .event-add-emp-search-box {
+        position: relative;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-home-page);
+    }
+
+    .event-add-emp-search-box .material-symbols-outlined {
+        position: absolute;
+        left: 32px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 20px;
+        color: var(--text-secondary);
+    }
+
+    .event-add-emp-search-box input {
+        width: 100%;
+        height: 38px;
+        padding: 8px 12px 8px 38px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background-color: var(--card);
+        color: var(--foreground);
+        font-size: 13.5px;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .event-add-emp-search-box input:focus {
+        border-color: var(--foreground);
+    }
+
+    .event-add-emp-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0;
+    }
+
+    .unassigned-table th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .event-add-emp-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+        background: var(--bg-home-page);
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .add-emp-footer-pagination {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .add-emp-footer-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-left: auto;
+    }
+
+    .selected-count-label {
+        font-size: 13.5px;
+        color: var(--text-secondary);
+    }
+
+    .btn-modal-cancel {
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--foreground);
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.18s ease;
+    }
+
+    .btn-modal-cancel:hover {
+        background: var(--border);
+    }
+
+    .btn-modal-submit {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        border-radius: 8px;
+        border: none;
+        background: var(--login-bg);
+        color: var(--background);
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: opacity 0.18s ease;
+    }
+
+    .btn-modal-submit:hover:not(:disabled) {
+        opacity: 0.9;
+    }
+
+    .btn-modal-submit:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    .btn-attendee-checkin {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: #07A39E;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(7, 163, 158, 0.25);
+    }
+
+    .btn-attendee-checkin:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+    }
+
+    /* Check-in Modal Styles */
+    .event-checkin-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .event-checkin-modal {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 520px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        animation: qrsSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .event-checkin-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .checkin-header-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .checkin-header-left h3 {
+        margin: 0;
+        font-size: 16.5px;
+        font-weight: 700;
+        color: var(--foreground);
+    }
+
+    .checkin-icon {
+        font-size: 24px;
+        color: #07A39E;
+    }
+
+    .btn-checkin-close {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .btn-checkin-close:hover {
+        background: var(--border);
+        color: var(--foreground);
+    }
+
+    .event-checkin-body {
+        padding: 20px;
+    }
+
+    .checkin-card {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .checkin-emp-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .checkin-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(7, 163, 158, 0.12);
+        color: #07A39E;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .checkin-emp-identity {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .checkin-emp-name {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--foreground);
+    }
+
+    .checkin-code-chip {
+        font-family: monospace;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        background: var(--bg-home-page);
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        width: fit-content;
+    }
+
+    .checkin-status-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .banner-checked-in {
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #10b981;
+    }
+
+    .banner-pending {
+        background: rgba(245, 158, 11, 0.12);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #f59e0b;
+    }
+
+    .checkin-details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        background: var(--bg-home-page);
+        padding: 14px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+    }
+
+    .checkin-info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .info-label {
+        font-size: 11px;
+        color: var(--text-secondary);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .info-val {
+        font-size: 13.5px;
+        color: var(--foreground);
+        font-weight: 600;
+    }
+
+    .checkin-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        gap: 10px;
+        color: var(--text-secondary);
+    }
+
+    .event-checkin-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+        background: var(--bg-home-page);
+        gap: 10px;
+    }
+
+    .btn-checkin-confirm {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        background: #10b981;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+    }
+
+    .btn-checkin-confirm:hover:not(:disabled) {
+        opacity: 0.92;
+    }
+
+    .btn-checkin-next {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        background: #07A39E;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+    }
+
+    .btn-checkin-next:hover {
+        opacity: 0.92;
     }
 
     .admin-detail-loading,

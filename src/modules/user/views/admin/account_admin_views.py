@@ -4,7 +4,7 @@ from src.modules.user.role_constants import ROLE
 from src.modules.user.user_services import UserServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth
+from src.shared.middlewares.auth_middlewares import AuthContext, auth
 from src.shared.schemas.pagination_schemas import PaginationQuery
 
 TAG_NAME = "admin/account"
