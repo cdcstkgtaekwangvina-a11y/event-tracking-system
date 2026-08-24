@@ -13,7 +13,7 @@ from src.shared.validators.account_validators import (
 class UpdateProfileRequest(BaseSchema):
     name: str | None = Field(default=None, max_length=300)
     username: str | None = Field(default=None, max_length=350)
-    email: str | None = Field(default=None, max_length=300)
+    email: EmailStr | None = Field(default=None, max_length=300)
 
     @field_validator("username")
     @classmethod
@@ -73,7 +73,7 @@ class UpdateAccountRequest(BaseSchema):
 
     name: str | None = Field(default=None, max_length=300)
     username: str | None = Field(default=None, max_length=350)
-    email: str | None = Field(default=None, max_length=300)
+    email: EmailStr | None = Field(default=None, max_length=300)
     password: str | None = Field(default=None)
     is_active: bool | None = Field(default=None)
 

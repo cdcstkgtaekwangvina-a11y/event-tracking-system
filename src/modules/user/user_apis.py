@@ -5,7 +5,7 @@ from src.shared.base.base_route import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import AuthContext, auth
 from src.shared.schemas.pagination_schemas import PaginationQuery
-
+from src.shared.middlewares.auth_middlewares import RequireAuth
 from .role_constants import ROLE
 from .user_schemas import (
     ChangePasswordRequest,
@@ -78,13 +78,13 @@ ACCOUNT_TAG = "Account"
 account_router = BaseRouter(
     controller=ACCOUNT_TAG,
     tags=[ACCOUNT_TAG],
-    dependencies=[auth(roles=[ROLE.SUPER_ADMIN])],
+    dependencies=[Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN]))],
 )
 
 
 @clean_cbv(account_router)
 class AccountApis:
-    """Admin-facing account management (`/api/Account`) — ADMIN/SUPER_ADMIN
+    """Admin-facing account management (`/api/Account`) — SUPER_ADMIN
     only. Reuses `UserServices` (see its `list_accounts`/`create_account`/
     `update_account`) rather than a separate service class, since both this
     and the self-service `/api/User/profile` endpoints above operate on the
@@ -106,8 +106,11 @@ class AccountApis:
         self,
         account_id: str,
         payload: UpdateAccountRequest,
-        auth: AuthContext = auth(roles=[ROLE.SUPER_ADMIN]),
+        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN])),
     ):
         return await self.service.update_account(
-            id=account_id, payload=payload, requester_role=auth.payload.role
+            id=account_id,
+            payload=payload,
+            requester_role=auth.payload.role,
+            requester_id=auth.payload.id,
         )

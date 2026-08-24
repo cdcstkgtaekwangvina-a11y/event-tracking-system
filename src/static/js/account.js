@@ -79,6 +79,13 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const emailToCheck = this.form.email?.trim();
+            if (emailToCheck && (this.mode === 'create' || this.canEditEmail) && !emailPattern.test(emailToCheck)) {
+                window.notify?.toast?.error?.('Lỗi', 'Email không đúng định dạng');
+                return;
+            }
+
             this.loading = true;
             try {
                 let res;

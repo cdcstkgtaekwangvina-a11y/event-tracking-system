@@ -6,12 +6,12 @@ from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import AuthContext, auth
 from src.shared.schemas.pagination_schemas import PaginationQuery
-
+from src.shared.middlewares.auth_middlewares import RequireAuth
 TAG_NAME = "admin/account"
 router = BaseRouter(
     controller=TAG_NAME,
     tags=[TAG_NAME],
-    dependencies=[auth(is_required_auth=True, roles=[ROLE.SUPER_ADMIN])],
+    dependencies=[Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN]))],
 )
 base_path = "modules/user/views/admin/"
 
@@ -25,7 +25,7 @@ class AccountAdminViews:
     def accounts(
         self,
         req: BaseRequest,
-        auth: AuthContext = auth(),
+        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN])),
     ):
         return req.response_html(
             name=f"{base_path}index.j2",
@@ -34,7 +34,10 @@ class AccountAdminViews:
 
     @router.get("table/html", name="accounts_table")
     async def accounts_table_html(
-        self, req: BaseRequest, pagination: PaginationQuery, auth: AuthContext = auth()
+        self,
+        req: BaseRequest,
+        pagination: PaginationQuery,
+        auth: AuthContext = Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN])),
     ):
         if "limit" not in req.query_params:
             pagination.limit = 20
