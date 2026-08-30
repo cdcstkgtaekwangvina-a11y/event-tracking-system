@@ -25,7 +25,7 @@ def layouts_routes(app: FastAPI) -> FastAPI:
     ):
 
         return req.response_html(
-            name="/templates/layouts/admin_home.j2", context={}, cache_time=3600
+            name="/templates/layouts/admin_home.j2", context={}
         )
 
     @app.get("/.well-known/appspecific/com.chrome.devtools.json")

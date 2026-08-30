@@ -41,7 +41,7 @@ PROJECT_ROOT = SRC_DIR.parent
 
 
 class CachedStaticFiles(StaticFiles):
-    def __init__(self, *args, cache_control: str = "public, max-age=604800", **kwargs):
+    def __init__(self, *args, cache_control: str = "public, max-age=2592000", **kwargs):
         self.cache_control = cache_control
         super().__init__(*args, **kwargs)
 
@@ -61,7 +61,7 @@ def create_app() -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
     app.router.route_class = BaseRoute
 
-    static_cache = "no-cache" if environment == "dev" else "public, max-age=604800"
+    static_cache = "public, max-age=604800" if environment == "dev" else "public, max-age=2592000, stale-while-revalidate=86400"
     app.mount("/static", CachedStaticFiles(directory=SRC_DIR / "static", cache_control=static_cache), name="static")
     fonts_dir = PROJECT_ROOT / "public" / "fonts"
     if fonts_dir.exists():

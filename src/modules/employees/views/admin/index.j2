@@ -1,7 +1,7 @@
 {% extends "templates/layouts/admin.j2" if not request.headers.get("hx-request") else
 "templates/layouts/admin_blank.j2"%}
 {% block admin_title %}Quản lý khách mời{% endblock %}
-{% block head_extra %}<link rel="stylesheet" href="/static/css/employees.css">{% endblock %}
+{% block admin_head_extra %}<link rel="stylesheet" href="/static/css/employees.css">{% endblock %}
 {% block admin_body %}
 <link rel="stylesheet" href="/static/css/employees.css">
 <script>

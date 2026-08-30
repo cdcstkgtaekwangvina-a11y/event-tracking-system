@@ -42,6 +42,9 @@ class BaseRequest(Request):
             media_type=media_type,
             background=background,
         )
+        response.headers["Vary"] = "HX-Request"
         if cache_time > 0:
             response.headers["Cache-Control"] = f"public, max-age={cache_time}"
+        else:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
         return response
