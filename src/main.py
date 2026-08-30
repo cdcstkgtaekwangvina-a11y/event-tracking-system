@@ -40,6 +40,18 @@ SRC_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SRC_DIR.parent
 
 
+class CachedStaticFiles(StaticFiles):
+    def __init__(self, *args, cache_control: str = "public, max-age=604800", **kwargs):
+        self.cache_control = cache_control
+        super().__init__(*args, **kwargs)
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = self.cache_control
+        return response
+
+
 def create_app() -> FastAPI:
     from src import subscription_services as services
     from src.modules.app_routes import router as main_router
@@ -48,10 +60,12 @@ def create_app() -> FastAPI:
 
     app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
     app.router.route_class = BaseRoute
-    app.mount("/static", StaticFiles(directory=SRC_DIR / "static"), name="static")
+
+    static_cache = "no-cache" if environment == "dev" else "public, max-age=604800"
+    app.mount("/static", CachedStaticFiles(directory=SRC_DIR / "static", cache_control=static_cache), name="static")
     fonts_dir = PROJECT_ROOT / "public" / "fonts"
     if fonts_dir.exists():
-        app.mount("/fonts", StaticFiles(directory=fonts_dir), name="fonts")
+        app.mount("/fonts", CachedStaticFiles(directory=fonts_dir, cache_control="public, max-age=31536000, immutable"), name="fonts")
     templates = global_values(Jinja2Templates(directory=PROJECT_ROOT / "src"))
 
     app.state.templates = templates
