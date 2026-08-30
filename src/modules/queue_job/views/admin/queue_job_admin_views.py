@@ -26,13 +26,11 @@ class QueueJobAdminViews:
         req: BaseRequest,
         status: str | None = None,
     ):
-        is_hx_fragment = bool(req.headers.get("hx-request"))
         return req.response_html(
             name=f"{base_path}index.j2",
             context={
                 "status_filter": status or "all",
             },
-            cache_time=3600 if is_hx_fragment else 0,
         )
 
     @router.get("table/html", name="queue_jobs_table")

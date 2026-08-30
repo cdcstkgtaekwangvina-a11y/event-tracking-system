@@ -22,11 +22,7 @@ class EmployeeAdminViews:
 
     @router.get(name="employees")
     def employees(self, req: BaseRequest):
-        is_hx_fragment = bool(req.headers.get("hx-request"))
-        return req.response_html(
-            name=f"{base_path}index.j2",
-            cache_time=3600 if is_hx_fragment else 0,
-        )
+        return req.response_html(name=f"{base_path}index.j2")
 
     @router.get("table/html", name="employees_table")
     async def employees_table_html(

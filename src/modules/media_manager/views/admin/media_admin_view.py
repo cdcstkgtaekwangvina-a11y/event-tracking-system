@@ -26,7 +26,6 @@ class MediaViews:
     async def media_manager(self, req: BaseRequest, folder_id: int | None = None):
         return req.response_html(
             name=f"{base_path}index.j2",
-            cache_time=3600,
             context={
                 "folder_id": folder_id,
                 "deleted_media": False,

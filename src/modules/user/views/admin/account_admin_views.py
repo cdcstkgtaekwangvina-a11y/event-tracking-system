@@ -29,7 +29,6 @@ class AccountAdminViews:
     ):
         return req.response_html(
             name=f"{base_path}index.j2",
-            cache_time=3600,
             context={"can_edit_email": auth.payload.role == ROLE.SUPER_ADMIN},
         )
 
