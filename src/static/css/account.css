@@ -470,6 +470,70 @@
     grid-column: 1 / -1;
 }
 
+.acc-form-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.acc-btn-text {
+    background: none;
+    border: none;
+    padding: 3px 8px;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 6px;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.acc-btn-text:hover {
+    opacity: 0.85;
+    background-color: var(--border);
+}
+
+.acc-btn-text .material-symbols-outlined {
+    font-size: 15px;
+}
+
+.acc-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.acc-input-wrapper .acc-form-input {
+    padding-right: 40px;
+}
+
+.acc-input-eye-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+}
+
+.acc-input-eye-btn:hover {
+    color: var(--foreground);
+}
+
+.acc-input-eye-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
 .acc-form-label {
     font-size: 13px;
     font-weight: 500;

@@ -5,6 +5,7 @@
 
 {% block admin_body %}
 <link rel="stylesheet" href="/static/css/employees.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.js"></script>
 <script>
     function adminEventDetailApp(eventId) {
         return {
@@ -61,6 +62,21 @@
             isSubmittingCheckIn: false,
             checkInSuccess: false,
 
+            // Analytics state (Tab 3)
+            analyticsLoaded: false,
+            analyticsLoading: false,
+            analyticsError: '',
+            analyticsData: [],
+            totalGuests: 0,
+            totalCheckedIn: 0,
+            totalSent: 0,
+            totalPending: 0,
+            charts: {
+                checkedIn: null,
+                sent: null,
+                pending: null
+            },
+
             async init() {
                 this.isLoading = true;
                 this.error = '';
@@ -102,6 +118,15 @@
                     // Only call attendees API when switching to Tab 2
                     if (!this.attendeesLoaded || this.attendees.length === 0) {
                         this.loadAttendees();
+                    }
+                } else if (tab === 'analytics') {
+                    // Only call analytics API when switching to Tab 3
+                    if (!this.analyticsLoaded || this.analyticsData.length === 0) {
+                        this.loadAnalytics();
+                    } else {
+                        this.$nextTick(() => {
+                            this.renderCharts();
+                        });
                     }
                 }
             },
@@ -555,6 +580,217 @@
                 this.$nextTick(() => {
                     this.startQrCheckIn();
                 });
+            },
+
+            ensureChartLoaded() {
+                return new Promise((resolve) => {
+                    if (window.Chart) {
+                        resolve(window.Chart);
+                        return;
+                    }
+                    const existing = document.querySelector('script[src*="Chart.js"]');
+                    if (existing) {
+                        existing.addEventListener('load', () => resolve(window.Chart));
+                        setTimeout(() => resolve(window.Chart || null), 500);
+                        return;
+                    }
+                    const script = document.createElement('script');
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.js';
+                    script.onload = () => resolve(window.Chart);
+                    script.onerror = () => {
+                        console.error('Không thể tải thư viện Chart.js');
+                        resolve(null);
+                    };
+                    document.head.appendChild(script);
+                });
+            },
+
+            destroyCharts() {
+                ['chartCheckedIn', 'chartSent', 'chartPending'].forEach(canvasId => {
+                    if (window.Chart) {
+                        const existing = window.Chart.getChart(canvasId);
+                        if (existing) {
+                            try {
+                                existing.stop();
+                                existing.destroy();
+                            } catch (e) {
+                                console.warn('Lỗi khi hủy biểu đồ:', e);
+                            }
+                        }
+                    }
+                });
+                this.charts.checkedIn = null;
+                this.charts.sent = null;
+                this.charts.pending = null;
+            },
+
+            async loadAnalytics() {
+                if (this.analyticsLoading) return;
+                this.analyticsLoading = true;
+                this.analyticsError = '';
+                try {
+                    const response = await fetch(`/api/events/${this.eventId}/analytics`);
+                    const result = await response.json();
+                    
+                    if (response.status === 429) {
+                        this.analyticsError = 'Quá nhiều yêu cầu thống kê. Vui lòng đợi trong giây lát và thử lại.';
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const data = result?.data || [];
+                        this.analyticsData = Array.isArray(data) ? data : [];
+                        this.analyticsLoaded = true;
+
+                        // Tính tổng các số liệu
+                        this.totalCheckedIn = this.analyticsData.reduce((sum, item) => sum + (Number(item.total_checked_in) || 0), 0);
+                        this.totalSent = this.analyticsData.reduce((sum, item) => sum + (Number(item.total_sent) || 0), 0);
+                        this.totalPending = this.analyticsData.reduce((sum, item) => sum + (Number(item.total_pending) || 0), 0);
+                        this.totalGuests = this.analyticsData.reduce((sum, item) => {
+                            return sum + (Number(item.total_sent) || 0) + (Number(item.total_pending) || 0);
+                        }, 0);
+
+                        this.$nextTick(() => {
+                            this.renderCharts();
+                        });
+                    } else {
+                        this.analyticsError = result?.message || result?.detail || 'Không thể tải dữ liệu phân tích.';
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi tải dữ liệu phân tích:', err);
+                    this.analyticsError = 'Không thể kết nối đến máy chủ.';
+                } finally {
+                    this.analyticsLoading = false;
+                }
+            },
+
+            async renderCharts() {
+                await this.ensureChartLoaded();
+                if (!window.Chart || this.analyticsData.length === 0) return;
+
+                // Stop and destroy any previous charts to avoid animator null pointer exceptions
+                this.destroyCharts();
+
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                const textColor = isDark ? '#94a3b8' : '#64748b';
+                const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+                const tooltipBg = isDark ? '#1e293b' : '#0f172a';
+
+                const labels = this.analyticsData.map(item => item.department || 'Khác');
+                const checkedInData = this.analyticsData.map(item => Number(item.total_checked_in) || 0);
+                const sentData = this.analyticsData.map(item => Number(item.total_sent) || 0);
+                const pendingData = this.analyticsData.map(item => Number(item.total_pending) || 0);
+
+                const getChartOptions = (unitLabel) => ({
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 300
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: tooltipBg,
+                            titleColor: '#fff',
+                            bodyColor: '#e2e8f0',
+                            padding: 10,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: (context) => ` Số lượng: ${context.parsed.y} ${unitLabel}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: textColor,
+                                font: { size: 12, family: "'Inter', sans-serif" }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                precision: 0,
+                                font: { size: 12, family: "'Inter', sans-serif" }
+                            }
+                        }
+                    }
+                });
+
+                // 1. Chart Checked In (Đã điểm danh)
+                const canvasCheckedIn = document.getElementById('chartCheckedIn');
+                if (canvasCheckedIn && canvasCheckedIn.isConnected) {
+                    const ctx = canvasCheckedIn.getContext('2d');
+                    if (ctx) {
+                        this.charts.checkedIn = new Chart(canvasCheckedIn, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Đã điểm danh',
+                                    data: checkedInData,
+                                    backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                                    borderColor: '#10b981',
+                                    borderWidth: 1.5,
+                                    borderRadius: 6,
+                                    hoverBackgroundColor: '#059669'
+                                }]
+                            },
+                            options: getChartOptions('người')
+                        });
+                    }
+                }
+
+                // 2. Chart Sent (Đã gửi mail)
+                const canvasSent = document.getElementById('chartSent');
+                if (canvasSent && canvasSent.isConnected) {
+                    const ctx = canvasSent.getContext('2d');
+                    if (ctx) {
+                        this.charts.sent = new Chart(canvasSent, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Đã gửi mail',
+                                    data: sentData,
+                                    backgroundColor: 'rgba(59, 130, 246, 0.75)',
+                                    borderColor: '#3b82f6',
+                                    borderWidth: 1.5,
+                                    borderRadius: 6,
+                                    hoverBackgroundColor: '#2563eb'
+                                }]
+                            },
+                            options: getChartOptions('email')
+                        });
+                    }
+                }
+
+                // 3. Chart Pending (Chưa gửi mail)
+                const canvasPending = document.getElementById('chartPending');
+                if (canvasPending && canvasPending.isConnected) {
+                    const ctx = canvasPending.getContext('2d');
+                    if (ctx) {
+                        this.charts.pending = new Chart(canvasPending, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Chưa gửi mail',
+                                    data: pendingData,
+                                    backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                                    borderColor: '#f59e0b',
+                                    borderWidth: 1.5,
+                                    borderRadius: 6,
+                                    hoverBackgroundColor: '#d97706'
+                                }]
+                            },
+                            options: getChartOptions('chờ gửi')
+                        });
+                    }
+                }
             }
         };
     }
@@ -848,17 +1084,240 @@
     </div>
 
     <!-- ============================================================
-         TAB 3: PHÂN TÍCH (Analytics Placeholder)
+         TAB 3: PHÂN TÍCH (Analytics Dashboard)
          ============================================================ -->
-    <div class="admin-detail-analytics-card" x-show="!isLoading && !error && currentTab === 'analytics'" x-cloak>
-        <div class="analytics-placeholder">
-            <div class="analytics-icon-wrap">
-                <span class="material-symbols-outlined analytics-placeholder-icon">analytics</span>
+    <div class="admin-detail-analytics-container" x-show="!isLoading && !error && currentTab === 'analytics'" x-cloak>
+        
+        <!-- Loading State -->
+        <div class="analytics-loading" x-show="analyticsLoading">
+            <div class="spinner-sm"></div>
+            <p>Đang tải dữ liệu phân tích...</p>
+        </div>
+
+        <!-- Error State -->
+        <div class="analytics-error-card" x-show="!analyticsLoading && analyticsError">
+            <span class="material-symbols-outlined analytics-error-icon">error</span>
+            <div class="analytics-error-content">
+                <h4>Không thể tải dữ liệu phân tích</h4>
+                <p x-text="analyticsError"></p>
             </div>
-            <h3 class="analytics-placeholder-title">Phân tích & Thống kê sự kiện</h3>
-            <p class="analytics-placeholder-desc">
-                Tính năng phân tích đang được xây dựng. Các biểu đồ thống kê người tham gia, tỷ lệ check-in và báo cáo chi tiết sự kiện sẽ được cập nhật tại đây.
-            </p>
+            <button type="button" class="btn-analytics-retry" @click="loadAnalytics()">
+                <span class="material-symbols-outlined">refresh</span>
+                Thử lại
+            </button>
+        </div>
+
+        <!-- Main Analytics View -->
+        <div class="analytics-content" x-show="!analyticsLoading && !analyticsError">
+            
+            <!-- Header with Refresh Button -->
+            <div class="analytics-header">
+                <div>
+                    <h3 class="analytics-title">Báo cáo & Phân tích sự kiện</h3>
+                    <p class="analytics-subtitle">Thống kê dữ liệu khách mời, tỷ lệ check-in và gửi thư mời theo từng phòng ban</p>
+                </div>
+                <button type="button" class="btn-analytics-refresh" @click="loadAnalytics()" title="Tải lại dữ liệu mới nhất">
+                    <span class="material-symbols-outlined">refresh</span>
+                    Làm mới
+                </button>
+            </div>
+
+            <!-- Empty State if no data -->
+            <div class="analytics-empty-card" x-show="analyticsData.length === 0">
+                <div class="analytics-icon-wrap">
+                    <span class="material-symbols-outlined analytics-placeholder-icon">analytics</span>
+                </div>
+                <h4 class="analytics-empty-title">Chưa có dữ liệu phân tích</h4>
+                <p class="analytics-empty-desc">Sự kiện chưa có khách mời nào được thêm vào. Vui lòng thêm khách mời ở tab "Khách mời" để xem phân tích thống kê.</p>
+            </div>
+
+            <!-- Dashboard Content when data exists -->
+            <div x-show="analyticsData.length > 0" class="analytics-dashboard">
+                
+                <!-- Stat Cards Grid -->
+                <div class="analytics-stats-grid">
+                    <!-- Total Guests -->
+                    <div class="analytics-stat-card stat-card--primary">
+                        <div class="stat-card-icon-wrap icon-primary">
+                            <span class="material-symbols-outlined">groups</span>
+                        </div>
+                        <div class="stat-card-body">
+                            <span class="stat-card-label">Tổng khách mời</span>
+                            <div class="stat-card-val-row">
+                                <span class="stat-card-value" x-text="totalGuests">0</span>
+                                <span class="stat-card-unit">người</span>
+                            </div>
+                            <span class="stat-card-desc">Tổng số khách mời của tất cả phòng ban</span>
+                        </div>
+                    </div>
+
+                    <!-- Checked In -->
+                    <div class="analytics-stat-card stat-card--success">
+                        <div class="stat-card-icon-wrap icon-success">
+                            <span class="material-symbols-outlined">how_to_reg</span>
+                        </div>
+                        <div class="stat-card-body">
+                            <span class="stat-card-label">Đã điểm danh</span>
+                            <div class="stat-card-val-row">
+                                <span class="stat-card-value" x-text="totalCheckedIn">0</span>
+                                <span class="stat-card-badge badge-success"
+                                      x-text="totalGuests > 0 ? ((totalCheckedIn / totalGuests) * 100).toFixed(1) + '%' : '0%'">0%</span>
+                            </div>
+                            <span class="stat-card-desc">Khách mời đã có mặt và check-in</span>
+                        </div>
+                    </div>
+
+                    <!-- Sent Mail -->
+                    <div class="analytics-stat-card stat-card--info">
+                        <div class="stat-card-icon-wrap icon-info">
+                            <span class="material-symbols-outlined">mark_email_read</span>
+                        </div>
+                        <div class="stat-card-body">
+                            <span class="stat-card-label">Đã gửi thư mời</span>
+                            <div class="stat-card-val-row">
+                                <span class="stat-card-value" x-text="totalSent">0</span>
+                                <span class="stat-card-badge badge-info"
+                                      x-text="totalGuests > 0 ? ((totalSent / totalGuests) * 100).toFixed(1) + '%' : '0%'">0%</span>
+                            </div>
+                            <span class="stat-card-desc">Đã gửi email kèm mã QR</span>
+                        </div>
+                    </div>
+
+                    <!-- Pending Mail -->
+                    <div class="analytics-stat-card stat-card--warning">
+                        <div class="stat-card-icon-wrap icon-warning">
+                            <span class="material-symbols-outlined">outgoing_mail</span>
+                        </div>
+                        <div class="stat-card-body">
+                            <span class="stat-card-label">Chưa gửi thư mời</span>
+                            <div class="stat-card-val-row">
+                                <span class="stat-card-value" x-text="totalPending">0</span>
+                                <span class="stat-card-badge badge-warning"
+                                      x-text="totalGuests > 0 ? ((totalPending / totalGuests) * 100).toFixed(1) + '%' : '0%'">0%</span>
+                            </div>
+                            <span class="stat-card-desc">Chưa hoàn tất gửi thư mời</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3 Charts Grid -->
+                <div class="analytics-charts-grid">
+                    <!-- Chart 1: Đã điểm danh -->
+                    <div class="analytics-chart-card">
+                        <div class="chart-card-header">
+                            <div class="chart-card-title-wrap">
+                                <span class="material-symbols-outlined chart-icon chart-icon--success">check_circle</span>
+                                <div>
+                                    <h4 class="chart-card-title">Đã điểm danh</h4>
+                                    <span class="chart-card-subtitle">Thống kê check-in theo phòng ban</span>
+                                </div>
+                            </div>
+                            <span class="chart-total-pill pill-success">
+                                <span x-text="totalCheckedIn"></span> người
+                            </span>
+                        </div>
+                        <div class="chart-canvas-container">
+                            <canvas id="chartCheckedIn"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2: Đã gửi mail -->
+                    <div class="analytics-chart-card">
+                        <div class="chart-card-header">
+                            <div class="chart-card-title-wrap">
+                                <span class="material-symbols-outlined chart-icon chart-icon--info">forward_to_inbox</span>
+                                <div>
+                                    <h4 class="chart-card-title">Đã gửi thư mời</h4>
+                                    <span class="chart-card-subtitle">Thống kê email đã gửi theo phòng ban</span>
+                                </div>
+                            </div>
+                            <span class="chart-total-pill pill-info">
+                                <span x-text="totalSent"></span> email
+                            </span>
+                        </div>
+                        <div class="chart-canvas-container">
+                            <canvas id="chartSent"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 3: Chưa gửi mail -->
+                    <div class="analytics-chart-card">
+                        <div class="chart-card-header">
+                            <div class="chart-card-title-wrap">
+                                <span class="material-symbols-outlined chart-icon chart-icon--warning">schedule_send</span>
+                                <div>
+                                    <h4 class="chart-card-title">Chưa gửi thư mời</h4>
+                                    <span class="chart-card-subtitle">Thống kê đang chờ gửi theo phòng ban</span>
+                                </div>
+                            </div>
+                            <span class="chart-total-pill pill-warning">
+                                <span x-text="totalPending"></span> chờ gửi
+                            </span>
+                        </div>
+                        <div class="chart-canvas-container">
+                            <canvas id="chartPending"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Breakdown Table -->
+                <div class="analytics-table-card">
+                    <div class="table-card-header">
+                        <div class="table-card-title-wrap">
+                            <span class="material-symbols-outlined">table_chart</span>
+                            <h4 class="table-card-title">Chi tiết số liệu theo phòng ban</h4>
+                        </div>
+                        <span class="table-badge"><span x-text="analyticsData.length"></span> phòng ban</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Phòng ban</th>
+                                    <th class="text-right">Tổng khách mời</th>
+                                    <th class="text-right">Đã điểm danh</th>
+                                    <th class="text-right">Tỷ lệ check-in</th>
+                                    <th class="text-right">Đã gửi mail</th>
+                                    <th class="text-right">Chưa gửi mail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="item in analyticsData" :key="item.department">
+                                    <tr>
+                                        <td class="font-medium" x-text="item.department || 'Khác'"></td>
+                                        <td class="text-right" x-text="(Number(item.total_sent) || 0) + (Number(item.total_pending) || 0)"></td>
+                                        <td class="text-right text-success font-semibold" x-text="item.total_checked_in || 0"></td>
+                                        <td class="text-right">
+                                            <div class="rate-progress-wrap">
+                                                <div class="rate-progress-bar">
+                                                    <div class="rate-progress-fill"
+                                                         :style="{ width: ((Number(item.total_sent) || 0) + (Number(item.total_pending) || 0)) > 0 ? Math.min(100, Math.round(((item.total_checked_in || 0) / ((Number(item.total_sent) || 0) + (Number(item.total_pending) || 0))) * 100)) + '%' : '0%' }"></div>
+                                                </div>
+                                                <span class="rate-text"
+                                                      x-text="((Number(item.total_sent) || 0) + (Number(item.total_pending) || 0)) > 0 ? Math.round(((item.total_checked_in || 0) / ((Number(item.total_sent) || 0) + (Number(item.total_pending) || 0))) * 100) + '%' : '0%'"></span>
+                                            </div>
+                                        </td>
+                                        <td class="text-right text-info font-semibold" x-text="item.total_sent || 0"></td>
+                                        <td class="text-right text-warning font-semibold" x-text="item.total_pending || 0"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td class="font-bold">Tổng cộng</td>
+                                    <td class="text-right font-bold" x-text="totalGuests"></td>
+                                    <td class="text-right font-bold text-success" x-text="totalCheckedIn"></td>
+                                    <td class="text-right font-bold text-success"
+                                        x-text="totalGuests > 0 ? ((totalCheckedIn / totalGuests) * 100).toFixed(1) + '%' : '0%'"></td>
+                                    <td class="text-right font-bold text-info" x-text="totalSent"></td>
+                                    <td class="text-right font-bold text-warning" x-text="totalPending"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 
@@ -1778,56 +2237,532 @@
     }
 
     /* ============================================================
-       ANALYTICS SECTION STYLES (Tab 3 Placeholder)
+       ANALYTICS SECTION STYLES (Tab 3)
        ============================================================ */
-    .admin-detail-analytics-card {
+    .admin-detail-analytics-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+    }
+
+    .analytics-loading {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 360px;
+        padding: 60px 20px;
+        gap: 12px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        color: var(--text-secondary);
+        font-size: 14px;
     }
 
-    .analytics-placeholder {
+    .analytics-error-card {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 24px;
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: 14px;
+        color: var(--foreground);
+    }
+
+    .analytics-error-icon {
+        font-size: 28px;
+        color: #ef4444;
+        flex-shrink: 0;
+    }
+
+    .analytics-error-content {
+        flex: 1;
+    }
+
+    .analytics-error-content h4 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+        color: #ef4444;
+    }
+
+    .analytics-error-content p {
+        font-size: 13.5px;
+        color: var(--text-secondary);
+        margin: 0;
+    }
+
+    .btn-analytics-retry,
+    .btn-analytics-refresh {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--foreground);
+    }
+
+    .btn-analytics-retry:hover,
+    .btn-analytics-refresh:hover {
+        background: var(--border);
+        color: var(--primary);
+    }
+
+    .btn-analytics-retry .material-symbols-outlined,
+    .btn-analytics-refresh .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    .analytics-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px 24px;
+    }
+
+    .analytics-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--foreground);
+        margin: 0 0 4px;
+    }
+
+    .analytics-subtitle {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin: 0;
+    }
+
+    .analytics-empty-card {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        max-width: 480px;
-        padding: 40px 20px;
+        padding: 48px 24px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
         gap: 12px;
     }
 
-    .analytics-icon-wrap {
-        width: 64px;
-        height: 64px;
-        border-radius: 16px;
-        background: rgba(59, 130, 246, 0.1);
-        border: 1px solid rgba(59, 130, 246, 0.2);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 6px;
-    }
-
-    .analytics-placeholder-icon {
-        font-size: 32px;
-        color: var(--login-bg, #3b82f6);
-    }
-
-    .analytics-placeholder-title {
-        font-size: 18px;
-        font-weight: 700;
+    .analytics-empty-title {
+        font-size: 17px;
+        font-weight: 600;
         color: var(--foreground);
         margin: 0;
     }
 
-    .analytics-placeholder-desc {
+    .analytics-empty-desc {
         font-size: 13.5px;
         color: var(--text-secondary);
-        line-height: 1.6;
+        max-width: 440px;
+        line-height: 1.5;
         margin: 0;
+    }
+
+    .analytics-dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    /* ---------- Stats Grid ---------- */
+    .analytics-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+    }
+
+    .analytics-stat-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px 20px;
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+
+    .analytics-stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .stat-card-icon-wrap {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .stat-card-icon-wrap .material-symbols-outlined {
+        font-size: 24px;
+    }
+
+    .icon-primary {
+        background: rgba(99, 102, 241, 0.12);
+        color: #6366f1;
+        border: 1px solid rgba(99, 102, 241, 0.25);
+    }
+
+    .icon-success {
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .icon-info {
+        background: rgba(59, 130, 246, 0.12);
+        color: #3b82f6;
+        border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+
+    .icon-warning {
+        background: rgba(245, 158, 11, 0.12);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    .stat-card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .stat-card-label {
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .stat-card-val-row {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+
+    .stat-card-value {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--foreground);
+        line-height: 1.1;
+    }
+
+    .stat-card-unit {
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    .stat-card-badge {
+        font-size: 11.5px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 6px;
+    }
+
+    .badge-success {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+    }
+
+    .badge-info {
+        background: rgba(59, 130, 246, 0.15);
+        color: #3b82f6;
+    }
+
+    .badge-warning {
+        background: rgba(245, 158, 11, 0.15);
+        color: #f59e0b;
+    }
+
+    .stat-card-desc {
+        font-size: 11.5px;
+        color: var(--text-secondary);
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* ---------- 3 Charts Grid ---------- */
+    .analytics-charts-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+    }
+
+    .analytics-chart-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    }
+
+    .chart-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .chart-card-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .chart-icon {
+        font-size: 22px;
+        flex-shrink: 0;
+    }
+
+    .chart-icon--success {
+        color: #10b981;
+    }
+
+    .chart-icon--info {
+        color: #3b82f6;
+    }
+
+    .chart-icon--warning {
+        color: #f59e0b;
+    }
+
+    .chart-card-title {
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--foreground);
+        margin: 0;
+    }
+
+    .chart-card-subtitle {
+        font-size: 11.5px;
+        color: var(--text-secondary);
+    }
+
+    .chart-total-pill {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 20px;
+        white-space: nowrap;
+    }
+
+    .pill-success {
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .pill-info {
+        background: rgba(59, 130, 246, 0.12);
+        color: #3b82f6;
+        border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+
+    .pill-warning {
+        background: rgba(245, 158, 11, 0.12);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    .chart-canvas-container {
+        position: relative;
+        width: 100%;
+        height: 240px;
+    }
+
+    /* ---------- Detailed Table ---------- */
+    .analytics-table-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    }
+
+    .table-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .table-card-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--foreground);
+    }
+
+    .table-card-title-wrap .material-symbols-outlined {
+        font-size: 20px;
+        color: var(--primary);
+    }
+
+    .table-card-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .table-badge {
+        font-size: 12px;
+        color: var(--text-secondary);
+        background: var(--border);
+        padding: 3px 8px;
+        border-radius: 6px;
+    }
+
+    .table-responsive {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .analytics-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+    }
+
+    .analytics-table th {
+        padding: 12px 16px;
+        background: var(--bg-home-page, rgba(0, 0, 0, 0.02));
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+    }
+
+    .analytics-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        color: var(--foreground);
+        vertical-align: middle;
+    }
+
+    .analytics-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .analytics-table tfoot td {
+        background: var(--bg-home-page, rgba(0, 0, 0, 0.03));
+        border-top: 2px solid var(--border);
+        border-bottom: none;
+        padding: 14px 16px;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .font-medium {
+        font-weight: 500;
+    }
+
+    .font-semibold {
+        font-weight: 600;
+    }
+
+    .font-bold {
+        font-weight: 700;
+    }
+
+    .text-success {
+        color: #10b981;
+    }
+
+    .text-info {
+        color: #3b82f6;
+    }
+
+    .text-warning {
+        color: #f59e0b;
+    }
+
+    .rate-progress-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .rate-progress-bar {
+        width: 60px;
+        height: 6px;
+        border-radius: 3px;
+        background: var(--border);
+        overflow: hidden;
+    }
+
+    .rate-progress-fill {
+        height: 100%;
+        border-radius: 3px;
+        background: #10b981;
+        transition: width 0.3s ease;
+    }
+
+    .rate-text {
+        font-size: 12px;
+        font-weight: 600;
+        color: #10b981;
+        min-width: 32px;
+        text-align: right;
+    }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 1200px) {
+        .analytics-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .analytics-charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .analytics-stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .analytics-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .chart-canvas-container {
+            height: 200px;
+        }
     }
 
     /* ============================================================

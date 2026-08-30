@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from src.shared.base import BaseRouter
 from src.shared.base.base_request import BaseRequest
 from src.shared.helpers.cbv import clean_cbv
+from src.shared.middlewares.rate_limit import rate_limit
 from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagination
 
 from .event_schemas import (
@@ -141,3 +142,9 @@ class EventController:
     @router.post_api("check-in")
     async def check_in_event(self, schema: CheckInEmployeeRequest):
         return await self.service.check_in_employee(schema)
+
+    @router.get_api(
+        "{event_id}/analytics", dependencies=[rate_limit(request_per_windows=60)]
+    )
+    async def get_event_analytics(self, event_id: int):
+        return await self.service.analytic_event(event_id)

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class EVENT_EMPLOYEE_STATUS(str, Enum):
     PENDING = "PENDING"
     CHECK_IN = "CHECK_IN"
-    NO_SHOW = "NO_SHOW"
+    SENT = "SENT"
 
 
 class EventsEmployees(SQLModel, table=True):

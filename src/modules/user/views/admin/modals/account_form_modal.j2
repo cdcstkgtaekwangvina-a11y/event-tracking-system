@@ -28,7 +28,7 @@
                 <div class="acc-form-group">
                     <label class="acc-form-label">Tên đăng nhập <span class="acc-required">*</span></label>
                     <input type="text" class="acc-form-input" x-model="form.username" placeholder="username"
-                        maxlength="350" autocomplete="off" required />
+                        maxlength="20" autocomplete="off" required />
                 </div>
                 <div class="acc-form-group">
                     <label class="acc-form-label">
@@ -45,12 +45,24 @@
 
             <div class="acc-form-row">
                 <div class="acc-form-group acc-form-group--full">
-                    <label class="acc-form-label">
-                        Mật khẩu <span class="acc-required" x-show="mode === 'create'">*</span>
-                        <span x-show="mode === 'edit'" style="font-weight: 400;">(để trống nếu không đổi)</span>
-                    </label>
-                    <input type="password" class="acc-form-input" x-model="form.password"
-                        placeholder="Tối thiểu 8 ký tự" autocomplete="new-password" :required="mode === 'create'" />
+                    <div class="acc-form-header-row">
+                        <label class="acc-form-label">
+                            Mật khẩu <span class="acc-required" x-show="mode === 'create'">*</span>
+                            <span x-show="mode === 'edit'" style="font-weight: 400;">(để trống nếu không đổi)</span>
+                        </label>
+                        <button type="button" class="acc-btn-text" @click="generatePassword" title="Tạo mật khẩu ngẫu nhiên">
+                            <span class="material-symbols-outlined">shuffle</span>
+                            <span>Tạo ngẫu nhiên</span>
+                        </button>
+                    </div>
+                    <div class="acc-input-wrapper">
+                        <input :type="showPassword ? 'text' : 'password'" class="acc-form-input" x-model="form.password"
+                            placeholder="Tối thiểu 8 ký tự, gồm chữ hoa, thường, số và ký tự đặc biệt" autocomplete="new-password" :required="mode === 'create'" />
+                        <button type="button" class="acc-input-eye-btn" @click="showPassword = !showPassword"
+                            :title="showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" tabindex="-1">
+                            <span class="material-symbols-outlined" x-text="showPassword ? 'visibility_off' : 'visibility'"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

@@ -35,13 +35,16 @@ class AuthenticationController:
                 target = "/"
             return auth.redirect_with(target)
         return req.response_html(
-            name="modules/authentication/views/login.j2", context={"redirect": redirect}
+            name="modules/authentication/views/login.j2",
+            cache_time=3600,
+            context={"redirect": redirect},
         )
 
     @router.get("forgot-password", name="forgot_password_view", include_in_schema=False)
     def forgot_password_view(self, req: BaseRequest, redirect: str | None = None):
         req.response_html(
             name="modules/authentication/views/forgot_password.j2",
+            cache_time=3600,
             context={"redirect": redirect},
         )
 

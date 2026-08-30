@@ -4,9 +4,9 @@ from src.modules.user.role_constants import ROLE
 from src.modules.user.user_services import UserServices
 from src.shared.base import BaseRequest, BaseRouter
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.middlewares.auth_middlewares import AuthContext, auth
+from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth
 from src.shared.schemas.pagination_schemas import PaginationQuery
-from src.shared.middlewares.auth_middlewares import RequireAuth
+
 TAG_NAME = "admin/account"
 router = BaseRouter(
     controller=TAG_NAME,
@@ -29,6 +29,7 @@ class AccountAdminViews:
     ):
         return req.response_html(
             name=f"{base_path}index.j2",
+            cache_time=3600,
             context={"can_edit_email": auth.payload.role == ROLE.SUPER_ADMIN},
         )
 

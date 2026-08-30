@@ -2,6 +2,31 @@
 "templates/layouts/admin_blank.j2"%}
 {% block admin_title %}Quản lý Tài khoản{% endblock %}
 {% block admin_body %}
+<link rel="stylesheet" href="/static/css/account.css?v=20260830-2">
+<script>
+    window.ACCOUNT_URLS = {
+        accountsTable: "{{ url_for('accounts_table') }}"
+    };
+</script>
+<script>
+(function() {
+    if (!window.accountActions || !window.accountFormModal) {
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/static/js/account.js?v=20260830-2', false);
+            xhr.send(null);
+            if (xhr.status === 200) {
+                const script = document.createElement('script');
+                script.text = xhr.responseText;
+                document.head.appendChild(script);
+            }
+        } catch (e) {
+            console.error('Không thể tải account.js:', e);
+        }
+    }
+})();
+</script>
+
 <div class="acc-container">
     <!-- Header -->
     <div class="acc-header">
@@ -39,12 +64,4 @@
 </div>
 
 {% include "modules/user/views/admin/modals/account_form_modal.j2" %}
-
-<link rel="stylesheet" href="/static/css/account.css">
-<script>
-    window.ACCOUNT_URLS = {
-        accountsTable: "{{ url_for('accounts_table') }}"
-    };
-</script>
-<script src="/static/js/account.js"></script>
 {% endblock %}
