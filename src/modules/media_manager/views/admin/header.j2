@@ -1,3 +1,27 @@
+<script>
+    window.managerPageUrl = "{{ url_for('media_manager') }}";
+    window.trashPageUrl = "{{ url_for('trash') }}";
+</script>
+<script>
+(function() {
+    if (!window.mediaActions || !window.mediaRenameModal) {
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/static/js/media_manager.js?v=20260826-1', false);
+            xhr.send(null);
+            if (xhr.status === 200) {
+                const script = document.createElement('script');
+                script.text = xhr.responseText;
+                document.head.appendChild(script);
+            }
+        } catch (e) {
+            console.error('Không thể tải media_manager.js:', e);
+        }
+    }
+})();
+</script>
+<link rel="stylesheet" href="/static/css/media_manager.css">
+
 <div class="media-header" x-data="{
         current_media: null,
         folder_id: new URLSearchParams(window.location.search).get('folder_id'),
@@ -162,7 +186,7 @@
                 window.history.pushState(null, '', pushUrl)
 
                 const query = params.toString()
-                const url = `{{ url_for('media_manager') }}/items/html${query ? `?${query}` : ''}`
+                const url = `${managerPageUrl}/items/html${query ? `?${query}` : ''}`
                 container.innerHTML = `<div class='media-loading'><div class='spinner-sm'></div><span>Đang tải dữ liệu...</span></div>`
                 htmx.ajax('GET', url, { target: '#media-items-container', swap: 'innerHTML' })
                 syncHeaderState()
@@ -275,7 +299,7 @@
 
 
 <!-- Modal đổi tên file/thư mục (Grid View) -->
-<div x-data="mediaRenameModal" @open-rename-modal.window="openModal($event.detail)" x-show="isOpen"
+<div x-data="mediaRenameModal()" @open-rename-modal.window="openModal($event.detail)" x-show="isOpen"
     class="nc-modal-overlay" style="display: none; z-index: 9999;" x-cloak>
     <div class="nc-modal" @click.stop style="max-width: 400px; width: 100%;">
         <div class="nc-modal__header"
@@ -305,7 +329,7 @@
 </div>
 
 <!-- Modal chọn thư mục đích để di chuyển -->
-<div x-data="folderMoveModal" @open-move-modal.window="openModal($event.detail.itemId)" x-show="isOpen"
+<div x-data="folderMoveModal()" @open-move-modal.window="openModal($event.detail.itemId)" x-show="isOpen"
     class="nc-modal-overlay" style="display: none; z-index: 9999;" x-cloak>
     <div class="nc-modal" @click.stop style="max-width: 450px; width: 100%;">
         <div class="nc-modal__header"
@@ -367,7 +391,7 @@
 
 
 <!-- Modal tạo thư mục / tải lên -->
-<div x-data="mediaCreateModal" @open-create-modal.window="openModal($event.detail)" x-show="isOpen"
+<div x-data="mediaCreateModal()" @open-create-modal.window="openModal($event.detail)" x-show="isOpen"
     class="nc-modal-overlay" style="display: none; z-index: 9999;" x-cloak>
     <div class="nc-modal" @click.stop style="max-width: 400px; width: 100%;">
         <div class="nc-modal__header"
@@ -435,11 +459,3 @@
         </div>
     </div>
 </div>
-
-
-<script>
-    window.managerPageUrl = "{{ url_for('media_manager') }}";
-    window.trashPageUrl = "{{ url_for('trash') }}";
-</script>
-<link rel="stylesheet" href="/static/css/media_manager.css">
-<script src="/static/js/media_manager.js"></script>

@@ -25,6 +25,7 @@ class RedisServices:
     url: str = os.environ["REDIS_URL"]
 
     def __init__(self):
+
         pool = redis.ConnectionPool.from_url(
             self.url, max_connections=30, decode_responses=True
         )
@@ -145,6 +146,19 @@ class RedisServices:
     # GET: Lấy dữ liệu + xác thực tag versions
     # ──────────────────────────────────────────────
 
+    async def get_async[T](
+        self, key: str, model_class: type[T] | None = None
+    ) -> T | None:
+        raw_envelope = await self.client.get(key)
+        if raw_envelope is not None:
+            envelope = orjson.loads(raw_envelope)
+            if isinstance(envelope, dict) and "value" in envelope:
+                value = envelope["value"]
+                if model_class and issubclass(model_class, BaseModel):
+                    return model_class(**value)
+                return value
+        return None
+
     async def get_or_set_async[T](
         self,
         key: str,
@@ -152,12 +166,12 @@ class RedisServices:
         tags: Sequence[str] | None = None,
         expires: int | datetime | None = 600,
         model_class: type[T] | None = None,
+        logical_expires_at=None,
         **kwargs,
     ) -> T:
         now = datetime.now().timestamp()
 
-        logical_expires_at = None
-        if expires is not None:
+        if logical_expires_at is None and expires is not None:
             if isinstance(expires, datetime):
                 logical_expires_at = expires.timestamp()
             else:

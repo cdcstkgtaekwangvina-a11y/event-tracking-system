@@ -3,9 +3,9 @@ from fastapi import Depends
 from src.shared.base.base_response import BaseResponse
 from src.shared.base.base_route import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
-from src.shared.middlewares.auth_middlewares import AuthContext, auth
+from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth, auth
 from src.shared.schemas.pagination_schemas import PaginationQuery
-from src.shared.middlewares.auth_middlewares import RequireAuth
+
 from .role_constants import ROLE
 from .user_schemas import (
     ChangePasswordRequest,
@@ -16,7 +16,7 @@ from .user_schemas import (
 )
 from .user_services import UserServices
 
-TAG = "User"
+TAG = "user"
 router = BaseRouter(tags=[TAG], controller=TAG)
 
 
@@ -74,7 +74,7 @@ class UserApis:
         )
 
 
-ACCOUNT_TAG = "Account"
+ACCOUNT_TAG = "account"
 account_router = BaseRouter(
     controller=ACCOUNT_TAG,
     tags=[ACCOUNT_TAG],
@@ -84,10 +84,10 @@ account_router = BaseRouter(
 
 @clean_cbv(account_router)
 class AccountApis:
-    """Admin-facing account management (`/api/Account`) — SUPER_ADMIN
+    """Admin-facing account management (`/api/account`) — SUPER_ADMIN
     only. Reuses `UserServices` (see its `list_accounts`/`create_account`/
     `update_account`) rather than a separate service class, since both this
-    and the self-service `/api/User/profile` endpoints above operate on the
+    and the self-service `/api/user/profile` endpoints above operate on the
     same `Users` table."""
 
     def __init__(self, service: UserServices = Depends()):

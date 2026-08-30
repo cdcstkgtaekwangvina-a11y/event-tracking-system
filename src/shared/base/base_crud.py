@@ -1,6 +1,5 @@
 from collections.abc import Callable, Sequence
 from contextlib import asynccontextmanager
-from inspect import isclass
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -121,8 +120,8 @@ class BaseCrud(Generic[T]):
         dto_class_arg = args[0] if args else kwargs.get("dto_class")
 
         if (
-            dto_class_arg
-            and isclass(dto_class_arg)
+            dto_class_arg is not None
+            and isinstance(dto_class_arg, type)
             and issubclass(dto_class_arg, BaseModel)
             and dto_class_arg != self.model
         ):

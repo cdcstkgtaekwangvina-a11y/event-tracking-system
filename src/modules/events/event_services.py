@@ -2,9 +2,10 @@ import asyncio
 from datetime import datetime, timezone
 
 from sqlalchemy import and_, or_
-from sqlmodel import col
+from sqlmodel import case, col, func
 
 from database.models.app_db import SessionDep, SessionFactoryDep
+from database.models.employees import Employees
 from database.models.events import EVENT_STATUS, Events
 from database.models.events_employees import EVENT_EMPLOYEE_STATUS, EventsEmployees
 from src.shared.base import BaseCrud, BaseResponse
@@ -15,6 +16,7 @@ from src.shared.services.redis_services import RedisDep
 
 from .event_schemas import (
     AdminEventQuery,
+    AnalyticEventResponse,
     CheckInEmployeeRequest,
     EmployeeIdsSchema,
     EmployeeInEvent,
@@ -125,7 +127,6 @@ class EventServices:
     async def get_employee_in_event(
         self, event_id: int, employee_id: int
     ) -> BaseResponse[EmployeeInEvent]:
-        from database.models.employees import Employees
 
         employee = (
             await self.ee_crud.select(
@@ -180,8 +181,6 @@ class EventServices:
     async def register_employee(
         self, event_id: int, schema: EmployeeIdsSchema
     ) -> BaseResponse[bool]:
-
-        from database.models.employees import Employees
 
         async def exiting_employees() -> list[int] | None:
             async with self.factory() as session:
@@ -304,3 +303,46 @@ class EventServices:
         return BaseResponse.fail(
             message="Check in thất bại, khách mời hoặc sự kiện không đúng"
         )
+
+    async def analytic_event(
+        self, event_id: int
+    ) -> BaseResponse[AnalyticEventResponse]:
+
+        results = await (
+            self.ee_crud.select(
+                # Xử lý trường hợp phòng ban bị NULL/None
+                func.coalesce(Employees.department, "Khác").label("department"),
+                # Đếm số nhân viên đã check-in
+                func.count(
+                    case((col(EventsEmployees.check_in_at).is_not(None), 1))
+                ).label("total_checked_in"),
+                # Đếm số nhân viên đã gửi mail (send_at không NULL)
+                func.count(case((col(EventsEmployees.send_at).is_not(None), 1))).label(
+                    "total_sent"
+                ),
+                func.count(case((col(EventsEmployees.send_at).is_(None), 1))).label(
+                    "total_pending"
+                ),
+            )
+            .join(
+                Employees,
+                col(EventsEmployees.employee_id) == Employees.id,
+            )
+            .where(EventsEmployees.event_id == event_id)
+            .group_by(Employees.department)
+        ).find_many()
+
+        if not results:
+            return BaseResponse.not_found(message="Không tìm thấy sự kiện")
+
+        analytics_by_department = [
+            AnalyticEventResponse(
+                department=dept,
+                total_checked_in=checked_in,
+                total_sent=sent,
+                total_pending=pending,
+            )
+            for dept, checked_in, sent, pending in results
+        ]
+
+        return BaseResponse.ok(analytics_by_department)
