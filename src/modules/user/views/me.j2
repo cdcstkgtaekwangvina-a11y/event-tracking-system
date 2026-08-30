@@ -1,6 +1,12 @@
 {% extends "templates/index.j2"%}
 
 {% block title %}{{ user.username if user.username else user.email }} - Hồ sơ cá nhân{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/profile.css?v=20260830-1">
+<link rel="stylesheet" href="/static/css/media_picker.css">
+{% endblock %}
+
 {% block body %}
 <div class="prof-container" x-data='profilePage({{ {
         "name": user.name or "",
@@ -248,9 +254,6 @@
     </div>
 
 </div>
-
-<link rel="stylesheet" href="/static/css/profile.css?v=20260830-1">
-<link rel="stylesheet" href="/static/css/media_picker.css">
 
 <!-- Chọn ảnh đại diện có sẵn từ thư viện Media -->
 <div class="media-picker-modal" x-data="avatarLibraryPicker()" x-show="isOpen" x-cloak
