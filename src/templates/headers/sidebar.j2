@@ -114,11 +114,7 @@
 
         <div class="sidebar-body">
             {% for page in ADMIN_PAGES %}
-<<<<<<< HEAD
-            {% if page.id != 'account' or auth.user.role == 'SUPPER_ADMIN' %}
-=======
-            {% if not page.include_roles or page.include_roles | length == 0%}
->>>>>>> dev
+            {% if not page.include_roles or auth.user.role in page.include_roles %}
             <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
                 hx-push-url="true" :data-active="isActivePage('{{ page.id }}', currentPath)"
                 @click="closeSidebarOnMobile()">

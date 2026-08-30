@@ -1,7 +1,34 @@
 {% extends "templates/layouts/admin.j2" if not request.headers.get("hx-request") else
 "templates/layouts/admin_blank.j2"%}
 {% block admin_title %}Quản lý khách mời{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/static/css/employees.css">{% endblock %}
 {% block admin_body %}
+<link rel="stylesheet" href="/static/css/employees.css">
+<script>
+    window.EMP_URLS = {
+        employeesTable: "{{ url_for('employees_table') }}",
+        mediaManager: "{{ url_for('media_manager') }}"
+    };
+</script>
+<script>
+(function() {
+    if (!window.employeeActions || !window.employeeFormModal) {
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/static/js/employees.js?v=20260826-1', false);
+            xhr.send(null);
+            if (xhr.status === 200) {
+                const script = document.createElement('script');
+                script.text = xhr.responseText;
+                document.head.appendChild(script);
+            }
+        } catch (e) {
+            console.error('Không thể tải employees.js:', e);
+        }
+    }
+})();
+</script>
+
 <div class="emp-container" x-data="{
     selectedIds: [],
     allIds: [],
@@ -174,14 +201,5 @@
 {% include "modules/employees/views/admin/modals/employee_form_modal.j2" %}
 {% include "modules/employees/views/admin/modals/employee_import_modal.j2" %}
 {% include "modules/employees/views/admin/modals/employee_delete_modal.j2" %}
-
-<link rel="stylesheet" href="/static/css/employees.css">
-<script>
-    window.EMP_URLS = {
-        employeesTable: "{{ url_for('employees_table') }}",
-        mediaManager: "{{ url_for('media_manager') }}"
-    };
-</script>
-<script src="/static/js/employees.js"></script>
 
 {% endblock %}

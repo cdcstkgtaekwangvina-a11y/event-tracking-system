@@ -120,3 +120,10 @@ class EmployeeIdsSchema(BaseSchema):
 class CheckInEmployeeRequest(BaseSchema):
     employee_id: int
     event_id: int
+
+
+class AnalyticEventResponse(BaseSchema):
+    department: str
+    total_checked_in: int
+    total_sent: int
+    total_pending: int

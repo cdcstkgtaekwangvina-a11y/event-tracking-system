@@ -8,111 +8,248 @@
         "email": user.email or "",
         "role": user.role or "",
         "avatar_url": user.file_url or user.avatar_url or "",
+        "created_at": (user.created_at | string) if user.created_at else "",
         "is_super_admin": is_super_admin,
     } | tojson | forceescape }})' @avatar-media-selected.window="avatarUrl = $event.detail.url">
-    <div class="prof-topbar">
-        <a href="/admin" class="prof-back-link">
-            <span class="material-symbols-outlined">arrow_back</span>
-            Quay lại
-        </a>
-        <h1 class="prof-title">Hồ sơ cá nhân</h1>
+
+    <!-- Topbar / Title -->
+    <div class="prof-header-section">
+        <div class="prof-header-top">
+            <button type="button" @click="goBack()" class="prof-back-btn" title="Quay lại">
+                <span class="material-symbols-outlined">arrow_back</span>
+                <span>Quay lại</span>
+            </button>
+        </div>
+        <h1 class="prof-page-title">Hồ sơ cá nhân</h1>
+        <p class="prof-page-subtitle">Thông tin tài khoản của bạn</p>
     </div>
 
-    <div class="prof-grid">
-        <!-- Thông tin cá nhân -->
-        <div class="prof-card">
-            <h2 class="prof-card-title">Thông tin cá nhân</h2>
+    <!-- 1. Profile Summary Card -->
+    <div class="prof-card prof-summary-card">
+        <div class="prof-summary-left">
+            <div class="prof-avatar-box" @click="openEditModal()" title="Nhấn để đổi ảnh đại diện">
+                <template x-if="avatarUrl">
+                    <img :src="avatarUrl" class="prof-avatar-image" alt="avatar" />
+                </template>
+                <template x-if="!avatarUrl">
+                    <span class="prof-avatar-initials" x-text="getInitials(profileData.name)">VA</span>
+                </template>
+                <div class="prof-avatar-hover-icon">
+                    <span class="material-symbols-outlined">photo_camera</span>
+                </div>
+            </div>
 
-            <div class="prof-avatar-row">
-                <div class="prof-avatar-wrapper" @click="window.avatarLibraryPicker?.open()">
-                    <img x-show="avatarUrl" :src="avatarUrl" class="prof-avatar-img" alt="avatar">
-                    <span x-show="!avatarUrl" class="material-symbols-outlined prof-avatar-placeholder">account_circle</span>
-                    <div class="prof-avatar-overlay">
-                        <span class="material-symbols-outlined">photo_library</span>
+            <div class="prof-summary-info">
+                <h2 class="prof-user-name" x-text="profileData.name || 'Người dùng'">Nguyễn Văn Admin</h2>
+                <div class="prof-username-text">@<span x-text="profileData.username">admin</span></div>
+                <div class="prof-meta-row">
+                    <span class="prof-role-pill">
+                        <span class="material-symbols-outlined">verified_user</span>
+                        <span x-text="roleLabel(role)">Admin</span>
+                    </span>
+                    <span class="prof-joined-text" x-text="formatJoinedDate(createdAt)">Tham gia từ 10 tháng 1,
+                        2024</span>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="prof-edit-btn" @click="openEditModal()" title="Chỉnh sửa thông tin">
+            <span class="material-symbols-outlined">edit</span>
+        </button>
+    </div>
+
+    <!-- 2. Account Information Card -->
+    <div class="prof-card">
+        <h3 class="prof-section-title">THÔNG TIN TÀI KHOẢN</h3>
+        <div class="prof-info-grid">
+            <!-- Họ và tên -->
+            <div class="prof-info-box">
+                <div class="prof-info-icon-box">
+                    <span class="material-symbols-outlined">person</span>
+                </div>
+                <div class="prof-info-content">
+                    <span class="prof-info-label">Họ và tên</span>
+                    <span class="prof-info-val" x-text="profileData.name || '—'">Nguyễn Văn Admin</span>
+                </div>
+            </div>
+
+            <!-- Tên đăng nhập -->
+            <div class="prof-info-box">
+                <div class="prof-info-icon-box">
+                    <span class="material-symbols-outlined">alternate_email</span>
+                </div>
+                <div class="prof-info-content">
+                    <span class="prof-info-label">Tên đăng nhập</span>
+                    <span class="prof-info-val" x-text="profileData.username || '—'">admin</span>
+                </div>
+            </div>
+
+            <!-- Email -->
+            <div class="prof-info-box">
+                <div class="prof-info-icon-box">
+                    <span class="material-symbols-outlined">mail</span>
+                </div>
+                <div class="prof-info-content">
+                    <span class="prof-info-label">Email</span>
+                    <span class="prof-info-val" x-text="profileData.email || '—'">admin@company.com</span>
+                </div>
+            </div>
+
+            <!-- Vai trò -->
+            <div class="prof-info-box">
+                <div class="prof-info-icon-box">
+                    <span class="material-symbols-outlined">verified_user</span>
+                </div>
+                <div class="prof-info-content">
+                    <span class="prof-info-label">Vai trò</span>
+                    <span class="prof-info-val" x-text="roleLabel(role)">Admin</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Security Card -->
+    <div class="prof-card">
+        <h3 class="prof-section-title">BẢO MẬT</h3>
+        <div class="prof-security-box">
+            <div class="prof-security-left">
+                <div class="prof-info-icon-box">
+                    <span class="material-symbols-outlined">key</span>
+                </div>
+                <div class="prof-security-content">
+                    <span class="prof-security-title">Mật khẩu</span>
+                    <span class="prof-security-desc">Cập nhật mật khẩu đăng nhập của bạn</span>
+                </div>
+            </div>
+            <button type="button" class="prof-btn-change-pwd" @click="openPasswordModal()">
+                <span class="material-symbols-outlined">key</span>
+                <span>Đổi mật khẩu</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: CHỈNH SỬA THÔNG TIN CÁ NHÂN
+         ============================================================ -->
+    <div class="prof-modal-backdrop" x-show="editModalOpen" x-cloak style="display: none;"
+        @keydown.escape.window="closeEditModal()">
+        <div class="prof-modal" @click.outside="closeEditModal()">
+            <div class="prof-modal-header">
+                <h3 class="prof-modal-title">Chỉnh sửa thông tin cá nhân</h3>
+                <button type="button" class="prof-modal-close" @click="closeEditModal()">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <form class="prof-modal-body" @submit.prevent="saveProfile">
+                <!-- Avatar Change Row in Modal -->
+                <div class="prof-modal-avatar-row">
+                    <div class="prof-avatar-box prof-avatar-box--modal" @click="window.avatarLibraryPicker?.open()"
+                        title="Chọn ảnh từ Thư viện">
+                        <template x-if="avatarUrl">
+                            <img :src="avatarUrl" class="prof-avatar-image" alt="avatar" />
+                        </template>
+                        <template x-if="!avatarUrl">
+                            <span class="prof-avatar-initials" x-text="getInitials(form.name)">VA</span>
+                        </template>
+                        <div class="prof-avatar-hover-icon">
+                            <span class="material-symbols-outlined">photo_library</span>
+                        </div>
+                    </div>
+                    <div class="prof-modal-avatar-info">
+                        <button type="button" class="prof-btn prof-btn-secondary"
+                            @click="window.avatarLibraryPicker?.open()">
+                            <span class="material-symbols-outlined">photo_library</span>
+                            Chọn ảnh đại diện
+                        </button>
+                        <span class="prof-form-hint">Chọn hình ảnh có sẵn từ Thư viện Media</span>
                     </div>
                 </div>
-                <div class="prof-avatar-hint">
-                    <p>Ảnh đại diện được chọn từ thư viện Media</p>
-                    <button type="button" class="prof-btn prof-btn-secondary"
-                        @click="window.avatarLibraryPicker?.open()">Chọn từ thư viện</button>
-                </div>
-            </div>
 
-            <div class="prof-form-row">
                 <div class="prof-form-group">
                     <label class="prof-form-label">Họ và tên <span class="prof-required">*</span></label>
-                    <input type="text" class="prof-form-input" x-model="form.name" maxlength="300" autocomplete="off">
+                    <input type="text" class="prof-form-input" x-model="form.name" maxlength="300" autocomplete="off"
+                        required />
                 </div>
+
                 <div class="prof-form-group">
                     <label class="prof-form-label">Tên đăng nhập <span class="prof-required">*</span></label>
-                    <input type="text" class="prof-form-input" x-model="form.username" maxlength="350" autocomplete="off">
+                    <input type="text" class="prof-form-input" x-model="form.username" maxlength="20" autocomplete="off"
+                        required />
+                    <span class="prof-form-hint">3-20 ký tự, bắt đầu bằng chữ cái, chỉ chứa chữ, số, _, @</span>
                 </div>
-            </div>
 
-            <div class="prof-form-row">
-                <div class="prof-form-group prof-form-group--full">
+                <div class="prof-form-group">
                     <label class="prof-form-label">
                         Email
                         <span class="material-symbols-outlined prof-tooltip-icon" x-show="!isSuperAdmin"
-                            title="Liên hệ Super Admin để thay đổi Email">info</span>
+                            title="Chỉ Super Admin mới có quyền chỉnh sửa Email">info</span>
                     </label>
-                    <input type="email" class="prof-form-input" x-model="form.email" maxlength="300"
-                        autocomplete="off" :disabled="!isSuperAdmin"
-                        :title="!isSuperAdmin ? 'Liên hệ Super Admin để thay đổi Email' : ''">
+                    <input type="email" class="prof-form-input" x-model="form.email" maxlength="300" autocomplete="off"
+                        :disabled="!isSuperAdmin" />
                 </div>
-            </div>
 
-            <div class="prof-form-row">
-                <div class="prof-form-group">
-                    <label class="prof-form-label">Vai trò</label>
-                    <span class="prof-role-badge" x-text="roleLabel(role)">—</span>
+                <div class="prof-modal-footer">
+                    <button type="button" class="prof-btn prof-btn-ghost" @click="closeEditModal()">Huỷ</button>
+                    <button type="submit" class="prof-btn prof-btn-primary" :disabled="savingProfile">
+                        <span x-show="savingProfile" class="prof-spinner prof-spinner-sm"></span>
+                        <span x-text="savingProfile ? 'Đang lưu...' : 'Lưu thay đổi'">Lưu thay đổi</span>
+                    </button>
                 </div>
-            </div>
+            </form>
+        </div>
+    </div>
 
-            <div class="prof-card-footer">
-                <button type="button" class="prof-btn prof-btn-primary" :disabled="savingProfile" @click="saveProfile">
-                    <span x-show="savingProfile" class="prof-spinner prof-spinner-sm"></span>
-                    <span x-text="savingProfile ? 'Đang lưu...' : 'Lưu thay đổi'">Lưu thay đổi</span>
+    <!-- ============================================================
+         MODAL: ĐỔI MẬT KHẨU
+         ============================================================ -->
+    <div class="prof-modal-backdrop" x-show="passwordModalOpen" x-cloak style="display: none;"
+        @keydown.escape.window="closePasswordModal()">
+        <div class="prof-modal" @click.outside="closePasswordModal()">
+            <div class="prof-modal-header">
+                <h3 class="prof-modal-title">Đổi mật khẩu</h3>
+                <button type="button" class="prof-modal-close" @click="closePasswordModal()">
+                    <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-        </div>
 
-        <!-- Đổi mật khẩu -->
-        <div class="prof-card">
-            <h2 class="prof-card-title">Đổi mật khẩu</h2>
-
-            <div class="prof-form-row">
-                <div class="prof-form-group prof-form-group--full">
+            <form class="prof-modal-body" @submit.prevent="changePassword">
+                <div class="prof-form-group">
                     <label class="prof-form-label">Mật khẩu hiện tại <span class="prof-required">*</span></label>
                     <input type="password" class="prof-form-input" x-model="passwordForm.current_password"
-                        autocomplete="current-password">
+                        autocomplete="current-password" required />
                 </div>
-            </div>
-            <div class="prof-form-row">
+
                 <div class="prof-form-group">
                     <label class="prof-form-label">Mật khẩu mới <span class="prof-required">*</span></label>
                     <input type="password" class="prof-form-input" x-model="passwordForm.new_password"
-                        autocomplete="new-password">
+                        placeholder="Tối thiểu 8 ký tự, gồm chữ hoa, thường, số và ký tự đặc biệt"
+                        autocomplete="new-password" required />
                 </div>
+
                 <div class="prof-form-group">
                     <label class="prof-form-label">Xác nhận mật khẩu mới <span class="prof-required">*</span></label>
                     <input type="password" class="prof-form-input" x-model="passwordForm.confirm_new_password"
-                        autocomplete="new-password">
+                        placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" required />
                 </div>
-            </div>
-            <p class="prof-form-hint">Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&amp;).</p>
 
-            <div class="prof-card-footer">
-                <button type="button" class="prof-btn prof-btn-primary" :disabled="changingPassword" @click="changePassword">
-                    <span x-show="changingPassword" class="prof-spinner prof-spinner-sm"></span>
-                    <span x-text="changingPassword ? 'Đang xử lý...' : 'Đổi mật khẩu'">Đổi mật khẩu</span>
-                </button>
-            </div>
+                <p class="prof-form-hint">Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt
+                    (@$!%*?&).</p>
+
+                <div class="prof-modal-footer">
+                    <button type="button" class="prof-btn prof-btn-ghost" @click="closePasswordModal()">Huỷ</button>
+                    <button type="submit" class="prof-btn prof-btn-primary" :disabled="changingPassword">
+                        <span x-show="changingPassword" class="prof-spinner prof-spinner-sm"></span>
+                        <span x-text="changingPassword ? 'Đang xử lý...' : 'Đổi mật khẩu'">Đổi mật khẩu</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
+
 </div>
 
-<link rel="stylesheet" href="/static/css/profile.css">
+<link rel="stylesheet" href="/static/css/profile.css?v=20260830-1">
 <link rel="stylesheet" href="/static/css/media_picker.css">
 
 <!-- Chọn ảnh đại diện có sẵn từ thư viện Media -->
@@ -128,8 +265,8 @@
             <div class="media-picker-header-actions">
                 <button type="button" class="media-picker-nav-btn" @click="goBack()"
                     :disabled="loading || !folderStack.length">Quay lại</button>
-                <button type="button" class="media-picker-nav-btn" @click="goRoot()"
-                    :disabled="loading">Trang đầu</button>
+                <button type="button" class="media-picker-nav-btn" @click="goRoot()" :disabled="loading">Trang
+                    đầu</button>
                 <button type="button" class="media-picker-close-btn" @click="close()">×</button>
             </div>
         </div>
@@ -160,8 +297,7 @@
                             </div>
                         </div>
                         <div class="media-picker-actions">
-                            <button type="button" class="media-picker-primary" :disabled="saving"
-                                @click="confirm()">
+                            <button type="button" class="media-picker-primary" :disabled="saving" @click="confirm()">
                                 <span x-text="saving ? 'Đang lưu...' : 'Dùng ảnh này'"></span>
                             </button>
                         </div>
@@ -183,5 +319,5 @@
         mediaManager: "{{ url_for('media_manager') }}"
     };
 </script>
-<script src="/static/js/profile.js"></script>
+<script src="/static/js/profile.js?v=20260830-1"></script>
 {% endblock %}

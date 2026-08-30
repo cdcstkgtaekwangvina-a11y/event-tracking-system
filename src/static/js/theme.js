@@ -1,4 +1,4 @@
-const theme = {
+var theme = window.theme || {
   dark: "dark",
   light: "light",
 };

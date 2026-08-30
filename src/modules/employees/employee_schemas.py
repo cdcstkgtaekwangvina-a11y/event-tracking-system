@@ -3,7 +3,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import Depends, Query
-from pydantic import Field, field_validator
+from pydantic import EmailStr, Field, field_validator
 
 from src.shared.base.base_schema import BaseSchema
 from src.shared.schemas.pagination_schemas import PaginationQuery, PaginationRequest
@@ -12,7 +12,7 @@ from src.shared.schemas.pagination_schemas import PaginationQuery, PaginationReq
 class EmployeeCreateRequest(BaseSchema):
     id: int | None = Field(default=None, description="Mã nhân viên (tuỳ chọn)")
     name: str = Field(max_length=300)
-    email: str | None = Field(default=None, max_length=500)
+    email: EmailStr | None = Field(default=None, max_length=500)
     position: str | None = Field(default=None, max_length=300)
     gender: str | None = Field(default=None, max_length=20)
     department: str | None = None
@@ -52,7 +52,7 @@ EmployeesPaginationQuery = Annotated[
 
 class EmployeeUpdateRequest(BaseSchema):
     name: str = Field(max_length=300)
-    email: str | None = Field(default=None, max_length=500)
+    email: EmailStr | None = Field(default=None, max_length=500)
     position: str | None = Field(default=None, max_length=300)
     gender: str | None = Field(default=None, max_length=20)
     department: str | None = None
