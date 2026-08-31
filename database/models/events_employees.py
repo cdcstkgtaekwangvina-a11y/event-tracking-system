@@ -14,6 +14,7 @@ class EVENT_EMPLOYEE_STATUS(str, Enum):
     PENDING = "PENDING"
     CHECK_IN = "CHECK_IN"
     SENT = "SENT"
+    SEND_FAIL = "SEND_FAIL"
 
 
 class EventsEmployees(SQLModel, table=True):

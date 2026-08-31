@@ -9,8 +9,8 @@ from sqlmodel import and_, func, select
 
 from database.models.app_db import get_session_factory
 from database.models.employees import Employees
-from database.models.events_employees import EventsEmployees
 from database.models.events import Events
+from database.models.events_employees import EventsEmployees
 from database.models.queue_jobs import JobStatus, QueueJob, QueueJobLogs
 from src.modules.employees.employee_schemas import BulkUpsertResponse
 from src.shared.base.base_client import BaseClient
