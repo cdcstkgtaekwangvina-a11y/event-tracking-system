@@ -30,6 +30,8 @@ class AccountAdminViews:
         return req.response_html(
             name=f"{base_path}index.j2",
             context={"can_edit_email": auth.payload.role == ROLE.SUPER_ADMIN},
+            cache_time=3600,
+            public_cache=False,
         )
 
     @router.get("table/html", name="accounts_table")

@@ -20,6 +20,7 @@ class BaseRequest(Request):
         media_type: str | None = None,
         background: BackgroundTask | None = None,
         cache_time: int = 0,
+        public_cache: bool = True,
     ) -> HTMLResponse:
         templates = self.get_templates()
         if context is None:
@@ -44,7 +45,11 @@ class BaseRequest(Request):
         )
         response.headers["Vary"] = "HX-Request"
         if cache_time > 0:
-            response.headers["Cache-Control"] = f"public, max-age={cache_time}"
+            response.headers["Cache-Control"] = (
+                f"{'public' if public_cache else 'private'}, max-age={cache_time}"
+            )
         else:
-            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+            response.headers["Cache-Control"] = (
+                "no-cache, no-store, must-revalidate, max-age=0"
+            )
         return response
