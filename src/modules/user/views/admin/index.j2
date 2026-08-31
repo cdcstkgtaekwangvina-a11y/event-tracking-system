@@ -1,5 +1,4 @@
-{% extends "templates/layouts/admin.j2" if not request.headers.get("hx-request") else
-"templates/layouts/admin_blank.j2"%}
+{% extends "templates/layouts/admin.j2" %}
 {% block admin_title %}Quản lý Tài khoản{% endblock %}
 {% block admin_body %}
 <link rel="stylesheet" href="/static/css/account.css?v=20260830-2">
@@ -7,24 +6,6 @@
     window.ACCOUNT_URLS = {
         accountsTable: "{{ url_for('accounts_table') }}"
     };
-</script>
-<script>
-(function() {
-    if (!window.accountActions || !window.accountFormModal) {
-        try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', '/static/js/account.js?v=20260830-2', false);
-            xhr.send(null);
-            if (xhr.status === 200) {
-                const script = document.createElement('script');
-                script.text = xhr.responseText;
-                document.head.appendChild(script);
-            }
-        } catch (e) {
-            console.error('Không thể tải account.js:', e);
-        }
-    }
-})();
 </script>
 
 <div class="acc-container">

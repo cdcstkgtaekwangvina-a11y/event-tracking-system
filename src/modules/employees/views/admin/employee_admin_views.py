@@ -22,7 +22,11 @@ class EmployeeAdminViews:
 
     @router.get(name="employees")
     def employees(self, req: BaseRequest):
-        return req.response_html(name=f"{base_path}index.j2")
+        return req.response_html(
+            name=f"{base_path}index.j2",
+            cache_time=3600,
+            public_cache=False,
+        )
 
     @router.get("table/html", name="employees_table")
     async def employees_table_html(
