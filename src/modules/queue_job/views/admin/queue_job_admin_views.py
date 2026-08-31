@@ -31,6 +31,8 @@ class QueueJobAdminViews:
             context={
                 "status_filter": status or "all",
             },
+            cache_time=3600,
+            public_cache=False,
         )
 
     @router.get("table/html", name="queue_jobs_table")

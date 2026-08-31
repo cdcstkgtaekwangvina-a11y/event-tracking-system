@@ -2,24 +2,6 @@
     window.managerPageUrl = "{{ url_for('media_manager') }}";
     window.trashPageUrl = "{{ url_for('trash') }}";
 </script>
-<script>
-(function() {
-    if (!window.mediaActions || !window.mediaRenameModal) {
-        try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', '/static/js/media_manager.js?v=20260826-1', false);
-            xhr.send(null);
-            if (xhr.status === 200) {
-                const script = document.createElement('script');
-                script.text = xhr.responseText;
-                document.head.appendChild(script);
-            }
-        } catch (e) {
-            console.error('Không thể tải media_manager.js:', e);
-        }
-    }
-})();
-</script>
 <link rel="stylesheet" href="/static/css/media_manager.css">
 
 <div class="media-header" x-data="{

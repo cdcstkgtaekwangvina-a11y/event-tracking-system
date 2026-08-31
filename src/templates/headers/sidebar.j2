@@ -64,6 +64,12 @@
         window.addEventListener('popstate', () => { 
             this.currentPath = window.location.pathname; 
         });
+        document.addEventListener('htmx:afterSwap', (evt) => {
+            if (evt.detail.target && evt.detail.target.id === 'admin-main-content') {
+                this.updateMainMargin();
+                this.closeSidebarOnMobile();
+            }
+        });
         document.addEventListener('htmx:afterRequest', (evt) => {
             if (evt.detail.target && evt.detail.target.id === 'admin-main-content') {
                 this.closeSidebarOnMobile();
@@ -115,8 +121,9 @@
         <div class="sidebar-body">
             {% for page in ADMIN_PAGES %}
             {% if not page.include_roles or auth.user.role in page.include_roles %}
-            <div class="sidebar-body-item" id="{{ page.id }}" hx-get="{{ page.path }}" hx-target="#admin-main-content"
-                hx-push-url="true" :data-active="isActivePage('{{ page.id }}', currentPath)"
+            <a href="{{ page.path }}" class="sidebar-body-item" id="{{ page.id }}"
+                hx-boost="true" hx-target="#admin-main-content" hx-select="#admin-main-content" hx-swap="outerHTML"
+                :data-active="isActivePage('{{ page.id }}', currentPath)"
                 @click="closeSidebarOnMobile()">
 
                 <span class="material-symbols-outlined">
@@ -127,7 +134,7 @@
                     x-transition.opacity.duration.200ms>
                     {{ page.name }}
                 </span>
-            </div>
+            </a>
             {% endif %}
             {% endfor %}
         </div>
@@ -262,7 +269,8 @@
         gap: 12px;
         cursor: pointer;
         user-select: none;
-        transition: background-color 0.2s;
+        text-decoration: none;
+        transition: background-color 0.2s, color 0.2s;
     }
 
     .sidebar-body-item:hover {

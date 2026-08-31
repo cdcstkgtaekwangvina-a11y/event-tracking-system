@@ -30,6 +30,8 @@ class MediaViews:
                 "folder_id": folder_id,
                 "deleted_media": False,
             },
+            cache_time=3600,
+            public_cache=False,
         )
 
     @router.get("items/html", name="media_grid")
@@ -74,6 +76,8 @@ class MediaViews:
                 "folder_id": folder_id,
                 "deleted_media": True,
             },
+            cache_time=3600,
+            public_cache=False,
         )
 
     async def apply_sort_request(
