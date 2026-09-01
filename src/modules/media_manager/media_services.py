@@ -258,7 +258,9 @@ class MediaServices:
             return BaseResponse.not_found(message="Không tìm thấy media")
         return BaseResponse.ok(data=media)
 
-    async def create_media_or_fail(self, payload: CreateMediaSchema) -> Medias:
+    async def create_media_or_fail(
+        self, payload: CreateMediaSchema
+    ) -> BaseResponse[Medias]:
         """Same as `create_media` but returns the raw persisted model instead of
         an already-rendered `BaseResponse` — for callers (e.g. avatar upload in
         `UserServices`) that need the created row itself, not a JSON response.
@@ -360,11 +362,10 @@ class MediaServices:
         new_media = await self.crud.create(new_media)
         await self.redis.invalidate_tags_async(CacheTags.MEDIA)
 
-        return new_media
+        return BaseResponse.created(new_media)
 
     async def create_media(self, payload: CreateMediaSchema) -> BaseResponse[Medias]:
-        new_media = await self.create_media_or_fail(payload)
-        return BaseResponse.created(data=new_media)
+        return await self.create_media_or_fail(payload)
 
     async def bulk_delete_media(
         self, ids: list[int], is_soft_delete: bool = True

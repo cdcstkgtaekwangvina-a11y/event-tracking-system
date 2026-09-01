@@ -20,16 +20,15 @@ load_dotenv()
 
 logger = get_logger(__name__)
 
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+redis_pool = redis.ConnectionPool.from_url(
+    REDIS_URL, max_connections=50, decode_responses=True
+)
+
 
 class RedisServices:
-    url: str = os.environ["REDIS_URL"]
-
     def __init__(self):
-
-        pool = redis.ConnectionPool.from_url(
-            self.url, max_connections=30, decode_responses=True
-        )
-        self.client = redis.Redis.from_pool(connection_pool=pool)
+        self.client = redis.Redis.from_pool(connection_pool=redis_pool)
         self.tag_version_prefix = "tag_version:"
 
     @staticmethod

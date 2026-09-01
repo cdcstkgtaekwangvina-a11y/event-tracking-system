@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi.responses import StreamingResponse
 
-from database.models.app_db import SessionDep, SessionFactoryDep
+from database.models.app_db import SessionDep
 from database.models.employees import Employees
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.constants.cache_tags import CacheTags
@@ -25,11 +25,9 @@ class EmployeeServices:
     def __init__(
         self,
         session: SessionDep,
-        session_factory: SessionFactoryDep,
         redis: RedisDep,
     ):
         self.session = session
-        self.session_factory = session_factory
         self.redis = redis
         self.crud = BaseCrud(session, Employees)
 
@@ -191,7 +189,7 @@ class EmployeeServices:
         if employees.header_row is not None and employees.header_row >= 1:
             employees.header_row -= 1
 
-        job_service = QueueJobServices(session=self.session, redis=self.redis)
+        job_service = QueueJobServices(session=self.session)
         new_job = await job_service.create_job(
             CreateQueueJobSchema(
                 type=QueueKeys.BULK_UPSERT_EMPLOYEES.value,

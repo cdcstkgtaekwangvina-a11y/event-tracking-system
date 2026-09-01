@@ -37,6 +37,18 @@ install:
 dev:
 	python -m src.main
 
+granian:
+	set -a; \
+	source <(grep -v '^#' .env | tr -d '\r'); \
+	set +a; \
+	granian --interface asgi --loop uvloop --workers 4 --port $$PORT src.main:app
+
+granian-dev:
+	set -a; \
+	source <(grep -v '^#' .env | tr -d '\r'); \
+	set +a; \
+	granian --interface asgi --loop uvloop --reload --port $$PORT src.main:app
+
 update_env:
 	conda env update --prefix $(ENV_PATH) --file environment.yml --prune
 

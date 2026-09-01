@@ -1,0 +1,77 @@
+services:
+  # ============================================================================
+  # App — FastAPI + Granian + uvloop
+  # ============================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: event-tracking-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    env_file:
+      - .env
+    environment:
+      - env=production
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    #   redis:
+    #     condition: service_healthy
+    # networks:
+    #   - app-network
+    volumes:
+      - app-uploads:/app/uploads
+      
+  # ============================================================================
+  # PostgreSQL (uncomment nếu cần chạy local)
+  # ============================================================================
+  # postgres:
+  #   image: postgres:17-alpine
+  #   container_name: event-tracking-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: ${DB_NAME:-check-in-app}
+  #     POSTGRES_USER: ${DB_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+  #   ports:
+  #     - "${DB_PORT:-5432}:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-check-in-app}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+  #   networks:
+  #     - app-network
+
+  # ============================================================================
+  # Redis (uncomment nếu cần chạy local)
+  # ============================================================================
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: event-tracking-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - app-network
+
+volumes:
+  app-uploads:
+  # postgres-data:
+  # redis-data:
+
+# networks:
+#   app-network:
+#     driver: bridge

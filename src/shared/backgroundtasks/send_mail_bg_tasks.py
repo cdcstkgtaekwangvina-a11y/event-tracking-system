@@ -115,7 +115,7 @@ class SendMailBgTasks:
         self, value: SendMailResponse
     ) -> EmailStatusResponse:
         """Name of status: submitted, complete, in_progress"""
-        response: EmailStatusResponse
+        response = EmailStatusResponse()
         for i in range(MAX_TRIES):
             response = await elastic_email.get_status_email(value.TransactionID)
             if response.Status == "complete":
@@ -197,15 +197,8 @@ class SendMailBgTasks:
                     )
                 )
             )
-            if send_all:
-                employee_stmt = employee_stmt.where(col(Employees.email).is_not(None))
-            else:
-                employee_stmt = employee_stmt.where(
-                    and_(
-                        col(Employees.id).in_(employees),
-                        col(Employees.email).is_not(None),
-                    )
-                )
+            if not send_all:
+                employee_stmt = employee_stmt.where(col(Employees.id).in_(employees))
 
             employee_exec = await session.exec(employee_stmt)
             employees = employee_exec.all()
@@ -314,15 +307,17 @@ class SendMailBgTasks:
             update(QueueJob)
             .where(col(QueueJob.id) == job_id)
             .values(
-                job_id=job_id,
-                logs=job_logs,
+                status=JobStatus.SUCCESS.value,
+                logs=job_logs.model_dump(mode="json"),
                 overall_log=f"Đã hoàn thành có {len(success_emps)}/{send_email_status.RecipientsCount} thành công, {send_email_status.FailedCount} thất bại",
                 meta=meta_data,
+                finished_at=now,
             )
         )
 
-        async with session.begin():
-            await session.exec(update_emp_event)
-            await session.exec(update_job)
+        async with get_session_factory()() as new_session:
+            async with new_session.begin():
+                await new_session.exec(update_emp_event)
+                await new_session.exec(update_job)
 
         return
