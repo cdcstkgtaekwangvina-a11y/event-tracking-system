@@ -4,6 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from src.shared.base.base_logger import get_logger
+from src.shared.base.base_schema import BaseSchema
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,10 @@ def queue_job(key: str):
         return func
 
     return decorator
+
+
+class EnqueueResponse(BaseSchema):
+    job_id: str
 
 
 class QueueServices:
@@ -94,12 +99,13 @@ class QueueServices:
         trigger = CronTrigger.from_crontab(cron_expression)
         self.scheduler.add_job(func, trigger, **kwargs)
 
-    async def enqueue_by_type(self, job_type: str, job_id: str):
+    async def enqueue_by_type(self, job_type: str, job_id: str) -> EnqueueResponse:
         if job_type not in self._registry:
             raise ValueError(f"Loại job '{job_type}' không tồn tại trong hệ thống!")
 
         # Đẩy kèm job_id để quản lý
         await self.job_queue.put((job_id, job_type))
+        return EnqueueResponse(job_id=job_id)
 
     def cancel_job(self, job_id: str) -> bool:
         """Hủy 1 job đang chạy theo job_id"""

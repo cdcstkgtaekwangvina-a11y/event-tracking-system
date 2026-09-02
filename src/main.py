@@ -103,6 +103,7 @@ def create_app() -> FastAPI:
 app = create_app()
 
 from fastapi.middleware.cors import CORSMiddleware
+from src.shared.middlewares.timezone_middleware import TimezoneMiddleware
 
 app.add_middleware(
     CORSMiddleware,
@@ -111,6 +112,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TimezoneMiddleware)
 
 
 if __name__ == "__main__":

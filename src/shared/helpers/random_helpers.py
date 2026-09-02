@@ -1,5 +1,5 @@
 import random
-from .time_extensions import get_now_vn
+from .time_extensions import get_now_utc
 
 class RandomHelpers:
     characters: str = ""
@@ -28,12 +28,12 @@ class RandomHelpers:
 
     @classmethod
     def random_string_with_timestamp(cls, override_length: int, override_prefix: str = "") -> str:
-        timestamp = get_now_vn().strftime("%Y%m%d%H%M%S")
+        timestamp = get_now_utc().strftime("%Y%m%d%H%M%S")
         random_string = cls.generate_random_string(override_length, override_prefix)
         return f"{random_string}_{timestamp}"
     
     @classmethod
     def random_number_string_with_timestamp(cls, override_length: int, override_prefix: str = "") -> str:
-        timestamp = get_now_vn().strftime("%Y%m%d%H%M%S")
+        timestamp = get_now_utc().strftime("%Y%m%d%H%M%S")
         random_string = cls.generate_random_number_string(override_length, override_prefix)
         return f"{random_string}_{timestamp}"

@@ -9,7 +9,7 @@ from src.shared.middlewares.auth_middlewares import AuthContext, auth
 from ..user_services import UserServices
 
 TAG = "user"
-router = BaseRouter(tags=[TAG], controller=TAG)
+router = BaseRouter(tags=[TAG], controller=TAG, include_in_schema=False)
 base_path = "modules/user/views/"
 
 

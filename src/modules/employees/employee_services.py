@@ -1,23 +1,23 @@
-from typing import Any
-
 from fastapi.responses import StreamingResponse
 
 from database.models.app_db import SessionDep
 from database.models.employees import Employees
 from src.shared.base import BaseCrud, BaseResponse
+from src.shared.base.base_queue import EnqueueResponse, queue_service
 from src.shared.constants.cache_tags import CacheTags
 from src.shared.helpers.file_handel import FileHandelHelper
+from src.shared.helpers.qr_helper import CreateQRSchema, create_qr_url
 from src.shared.schemas.pagination_schemas import PaginationResponse
 from src.shared.services.redis_services import RedisDep
 
 from .employee_schemas import (
     BulkUpsertEmployeeRequest,
-    BulkUpsertResponse,
     EmployeeCreateRequest,
     EmployeesPagination,
     EmployeeUpdateRequest,
     ExportEmployeeRequest,
     ReadSheetFile,
+    ReadSheetFileResponse,
 )
 
 
@@ -44,7 +44,19 @@ class EmployeeServices:
 
         # Tạo dict dữ liệu, loại bỏ id nếu None để DB tự sinh
         create_data = employee.model_dump(exclude_none=True)
-        new_employee = await self.crud.create(create_data)
+        if employee.id is not None:
+            create_data["qr_url"] = create_qr_url(CreateQRSchema(data=str(employee.id)))
+
+        new_employee = Employees(**create_data)
+        self.session.add(new_employee)
+        await self.session.flush()
+
+        # Tạo và cập nhật qr_url nếu ID được tự sinh
+        if new_employee.qr_url is None and new_employee.id is not None:
+            new_employee.qr_url = create_qr_url(
+                CreateQRSchema(data=str(new_employee.id))
+            )
+            self.session.add(new_employee)
 
         # Nếu tạo với custom ID, đồng bộ sequence để tránh xung đột
         if employee.id is not None:
@@ -61,7 +73,9 @@ class EmployeeServices:
                         )
                     )
                 )
-                await self.session.commit()
+
+        await self.session.commit()
+        # await self.session.refresh(new_employee)
 
         await self.redis.invalidate_tags_async(CacheTags.EMPLOYEE)
         return BaseResponse.created(new_employee, message="Thêm nhân viên thành công")
@@ -179,7 +193,7 @@ class EmployeeServices:
 
     async def bulk_upsert_employees(
         self, employees: BulkUpsertEmployeeRequest
-    ) -> BaseResponse[BulkUpsertResponse]:
+    ) -> BaseResponse[EnqueueResponse]:
 
         from src.modules.queue_job.queue_job_schemas import CreateQueueJobSchema
         from src.modules.queue_job.queue_job_services import QueueJobServices
@@ -198,20 +212,20 @@ class EmployeeServices:
         )
 
         if new_job:
-            from src.shared.base.base_queue import queue_service
-
-            await queue_service.enqueue_by_type(
+            enqueue = await queue_service.enqueue_by_type(
                 QueueKeys.BULK_UPSERT_EMPLOYEES.value,
                 str(new_job.id),
             )
             return BaseResponse.ok(
-                BulkUpsertResponse(job_id=new_job.id),
+                enqueue,
                 message="Bulk upsert employee thành công",
             )
 
         return BaseResponse.fail(message="Bulk upsert employee thất bại")
 
-    async def read_import_file(self, file: ReadSheetFile) -> BaseResponse[Any]:
+    async def read_import_file(
+        self, file: ReadSheetFile
+    ) -> BaseResponse[ReadSheetFileResponse]:
         from src.shared.base.base_client import BaseClient
 
         async with BaseClient() as client:
@@ -250,12 +264,12 @@ class EmployeeServices:
         rows = df.to_dicts()
 
         return BaseResponse.ok(
-            {
-                "headers": headers,
-                "rows": rows,
-                "header_index": header_row_index if file_type != "json" else None,
-                "file_type": file_type,
-            },
+            ReadSheetFileResponse(
+                headers=headers,
+                rows=rows,
+                header_index=header_row_index if file_type != "json" else None,
+                file_type=file_type,
+            ),
             message="Read sheet file thành công",
         )
 

@@ -135,7 +135,6 @@ class BulkSendEventEmail(BaseSchema):
     )
     employees: list[int] | None = Field(default=None, min_length=1)
     send_all: bool = Field(default=False)
-    event_id: int
     template_name: str | None = Field(default="default")
 
     @model_validator(mode="after")

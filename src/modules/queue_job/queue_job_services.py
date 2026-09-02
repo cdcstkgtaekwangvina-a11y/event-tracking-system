@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlmodel import and_, col
+from sqlmodel import col
 from uuid6 import uuid8
 
 from database.models.app_db import SessionDep
@@ -57,22 +57,22 @@ class QueueJobServices:
         exiting_jobs = (
             await self.crud.select(QueueJob)
             .where(
-                and_(
-                    col(QueueJob.status) == JobStatus.RUNNING.value,
-                    col(QueueJob.id) == jobs.id,
-                )
+                col(QueueJob.id) == jobs.id,
             )
             .find_one()
         )
         if not exiting_jobs:
             return BaseResponse.not_found(message="Không tìm thấy job")
 
+        if exiting_jobs.status != JobStatus.RUNNING.value:
+            return BaseResponse.fail("Chỉ có thể dừng job đang chạy")
+
         from src.shared.base.base_queue import queue_service
-        from src.shared.helpers.time_extensions import get_vn_time
+        from src.shared.helpers.time_extensions import get_now_utc
 
         async with self.crud.transaction():
             exiting_jobs.status = JobStatus.CANCELLED.value
-            exiting_jobs.finished_at = get_vn_time()
+            exiting_jobs.finished_at = get_now_utc()
             self.session.add(exiting_jobs)
             canceled = queue_service.cancel_job(str(exiting_jobs.id))
 

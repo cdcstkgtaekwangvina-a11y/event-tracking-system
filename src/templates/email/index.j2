@@ -11,7 +11,11 @@
 <body
     style="margin: 0; padding: 24px 12px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
 
-    {% include "templates/email/body.j2" %}
+    {% if email_service == "aws_ses" %}
+        {% include "templates/email/body_aws_ses.j2" %}
+    {% else %}
+        {% include "templates/email/body_elastic_email.j2" %}
+    {% endif %}
 </body>
 
 </html>

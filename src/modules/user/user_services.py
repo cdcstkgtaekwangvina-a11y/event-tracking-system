@@ -4,13 +4,14 @@ from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 from pwdlib import PasswordHash
+from sqlmodel import col
 
 from database.models.app_db import SessionDep
 from database.models.media import Medias
 from src.modules.user.role_constants import ROLE
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.constants.cache_tags import CacheTags
-from src.shared.helpers import RandomHelpers, get_vn_time
+from src.shared.helpers import RandomHelpers, get_utc_time
 from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
 from src.shared.services.redis_services import RedisDep
 
@@ -52,8 +53,8 @@ class UserServices:
                     self.crud.select(
                         UserSelect,
                         logic_column=[
-                            Medias.id.label("file_id"),
-                            Medias.url.label("file_url"),
+                            col(Medias.id).label("file_id"),
+                            col(Medias.url).label("file_url"),
                         ],
                     )
                     .join(Medias, isouter=True)
@@ -74,7 +75,7 @@ class UserServices:
 
     async def create_user_or_fail(
         self, req: Users, withVerifyEmail: bool = False
-    ) -> Users:
+    ) -> BaseResponse[Users]:
         """Creates a user and returns the raw model (`BaseResponse.fail` raises on
         a duplicate email/username). Shared by `create_user` (register/API response)
         and `AccountServices.create_account`, which needs the raw model rather than
@@ -103,7 +104,7 @@ class UserServices:
             dump_req["otp_code"] = RandomHelpers.generate_random_number_string(
                 override_length=6
             )
-            dump_req["expired_at"] = get_vn_time(secs=600)
+            dump_req["expired_at"] = get_utc_time(secs=600)
         if req.password:
             password_hash = PasswordHash.recommended()
             dummy_hashh = password_hash.hash(req.password)
@@ -111,13 +112,12 @@ class UserServices:
 
         new_user = await self.crud.create(Users(**dump_req))
         await self.cache.invalidate_tags_async(CacheTags.USER)
-        return new_user
+        return BaseResponse.created(new_user)
 
     async def create_user(
         self, req: Users, withVerifyEmail: bool = False
     ) -> BaseResponse[Users]:
-        new_user = await self.create_user_or_fail(req, withVerifyEmail)
-        return BaseResponse.created(new_user)
+        return await self.create_user_or_fail(req, withVerifyEmail)
 
     async def update_profile(
         self,
@@ -195,7 +195,7 @@ class UserServices:
                 status_code=400,
             )
 
-        return await self._link_avatar_media(id, media.id)
+        return await self._link_avatar_media(id, cast(int, media.id))
 
     async def change_password(
         self, id: UUID | str, payload: ChangePasswordRequest
@@ -224,7 +224,9 @@ class UserServices:
         )
 
         await self.cache.invalidate_tags_async(CacheTags.USER)
-        return BaseResponse.ok(message="Đổi mật khẩu thành công, vui lòng đăng nhập lại")
+        return BaseResponse.ok(
+            message="Đổi mật khẩu thành công, vui lòng đăng nhập lại"
+        )
 
     # ------------------------------------------------------------------
     # Admin account management (`/admin/account`) — ADMIN/SUPER_ADMIN only,
@@ -302,9 +304,7 @@ class UserServices:
             exclude_unset=True, exclude_none=True, exclude={"password"}
         )
         if payload.password:
-            update_data["password"] = PasswordHash.recommended().hash(
-                payload.password
-            )
+            update_data["password"] = PasswordHash.recommended().hash(payload.password)
 
         if payload.password or payload.is_active is False:
             update_data["token_version"] = target.token_version + 1

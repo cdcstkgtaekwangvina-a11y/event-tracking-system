@@ -450,9 +450,9 @@ class MediaServices:
             else:
                 from sqlmodel import update
 
-                from src.shared.helpers.time_extensions import get_now_vn
+                from src.shared.helpers.time_extensions import get_now_utc
 
-                now = get_now_vn()
+                now = get_now_utc()
 
                 # Bước A: Cập nhật các file/thư mục con (Bị xóa ké -> is_direct_delete = False)
                 if folders:

@@ -34,6 +34,11 @@ ENV_PATH := $(PROJECT_PATH)/envs
 install:
 	conda create --file environment.yml --prefix ./envs
 
+uv-install:
+	uv venv ./envs --python 3.14
+	source ./envs/bin/activate
+	uv pip install -r requirements.txt
+
 dev:
 	python -m src.main
 
@@ -47,7 +52,7 @@ granian-dev:
 	set -a; \
 	source <(grep -v '^#' .env | tr -d '\r'); \
 	set +a; \
-	granian --interface asgi --loop uvloop --reload --port $$PORT src.main:app
+	granian --interface asgi --loop uvloop --reload --reload-paths src --port $$PORT src.main:app
 
 update_env:
 	conda env update --prefix $(ENV_PATH) --file environment.yml --prune

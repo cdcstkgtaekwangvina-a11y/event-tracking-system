@@ -57,19 +57,19 @@ RUN mkdir -p /app/uploads && chown -R appuser:appuser /app
 # Chuyển sang user non-root
 USER appuser
 
-# Expose port (mặc định 4000, có thể override bằng env)
-EXPOSE 4000
+# Expose port (mặc định 8000, có thể override bằng env)
+EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-4000}/docs')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/docs')" || exit 1
 
 # Khởi chạy Granian với uvloop
 CMD ["granian", \
     "--interface", "asgi", \
     "--loop", "uvloop", \
     "--host", "0.0.0.0", \
-    "--port", "8000", \
+    "--port", "${PORT:-8000}", \
     "--workers", "4", \
     "--backpressure", "128", \
     "src.main:app"]

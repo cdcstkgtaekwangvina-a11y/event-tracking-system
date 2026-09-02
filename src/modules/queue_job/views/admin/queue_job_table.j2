@@ -40,7 +40,7 @@
                                 <span class="qj-th-label">Hoàn thành</span>
                                 <span class="material-symbols-outlined qj-sort-icon" :class="{ 'qj-sort-icon--idle': !isSortActive('finished_at') }" x-text="sortIcon('finished_at')"></span>
                             </th>
-                            <th class="qj-th qj-th-action">Chi tiết</th>
+                            <th class="qj-th qj-th-action">Hành động</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -96,6 +96,18 @@
                                             @click="showDetail(job)">
                                         <span class="material-symbols-outlined">visibility</span>
                                     </button>
+                                    <template x-if="job.status === 'running'">
+                                        <button type="button"
+                                                class="qj-action-btn qj-action-btn--cancel"
+                                                title="Dừng job"
+                                                :disabled="cancellingId === job.id"
+                                                @click="cancelJob(job)">
+                                            <span class="material-symbols-outlined"
+                                                  :class="{ 'qj-spin': cancellingId === job.id }"
+                                                  x-text="cancellingId === job.id ? 'progress_activity' : 'stop_circle'">
+                                            </span>
+                                        </button>
+                                    </template>
                                 </td>
                             </tr>
                         </template>

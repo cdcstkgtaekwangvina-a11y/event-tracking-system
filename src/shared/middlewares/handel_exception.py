@@ -1,12 +1,12 @@
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.responses import (
-    JSONResponse,
     HTMLResponse,
+    JSONResponse,
     RedirectResponse,
 )  # Thêm RedirectResponse
-from fastapi.exceptions import HTTPException as FastAPIHTTPException
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.shared.base.base_logger import get_logger
 
@@ -72,7 +72,9 @@ def handle_exceptions(app: FastAPI, templates: Jinja2Templates) -> FastAPI:
             )
             return response
 
-        return JSONResponse(status_code=status_code, content={"detail": detail})
+        return JSONResponse(
+            status_code=status_code, content={"message": "Lỗi hệ thống!"}
+        )
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(req: Request, exc: Exception):

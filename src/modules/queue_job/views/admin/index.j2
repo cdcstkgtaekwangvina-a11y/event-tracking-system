@@ -6,6 +6,7 @@
 (function() {
     window.mapJob = {
         "bulk_upsert_employees_task": "Import khách mời",
+        "bulk_send_event_email": "Gửi email sự kiện",
     };
     window.reverseMapJob = Object.fromEntries(
         Object.entries(window.mapJob).map(([k, v]) => [v.toLowerCase(), k])
@@ -24,6 +25,7 @@
             sortField: 'created_at',
             isDesc: true,
             loading: false,
+            cancellingId: null,
 
             async initData() {
                 await this.fetchJobs();
@@ -128,6 +130,30 @@
 
             showDetail(job) {
                 window.queueJobDetailModal?.open(job);
+            },
+
+            async cancelJob(job) {
+                if (this.cancellingId === job.id) return;
+                if (!confirm(`Bạn có chắc muốn dừng job "${this.getJobTypeLabel(job.type)}" không?`)) return;
+
+                this.cancellingId = job.id;
+                try {
+                    while (!window.fetchHelper) {
+                        await new Promise(r => setTimeout(r, 50));
+                    }
+                    const res = await window.fetchHelper.put('queue-jobs/cancel-job', { id: job.id });
+                    if (res && (res.status_code === 200 || res.status_code === 201)) {
+                        await this.fetchJobs(this.page);
+                    } else {
+                        const msg = res?.message || res?.detail || 'Có lỗi xảy ra khi dừng job.';
+                        alert(msg);
+                    }
+                } catch (e) {
+                    console.error('Lỗi khi hủy job:', e);
+                    alert('Có lỗi xảy ra, vui lòng thử lại.');
+                } finally {
+                    this.cancellingId = null;
+                }
             }
         }));
     }

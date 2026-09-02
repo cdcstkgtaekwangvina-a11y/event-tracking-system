@@ -3,13 +3,15 @@ from enum import Enum
 from typing import Any
 
 from dotenv import find_dotenv, load_dotenv
+from httpx import Response
 
 from src.shared.base.base_client import BaseClient
 from src.shared.base.base_email_service import BaseEmailService
+from src.shared.base.base_logger import get_logger
 from src.shared.base.base_schema import BaseSchema
 
 load_dotenv(find_dotenv())
-
+logger = get_logger(__name__)
 BASE_URL = "https://api.elasticemail.com"
 SEND_EMAIL_PATH = "/v4/emails"
 GET_EMAIL_PATH = "/v4/emails/{msgid}/view"
@@ -148,13 +150,15 @@ class ElasticEmail(BaseClient, BaseEmailService):
             "X-ElasticEmail-ApiKey": self.api_key,
             "Content-Type": "application/json",
         }
-        super().__init__(base_url=BASE_URL, headers=headers)
+        super().__init__(
+            base_url=BASE_URL, headers=headers, raise_error=False, max_retries=1
+        )
 
     async def send_email(
         self, req: SendMailRequest, jinja_data: dict[str, Any] = {}
-    ) -> SendMailResponse:
+    ) -> SendMailResponse | Response:
         body = BodyPart(
-            ContentType="HTML", Content=self.__get_email_template(data=jinja_data)
+            ContentType="HTML", Content=self._get_email_template(data=jinja_data)
         )
         payload = req.model_dump(exclude_none=True)
         if not payload.get("Content", None):
@@ -162,6 +166,11 @@ class ElasticEmail(BaseClient, BaseEmailService):
         if not req.Content.TemplateName:
             payload["Content"]["Body"] = [body.model_dump()]
         response = await self.post(path=SEND_EMAIL_PATH, json=payload)
+        if response.status_code != 200:
+            logger.error(f"Send email failed: {response.text}")
+            logger.error(response.json())
+            return response
+
         return SendMailResponse(**response.json())
 
     async def get_email(self, message_id: str) -> dict[str, Any]:

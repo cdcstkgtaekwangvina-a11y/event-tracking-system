@@ -12,6 +12,7 @@ router = BaseRouter(
     controller=TAG_NAME,
     tags=[TAG_NAME],
     dependencies=[Depends(RequireAuth(roles=[ROLE.SUPER_ADMIN]))],
+    include_in_schema=False,
 )
 base_path = "modules/user/views/admin/"
 
