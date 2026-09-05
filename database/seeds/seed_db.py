@@ -3,10 +3,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel, select, text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from database.models.app_db import engine
+from database.models.media import Medias
 from database.models.settings import Settings
 from database.models.users import Users
 from src.modules.setting.setting_constants import AppConfigKey
@@ -20,8 +21,6 @@ VN_TZ = timezone(timedelta(hours=7))
 async def seed():
     # Force table creation / recreate for all tables
     async with engine.begin() as conn:
-        logger.info("Dropping existing tables to refresh schema...")
-        await conn.run_sync(SQLModel.metadata.drop_all)
         logger.info("Recreating tables...")
         await conn.run_sync(SQLModel.metadata.create_all)
 
@@ -64,7 +63,31 @@ async def seed():
                 ]
 
                 session.add_all(settings)
+
+            exiting_media = (await session.exec(select(Medias))).first()
+            if exiting_media is None:
+                media = [
+                    Medias(
+                        id=1,
+                        name="avatar",
+                        is_folder=True,
+                        updated_at=datetime.fromisoformat(
+                            "2026-06-08T22:03:57.737385+00:00"
+                        ),
+                        created_at=datetime.fromisoformat(
+                            "2026-06-08T22:03:57.339527+00:00"
+                        ),
+                    )
+                ]
+
+                session.add_all(media)
             await session.commit()
+            conn = await session.connection()
+            await conn.execute(
+                text(
+                    "SELECT setval(pg_get_serial_sequence('medias', 'id'), (SELECT MAX(id) FROM medias));"
+                )
+            )
             logger.info("Database seeding completed successfully!")
         except Exception as e:
             print(f"Database seeding failed: {e}")

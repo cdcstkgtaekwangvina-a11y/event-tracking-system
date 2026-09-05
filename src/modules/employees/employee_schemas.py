@@ -1,6 +1,5 @@
 from datetime import date
 from typing import Annotated, Any, Literal
-from uuid import UUID
 
 from fastapi import Depends, Query
 from pydantic import EmailStr, Field, field_validator
@@ -75,10 +74,6 @@ class BulkUpsertEmployeeRequest(BaseSchema):
     event_id: int | None = Field(default=None)
 
 
-class BulkUpsertResponse(BaseSchema):
-    job_id: UUID
-
-
 class ReadSheetFile(BaseSchema):
     url: str
     row_count: int = Field(default=10, gt=0)
@@ -86,8 +81,10 @@ class ReadSheetFile(BaseSchema):
 
 
 class ReadSheetFileResponse(BaseSchema):
-    row_index: int
-    data: list[str]
+    header_index: int | None
+    headers: list[str] | None
+    rows: list[dict[str, Any]] | None
+    file_type: Literal["excel", "csv", "json"] | None
 
 
 class EmployeeBulkDeleteRequest(BaseSchema):
@@ -96,6 +93,3 @@ class EmployeeBulkDeleteRequest(BaseSchema):
 
 class ExportEmployeeRequest(BaseSchema):
     file_type: Literal["json", "csv", "excel"] = Field(default="json")
-
-
-BulkUpsertResponse.model_rebuild()

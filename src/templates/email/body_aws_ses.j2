@@ -1,0 +1,213 @@
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" width="100%"
+    style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06); border: 1px solid #e2e8f0; border-collapse: separate;">
+    <!-- HEADER BANNER — event-level data rendered by Jinja2 -->
+    <tr>
+        <td
+            style="background: #6366f1; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 36px 24px 32px; text-align: center; color: #ffffff;">
+            <!-- App Badge -->
+            <div
+                style="display: inline-block; background-color: rgba(255, 255, 255, 0.2); backdrop-filter: blur(8px); padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 16px; letter-spacing: 0.3px;">
+                🗓️ Event Tracking System
+            </div>
+
+            <!-- Tag -->
+            <div style="margin-bottom: 12px;">
+                <span
+                    style="display: inline-block; background-color: rgba(255, 255, 255, 0.25); padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase;">
+                    Hoạt động
+                </span>
+            </div>
+
+            <!-- Event Name (Jinja2) -->
+            <h1
+                style="margin: 0 0 16px; font-size: 26px; font-weight: 800; line-height: 1.3; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                {{ event_name }}
+            </h1>
+
+            <!-- Event Image — conditional rendered by Jinja2, not Handlebars -->
+            {% set img_url = (event_dict.event_image if event_dict is defined and event_dict and event_dict.event_image
+            is defined else (event_dict.get('event_image') if event_dict is defined and event_dict and event_dict.get is
+            defined else (event_image if event_image is defined else none))) %}
+            {% if img_url %}
+            <div
+                style="margin: 0 auto 18px; max-width: 520px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);">
+                <img src="{{ img_url }}" alt="{{ event_name }}"
+                    style="display: block; width: 100%; max-height: 240px; object-fit: cover; border-radius: 12px; border: 0;" />
+            </div>
+            {% endif %}
+
+            <!-- Date & Time Badges (Jinja2) -->
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center"
+                style="margin: 0 auto;">
+                <tr>
+                    <td
+                        style="background-color: rgba(255, 255, 255, 0.18); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; color: #ffffff;">
+                        🗓️ {{ event_date }}
+                    </td>
+                    <td width="10"></td>
+                    <td
+                        style="background-color: rgba(255, 255, 255, 0.18); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; color: #ffffff;">
+                        🕒 {{ event_time }}
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- MAIN BODY CONTENT -->
+    <tr>
+        <td style="padding: 32px 28px 24px; color: #1e293b;">
+            <!-- Greeting — per-recipient via Handlebars -->
+            {% raw %}<h2 style="margin: 0 0 10px; font-size: 20px; font-weight: 700; color: #0f172a;">
+                Xin chào, {{name}}! 👋
+            </h2>{% endraw %}
+            <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #475569;">
+                Bạn được trân trọng mời tham dự sự kiện <strong style="color: #0f172a;">{{ event_name }}</strong>. Đây là cơ
+                hội tuyệt vời để giao lưu, học hỏi và cùng nhau tạo nên những kỷ niệm đáng nhớ.
+            </p>
+
+            <!-- RECIPIENT INFO CARD — per-recipient data via Handlebars -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; margin-bottom: 28px;">
+                <tr>
+                    <td colspan="2"
+                        style="padding-bottom: 12px; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
+                        THÔNG TIN NGƯỜI NHẬN
+                    </td>
+                </tr>
+                {% raw %}<tr>
+                    <td width="50%" style="padding: 6px 10px 6px 0; vertical-align: top;">
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 3px;">👤 Họ và tên</div>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">{{name}}</div>
+                    </td>
+                    <td width="50%" style="padding: 6px 0 6px 10px; vertical-align: top;">
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 3px;">🏢 Phòng ban</div>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">{{department}}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="50%" style="padding: 6px 10px 0 0; vertical-align: top;">
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 3px;">✉️ Email</div>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a; word-break: break-all;">{{email}}
+                        </div>
+                    </td>
+                    <td width="50%" style="padding: 6px 0 0 10px; vertical-align: top;">
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 3px;">💼 Chức vụ</div>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">{{position}}</div>
+                    </td>
+                </tr>{% endraw %}
+            </table>
+
+            <!-- EVENT DETAILS SECTION — event-level data via Jinja2 -->
+            <div
+                style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
+                CHI TIẾT SỰ KIỆN
+            </div>
+
+            <!-- Date Box -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="background-color: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; padding: 12px 16px; margin-bottom: 10px;">
+                <tr>
+                    <td width="30" style="font-size: 18px; vertical-align: middle;">📅</td>
+                    <td style="vertical-align: middle;">
+                        <div style="font-size: 12px; color: #64748b;">Ngày</div>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">{{ event_date }}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Time Box -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="background-color: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; padding: 12px 16px; margin-bottom: 10px;">
+                <tr>
+                    <td width="30" style="font-size: 18px; vertical-align: middle;">🕒</td>
+                    <td style="vertical-align: middle;">
+                        <div style="font-size: 12px; color: #64748b;">Thời gian</div>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">{{ event_time }}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Location Box with Map URL -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="background-color: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
+                <tr>
+                    <td width="30" style="font-size: 18px; vertical-align: middle;">📍</td>
+                    <td style="vertical-align: middle;">
+                        <div style="font-size: 12px; color: #64748b;">Địa điểm</div>
+                        <div style="font-size: 14px; font-weight: 700;">
+                            <a href="{{ url_map }}" target="_blank"
+                                style="color: #2563eb; text-decoration: underline; font-weight: 700; line-height: 1.4;">
+                                {{ event_location }} ↗
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Description Box -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="border-left: 4px solid #6366f1; background-color: #f8fafc; border-radius: 0 10px 10px 0; padding: 14px 16px; margin-bottom: 32px;">
+                <tr>
+                    <td>
+                        <div
+                            style="font-size: 12px; font-weight: 700; color: #4f46e5; margin-bottom: 6px; text-transform: uppercase;">
+                            MÔ TẢ
+                        </div>
+                        <div style="font-size: 14px; color: #334155; line-height: 1.6;">
+                            {{ event_description }}
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- QR CODE CHECK-IN SECTION — per-recipient via Handlebars -->
+            <div style="text-align: center; margin-bottom: 14px;">
+                <div
+                    style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;">
+                    MÃ QR CHECK-IN
+                </div>
+
+                <!-- QR Card -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center"
+                    style="margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 24px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04); text-align: center;">
+                    <tr>
+                        {% raw %}<td align="center">
+                            <img src="{{qr_code_url}}" alt="Mã QR Check-in" width="170" height="170"
+                                style="display: block; margin: 0 auto; border-radius: 8px; border: 0;" />
+                            <p style="margin: 12px 0 4px; font-size: 13px; color: #64748b; font-weight: 500;">
+                                Quét mã QR để check-in tại sự kiện
+                            </p>
+                            <p
+                                style="margin: 0; font-size: 12px; color: #94a3b8; font-family: monospace; font-weight: 600;">
+                                ID: {{user_id}}
+                            </p>
+                        </td>{% endraw %}
+                    </tr>
+                </table>
+
+                <!-- Warning Notice -->
+                {% raw %}<p style="margin: 14px 0 0; font-size: 13px; font-weight: 600; color: #dc2626; line-height: 1.5;">
+                    ⚠️ Mã QR này chỉ dành riêng cho {{name}}. Vui lòng không chia sẻ.
+                </p>{% endraw %}
+            </div>
+        </td>
+    </tr>
+
+    <!-- FOOTER -->
+    <tr>
+        <td
+            style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 20px; text-align: center; color: #64748b; font-size: 13px; line-height: 1.6;">
+            <div style="font-weight: 700; color: #1e293b; font-size: 14px; margin-bottom: 4px;">
+                Event Tracking System
+            </div>
+            <div style="margin-bottom: 8px; font-size: 12px; color: #94a3b8;">
+                Hệ thống quản lý và điểm danh sự kiện
+            </div>
+            <div style="font-size: 12px; color: #94a3b8;">
+                Bạn nhận được email này vì bạn là khách mời tham dự sự kiện. Nếu có thắc mắc, vui lòng liên hệ ban tổ
+                chức.
+            </div>
+        </td>
+    </tr>
+</table>

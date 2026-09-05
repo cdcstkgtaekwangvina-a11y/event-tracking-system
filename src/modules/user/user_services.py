@@ -1,23 +1,26 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Annotated, cast
 from uuid import UUID
 
+from fastapi import Depends, UploadFile
 from pwdlib import PasswordHash
+from sqlmodel import col
 
 from database.models.app_db import SessionDep
 from database.models.media import Medias
+from src.modules.media_manager.media_services import MediaServices
 from src.modules.user.role_constants import ROLE
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.constants.cache_tags import CacheTags
-from src.shared.helpers import RandomHelpers, get_vn_time
+from src.shared.helpers import RandomHelpers, get_utc_time
 from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
 from src.shared.services.redis_services import RedisDep
 
 from .user_schemas import (
-    ChangePasswordRequest,
     CreateAccountRequest,
     UpdateAccountRequest,
+    UpdateAvatarResponse,
     UpdateProfileRequest,
 )
 from .user_select import AccountSelect, UserSelect
@@ -34,12 +37,18 @@ class UserServices:
     since both operate on the same `Users` table and the admin flows reuse
     the self-service create/update logic directly (`create_user_or_fail`)."""
 
-    def __init__(self, session: SessionDep, cache: RedisDep):
+    def __init__(
+        self,
+        session: SessionDep,
+        cache: RedisDep,
+        media_service: MediaServices = Depends(),
+    ):
         self.session = session
         self.cache = cache
         from database.models.users import Users
 
         self.crud = BaseCrud[Users](session, Users)
+        self.media_service = media_service
 
     async def get_raw_user(self, id: UUID | str) -> UserSelect | None:
         cache_key = f"{CacheTags.USER}:{id}"
@@ -52,8 +61,8 @@ class UserServices:
                     self.crud.select(
                         UserSelect,
                         logic_column=[
-                            Medias.id.label("file_id"),
-                            Medias.url.label("file_url"),
+                            col(Medias.id).label("file_id"),
+                            col(Medias.url).label("file_url"),
                         ],
                     )
                     .join(Medias, isouter=True)
@@ -74,7 +83,7 @@ class UserServices:
 
     async def create_user_or_fail(
         self, req: Users, withVerifyEmail: bool = False
-    ) -> Users:
+    ) -> BaseResponse[Users]:
         """Creates a user and returns the raw model (`BaseResponse.fail` raises on
         a duplicate email/username). Shared by `create_user` (register/API response)
         and `AccountServices.create_account`, which needs the raw model rather than
@@ -103,7 +112,7 @@ class UserServices:
             dump_req["otp_code"] = RandomHelpers.generate_random_number_string(
                 override_length=6
             )
-            dump_req["expired_at"] = get_vn_time(secs=600)
+            dump_req["expired_at"] = get_utc_time(secs=600)
         if req.password:
             password_hash = PasswordHash.recommended()
             dummy_hashh = password_hash.hash(req.password)
@@ -111,13 +120,12 @@ class UserServices:
 
         new_user = await self.crud.create(Users(**dump_req))
         await self.cache.invalidate_tags_async(CacheTags.USER)
-        return new_user
+        return BaseResponse.created(new_user)
 
     async def create_user(
         self, req: Users, withVerifyEmail: bool = False
     ) -> BaseResponse[Users]:
-        new_user = await self.create_user_or_fail(req, withVerifyEmail)
-        return BaseResponse.created(new_user)
+        return await self.create_user_or_fail(req, withVerifyEmail)
 
     async def update_profile(
         self,
@@ -167,69 +175,78 @@ class UserServices:
         user = await self.get_raw_user(id)
         return BaseResponse.ok(user, message="Cập nhật thông tin thành công")
 
-    async def _link_avatar_media(
-        self, id: UUID | str, media_id: int
-    ) -> BaseResponse[UserSelect]:
-        updated = await self.crud.update(id=id, data={"media_id": media_id})
-        if not updated:
+    async def update_avatar(
+        self, id: UUID, file: UploadFile
+    ) -> BaseResponse[UpdateAvatarResponse]:
+        from database.models.users import Users
+
+        exiting_user: Users | None = (
+            await self.crud.select(Users).where(Users.id == id).find_one()
+        )
+        if not exiting_user:
             return BaseResponse.fail(
                 message="Không tìm thấy người dùng", status_code=404
             )
-
-        await self.cache.invalidate_tags_async(CacheTags.USER)
-        user = await self.get_raw_user(id)
-        return BaseResponse.ok(user, message="Cập nhật ảnh đại diện thành công")
-
-    async def set_avatar_from_media(
-        self, id: UUID | str, media_id: int
-    ) -> BaseResponse[UserSelect]:
-        """Picks an EXISTING file already in the Media library as the avatar —
-        no upload, just links `Users.media_id` to it (see `_link_avatar_media`)."""
-        media = await BaseCrud(self.session, Medias).find_by_id(media_id)
-        if not media or media.is_folder:
-            return BaseResponse.fail(message="Không tìm thấy file", status_code=404)
-
-        if not media.media_metadata or media.media_metadata.get("type") != "image":
+        if not exiting_user.is_active:
             return BaseResponse.fail(
-                message="Chỉ có thể chọn file ảnh làm ảnh đại diện",
-                status_code=400,
+                message="Tài khoản của bạn đã bị vô hiệu hóa", status_code=403
             )
 
-        return await self._link_avatar_media(id, media.id)
-
-    async def change_password(
-        self, id: UUID | str, payload: ChangePasswordRequest
-    ) -> BaseResponse[None]:
-        current_user = await self.crud.find_by_id(id)
-        if not current_user:
-            return BaseResponse.fail(
-                message="Không tìm thấy người dùng", status_code=404
-            )
-
-        password_hash = PasswordHash.recommended()
-        if not current_user.password or not password_hash.verify(
-            payload.current_password, current_user.password
-        ):
-            return BaseResponse.fail(
-                message="Mật khẩu hiện tại không đúng", status_code=400
-            )
-
-        new_hash = password_hash.hash(payload.new_password)
-        await self.crud.update(
-            id=id,
-            data={
-                "password": new_hash,
-                "token_version": current_user.token_version + 1,
-            },
+        update_avatar = await self.media_service.replace_or_create_file(
+            file=file,
+            path=exiting_user.avatar_url,
+            folder_id=1,
+            name=f"avatar-{str(id)}",
         )
 
-        await self.cache.invalidate_tags_async(CacheTags.USER)
-        return BaseResponse.ok(message="Đổi mật khẩu thành công, vui lòng đăng nhập lại")
+        if not update_avatar.success:
+            return BaseResponse.fail(
+                update_avatar.message or "Cập nhật avatar thất bại"
+            )
 
-    # ------------------------------------------------------------------
-    # Admin account management (`/admin/account`) — ADMIN/SUPER_ADMIN only,
-    # gated at the route level (see `user_apis.AccountApis`).
-    # ------------------------------------------------------------------
+        await self.crud.update(id=id, data={"avatar_url": update_avatar.data})
+
+        await self.cache.remove_async(f"{CacheTags.USER}:{str(id)}")
+        return BaseResponse.ok(
+            UpdateAvatarResponse(url=update_avatar.data or ""),
+            message="Cập nhật avatar thành công",
+        )
+
+    # async def change_password(
+    #     self, id: UUID | str, payload: ChangePasswordRequest
+    # ) -> BaseResponse[None]:
+    #     current_user = await self.crud.find_by_id(id)
+    #     if not current_user:
+    #         return BaseResponse.fail(
+    #             message="Không tìm thấy người dùng", status_code=404
+    #         )
+
+    #     password_hash = PasswordHash.recommended()
+    #     if not current_user.password or not password_hash.verify(
+    #         payload.current_password, current_user.password
+    #     ):
+    #         return BaseResponse.fail(
+    #             message="Mật khẩu hiện tại không đúng", status_code=400
+    #         )
+
+    #     new_hash = password_hash.hash(payload.new_password)
+    #     await self.crud.update(
+    #         id=id,
+    #         data={
+    #             "password": new_hash,
+    #             "token_version": current_user.token_version + 1,
+    #         },
+    #     )
+
+    #     await self.cache.invalidate_tags_async(CacheTags.USER)
+    #     return BaseResponse.ok(
+    #         message="Đổi mật khẩu thành công, vui lòng đăng nhập lại"
+    #     )
+
+    # # ------------------------------------------------------------------
+    # # Admin account management (`/admin/account`) — ADMIN/SUPER_ADMIN only,
+    # # gated at the route level (see `user_apis.AccountApis`).
+    # # ------------------------------------------------------------------
 
     async def list_accounts_raw(
         self, pagination: PaginationRequest
@@ -256,14 +273,12 @@ class UserServices:
 
     async def create_account(
         self, payload: CreateAccountRequest
-    ) -> BaseResponse[AccountSelect]:
+    ) -> BaseResponse[Users]:
         from database.models.users import Users
 
-        new_user = await self.create_user_or_fail(
+        return await self.create_user_or_fail(
             Users(**payload.model_dump(), role=ROLE.ADMIN)
         )
-        account = AccountSelect.model_validate(new_user, from_attributes=True)
-        return BaseResponse.created(account, message="Tạo tài khoản thành công")
 
     async def update_account(
         self,
@@ -302,9 +317,7 @@ class UserServices:
             exclude_unset=True, exclude_none=True, exclude={"password"}
         )
         if payload.password:
-            update_data["password"] = PasswordHash.recommended().hash(
-                payload.password
-            )
+            update_data["password"] = PasswordHash.recommended().hash(payload.password)
 
         if payload.password or payload.is_active is False:
             update_data["token_version"] = target.token_version + 1
@@ -341,3 +354,6 @@ class UserServices:
         await self.cache.invalidate_tags_async(CacheTags.USER)
         account = AccountSelect.model_validate(updated, from_attributes=True)
         return BaseResponse.ok(account, message="Cập nhật tài khoản thành công")
+
+
+UserServiceDep = Annotated[UserServices, Depends()]

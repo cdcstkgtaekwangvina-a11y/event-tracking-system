@@ -332,6 +332,30 @@
     border-color: var(--primary);
 }
 
+.qj-action-btn--cancel {
+    color: #ef4444;
+    border-color: #fecaca;
+    background-color: #fff5f5;
+}
+
+.qj-action-btn--cancel:hover:not(:disabled) {
+    background-color: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
+}
+
+.qj-action-btn--cancel:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.qj-td-action {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-start;
+}
+
 /* Empty State */
 .qj-empty {
     padding: 60px 20px;

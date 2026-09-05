@@ -25,9 +25,9 @@
                     <span class="event-meta-item">
                         <span class="material-symbols-outlined">calendar_today</span>
                         <span>
-                            {{ event.start_at.strftime('%d/%m/%Y') if event.start_at else 'Chưa xác định' }}
-                            {% if event.start_at %}· {{ event.start_at.strftime('%H:%M') }} - {{
-                            event.end_at.strftime('%H:%M') if event.end_at else '00:00' }}{% endif %}
+                            {{ (event.start_at | user_tz).strftime('%d/%m/%Y') if event.start_at else 'Chưa xác định' }}
+                            {% if event.start_at %}· {{ (event.start_at | user_tz).strftime('%H:%M') }} - {{
+                            (event.end_at | user_tz).strftime('%H:%M') if event.end_at else '00:00' }}{% endif %}
                         </span>
                     </span>
                     {% if event.location %}

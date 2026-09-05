@@ -148,7 +148,12 @@ Quy ước này cho phép phân quyền và bố trí layout riêng cho từng k
 Các lệnh thường dùng (xem `Makefile`):
 
 ```bash
+# Dùng conda
 make install      # Tạo môi trường conda tại ./envs từ environment.yml
+# Dùng uv
+uv venv ./envs --python 3.14
+source ./envs/bin/activate
+uv pip install -r requirements.txt
 make dev          # Chạy server dev (python -m src.main)
 
 # Database

@@ -1,7 +1,7 @@
 import asyncio
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
-from fastapi import UploadFile
+from fastapi import Depends, UploadFile
 from sqlmodel import and_, col, or_
 from uuid6 import uuid8
 
@@ -258,7 +258,9 @@ class MediaServices:
             return BaseResponse.not_found(message="Không tìm thấy media")
         return BaseResponse.ok(data=media)
 
-    async def create_media_or_fail(self, payload: CreateMediaSchema) -> Medias:
+    async def create_media_or_fail(
+        self, payload: CreateMediaSchema
+    ) -> BaseResponse[Medias]:
         """Same as `create_media` but returns the raw persisted model instead of
         an already-rendered `BaseResponse` — for callers (e.g. avatar upload in
         `UserServices`) that need the created row itself, not a JSON response.
@@ -360,15 +362,17 @@ class MediaServices:
         new_media = await self.crud.create(new_media)
         await self.redis.invalidate_tags_async(CacheTags.MEDIA)
 
-        return new_media
+        return BaseResponse.created(new_media)
 
     async def create_media(self, payload: CreateMediaSchema) -> BaseResponse[Medias]:
-        new_media = await self.create_media_or_fail(payload)
-        return BaseResponse.created(data=new_media)
+        return await self.create_media_or_fail(payload)
 
     async def bulk_delete_media(
         self, ids: list[int], is_soft_delete: bool = True
     ) -> BaseResponse[bool]:
+
+        if 1 in ids:
+            return BaseResponse.fail("Folder avatar là folder hệ thống không thể xóa")
 
         # 1. Tìm các bản ghi gốc được yêu cầu xóa trực tiếp từ danh sách ids
         target_medias = (
@@ -449,9 +453,9 @@ class MediaServices:
             else:
                 from sqlmodel import update
 
-                from src.shared.helpers.time_extensions import get_now_vn
+                from src.shared.helpers.time_extensions import get_now_utc
 
-                now = get_now_vn()
+                now = get_now_utc()
 
                 # Bước A: Cập nhật các file/thư mục con (Bị xóa ké -> is_direct_delete = False)
                 if folders:
@@ -649,3 +653,50 @@ class MediaServices:
         await self.session.refresh(updated_media)
         await self.redis.invalidate_tags_async(CacheTags.MEDIA)
         return BaseResponse.ok(updated_media)
+
+    async def replace_or_create_file(
+        self,
+        file: UploadFile,
+        path: str | None,
+        folder_id: int | None,
+        name: str | None = None,
+    ) -> BaseResponse[str]:
+
+        if not path:
+            new_media = await self.create_media_or_fail(
+                CreateMediaSchema(
+                    file=file,
+                    folder_id=folder_id,
+                    name=name or file.filename or str(uuid8()),
+                    is_folder=False,
+                )
+            )
+
+            if new_media.success and new_media.data and new_media.data.url:
+                return BaseResponse.ok(new_media.data.url)
+
+            return BaseResponse.fail(new_media.message)
+
+        res = await self.vercel_blob.replace_file_binary(
+            file,
+            path,
+        )
+        if not res or not res.url:
+            new_media = await self.create_media_or_fail(
+                CreateMediaSchema(
+                    file=file,
+                    folder_id=folder_id,
+                    name=name or file.filename or str(uuid8()),
+                    is_folder=False,
+                )
+            )
+
+            if new_media.success and new_media.data and new_media.data.url:
+                return BaseResponse.ok(new_media.data.url)
+
+            return BaseResponse.fail(new_media.message)
+
+        return BaseResponse.ok(res.url)
+
+
+MediaServicesDep = Annotated[MediaServices, Depends()]

@@ -20,6 +20,8 @@ class BaseClient:
         follow_redirects: bool = True,
         auto_close: bool = False,
         max_retries: int = 3,
+        headers: dict[str, Any] = {},
+        raise_error: bool = True,
         **kwargs: Any,
     ):
         self.auto_close = auto_close
@@ -34,6 +36,8 @@ class BaseClient:
             self.extra_kwargs = kwargs
             self._client = self._build_client()
             self.max_retries = max_retries
+            self.headers = headers
+            self.raise_error = raise_error
 
     def _build_client(self) -> AsyncClient:
         return AsyncClient(
@@ -58,8 +62,11 @@ class BaseClient:
         try:
             for attempt in range(retries):
                 try:
-                    response = await self.client.request(method, path, **kwargs)
-                    response.raise_for_status()
+                    response = await self.client.request(
+                        method, path, headers=self.headers, **kwargs
+                    )
+                    if self.raise_error:
+                        response.raise_for_status()
                     return response
                 except (
                     ConnectError,

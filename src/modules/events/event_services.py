@@ -9,14 +9,16 @@ from database.models.employees import Employees
 from database.models.events import EVENT_STATUS, Events
 from database.models.events_employees import EVENT_EMPLOYEE_STATUS, EventsEmployees
 from src.shared.base import BaseCrud, BaseResponse
+from src.shared.base.base_queue import EnqueueResponse, queue_service
 from src.shared.constants.cache_tags import CacheTags
-from src.shared.helpers.time_extensions import get_vn_time
+from src.shared.helpers.time_extensions import get_now_utc
 from src.shared.schemas.pagination_schemas import PaginationRequest, PaginationResponse
 from src.shared.services.redis_services import RedisDep
 
 from .event_schemas import (
     AdminEventQuery,
     AnalyticEventResponse,
+    BulkSendEventEmail,
     CheckInEmployeeRequest,
     EmployeeIdsSchema,
     EmployeeInEvent,
@@ -237,7 +239,7 @@ class EventServices:
         for emp in new_emps:
             register_emps.append(
                 EventsEmployees(
-                    event_id=event_id, employee_id=emp, join_at=get_vn_time()
+                    event_id=event_id, employee_id=emp, join_at=get_now_utc()
                 )
             )
 
@@ -289,7 +291,7 @@ class EventServices:
             )
             .values(
                 {
-                    "check_in_at": get_vn_time(),
+                    "check_in_at": get_now_utc(),
                     "status": EVENT_EMPLOYEE_STATUS.CHECK_IN.value,
                 }
             )
@@ -333,7 +335,8 @@ class EventServices:
         ).find_many()
 
         if not results:
-            return BaseResponse.not_found(message="Không tìm thấy sự kiện")
+            # Event tồn tại nhưng chưa có employee nào → trả 200 với data rỗng
+            return BaseResponse.ok(None)
 
         analytics_by_department = [
             AnalyticEventResponse(
@@ -346,3 +349,44 @@ class EventServices:
         ]
 
         return BaseResponse.ok(analytics_by_department)
+
+    async def bulk_invite_employees(
+        self, event_id: int, payload: BulkSendEventEmail
+    ) -> BaseResponse[EnqueueResponse]:
+        exiting_event = (
+            await self.crud.select(Events).where(col(Events.id) == event_id).find_one()
+        )
+
+        if not exiting_event:
+            return BaseResponse.not_found("Không tìm thấy sự kiện")
+        if exiting_event.status != EVENT_STATUS.PUBLISHED.value:
+            return BaseResponse.fail("Sự kiện chưa được publish thì không thể gửi mail")
+
+        from src.modules.queue_job.queue_job_schemas import CreateQueueJobSchema
+        from src.modules.queue_job.queue_job_services import QueueJobServices
+        from src.shared.constants.queue_keys import QueueKeys
+
+        job_service = QueueJobServices(session=self.session)
+        new_job = await job_service.create_job(
+            CreateQueueJobSchema(
+                type=QueueKeys.BULK_SEND_EVENT_EMAIL.value,
+                next_payload={
+                    **payload.model_dump(mode="json"),
+                    **{
+                        "event_id": event_id,
+                        "event": exiting_event.model_dump(mode="json"),
+                    },
+                },
+            )
+        )
+
+        if new_job:
+            enqueue = await queue_service.enqueue_by_type(
+                QueueKeys.BULK_SEND_EVENT_EMAIL.value,
+                str(new_job.id),
+            )
+            return BaseResponse.ok(
+                enqueue,
+                message="Bulk send event email thành công",
+            )
+        return BaseResponse.fail(message="Tạo job thất bại")

@@ -1,9 +1,10 @@
-from dotenv import load_dotenv
-from vercel.blob import GetBlobResult, AsyncBlobClient, PutBlobResult, ListBlobResult
-from fastapi import UploadFile
 import os
-from typing import Optional, Literal, cast, Iterable, Annotated
-from fastapi import Depends
+from collections.abc import Iterable
+from typing import Annotated, Literal, cast
+
+from dotenv import load_dotenv
+from fastapi import Depends, UploadFile
+from vercel.blob import AsyncBlobClient, GetBlobResult, ListBlobResult, PutBlobResult
 
 load_dotenv()
 
@@ -26,7 +27,7 @@ class VercelBlobServices:
         self,
         file: UploadFile,
         override_name: str | None = None,
-        folder: Optional[str] = None,
+        folder: str | None = None,
     ) -> PutBlobResult:
         path: str = override_name or file.filename or ""
         if folder:
@@ -38,6 +39,9 @@ class VercelBlobServices:
             content_type=file.content_type,
             overwrite=True,
         )
+
+    async def replace_file_binary(self, file: UploadFile, path: str) -> PutBlobResult:
+        return await self.client.put(path, body=await file.read(), access=self.access)
 
     async def get_async(self, path: str) -> GetBlobResult:
         return await self.client.get(path, access=self.access)

@@ -11,6 +11,7 @@ from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagin
 
 from .event_schemas import (
     AdminEventQuery,
+    BulkSendEventEmail,
     CheckInEmployeeRequest,
     EmployeeIdsSchema,
     EventCreateRequest,
@@ -148,3 +149,7 @@ class EventController:
     )
     async def get_event_analytics(self, event_id: int):
         return await self.service.analytic_event(event_id)
+
+    @router.post_api("{event_id}/invites")
+    async def invite_emps(self, event_id: int, payload: BulkSendEventEmail):
+        return await self.service.bulk_invite_employees(event_id, payload)

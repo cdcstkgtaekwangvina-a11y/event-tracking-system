@@ -23,18 +23,20 @@ class BaseRoute(APIRoute):
 class BaseRouter(APIRouter):
     version: str | None = None
     controller: str
+    dependencies: Sequence[Depends] | None = None
 
     def __init__(
         self,
         controller: str,
         version: str | None = None,
+        dependencies: Sequence[Depends] | None = None,
         *args,
         **kwargs,
     ):
         kwargs.setdefault("route_class", BaseRoute)
         self.version = version
         self.controller = controller
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, dependencies=dependencies, **kwargs)
 
     def __get_path__(self, path: str | None = None) -> str:
         return (

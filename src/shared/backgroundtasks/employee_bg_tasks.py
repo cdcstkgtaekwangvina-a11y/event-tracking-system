@@ -5,28 +5,28 @@ from typing import cast
 from uuid import UUID
 
 from polars import DataFrame
-from sqlmodel import and_, func, select
+from sqlmodel import func, select
 
 from database.models.app_db import get_session_factory
 from database.models.employees import Employees
-from database.models.events_employees import EventsEmployees
 from database.models.events import Events
-from database.models.queue_jobs import JobStatus, QueueJob, QueueJobLogs
-from src.modules.employees.employee_schemas import BulkUpsertResponse
+from database.models.events_employees import EventsEmployees
+from database.models.queue_jobs import JobStatus, QueueJobLogs
+from src.shared.base.base_bg_task import BaseBackgroundTask
 from src.shared.base.base_client import BaseClient
 from src.shared.base.base_queue import queue_job, queue_service
 from src.shared.constants.cache_tags import CacheTags
 from src.shared.constants.queue_keys import QueueKeys
 from src.shared.helpers.file_handel import FileHandelHelper
 from src.shared.helpers.qr_helper import CreateQRSchema, create_qr_url
-from src.shared.helpers.random_helpers import get_now_vn
+from src.shared.helpers.time_extensions import get_now_utc
 from src.shared.services.redis_services import RedisServices
 
 MAX_DETAILED_ERRORS = 500
 
 
 @queue_service.register_class
-class EmployeeBackgroundTask:
+class EmployeeBackgroundTask(BaseBackgroundTask):
     def __init__(self):
         self.BATCH_SIZE = 1000
         self.redis = RedisServices()
@@ -63,18 +63,10 @@ class EmployeeBackgroundTask:
     async def bulk_upsert_employees_db(
         self,
         job_id: UUID,
-    ) -> BulkUpsertResponse | None:
+    ):
 
         async with get_session_factory()() as session:
-            query_job = await session.exec(
-                select(QueueJob).where(
-                    and_(
-                        QueueJob.id == job_id,
-                        QueueJob.status == JobStatus.RUNNING.value,
-                    )
-                )
-            )
-            job = query_job.first()
+            job = await self.get_job(session, job_id)
             if not job:
                 return
 
@@ -101,7 +93,7 @@ class EmployeeBackgroundTask:
 
             if not next_payload or not file_url:
                 job.status = JobStatus.FAILED
-                job.finished_at = get_now_vn()
+                job.finished_at = get_now_utc()
                 cast(list, job_logs.errors).append(
                     {
                         "global_error": "Dữ liệu payload trống hoặc thiếu đường dẫn file_url"
@@ -328,7 +320,7 @@ class EmployeeBackgroundTask:
                     job.status = JobStatus.SUCCESS
 
                 job.progress = 100
-                job.finished_at = get_now_vn()
+                job.finished_at = get_now_utc()
                 job.logs = job_logs.model_dump()
 
                 # Tạo chuỗi overall_log tổng kết
@@ -362,7 +354,7 @@ class EmployeeBackgroundTask:
 
             except Exception as global_err:
                 job.status = JobStatus.FAILED
-                job.finished_at = get_now_vn()
+                job.finished_at = get_now_utc()
                 cast(list, job_logs.errors).append({"global_error": str(global_err)})
                 job.logs = job_logs.model_dump()
                 await self.redis.invalidate_tags_async(CacheTags.EMPLOYEE)

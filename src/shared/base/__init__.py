@@ -6,7 +6,7 @@ from .base_crud import BaseCrud
 from .base_request import BaseRequest
 from .base_route import BaseRoute, BaseRouter
 from .base_client import BaseClient
-
+from .base_bg_task import BaseBackgroundTask
 __all__ = [
     "base_response",
     "BaseResponse",
@@ -20,5 +20,6 @@ __all__ = [
     "BaseLogger",
     "get_logger",
     "base_logger",
-    "BaseClient"
+    "BaseClient",
+    "BaseBackgroundTask"
 ]

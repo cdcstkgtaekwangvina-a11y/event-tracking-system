@@ -8,9 +8,7 @@ from src.shared.middlewares.auth_middlewares import auth
 
 TAG_NAME = "admin/employees"
 router = BaseRouter(
-    controller=TAG_NAME,
-    tags=[TAG_NAME],
-    dependencies=[auth()],
+    controller=TAG_NAME, tags=[TAG_NAME], dependencies=[auth()], include_in_schema=False
 )
 base_path = "modules/employees/views/admin/"
 
