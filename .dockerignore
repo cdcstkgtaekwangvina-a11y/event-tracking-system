@@ -1,0 +1,35 @@
+# Virtual environments
+envs/
+venv/
+.venv/
+
+# Cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Env (sẽ mount qua docker-compose)
+.env
+.env.example
+
+# Tests & docs
+tests/
+README.md
+*.md
+
+# Misc
+save_code.js
+uploads/

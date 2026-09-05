@@ -9,33 +9,31 @@ class RateLimit:
         self.request_per_windows = request_per_windows
         self.windows_time = windows_time
 
-    def __cache_key(self, ip: str) -> str:
-        return f"rate_limit:{ip}"
-
-    def __get_client_ip(self, request: Request) -> str | None:
-        # Trust direct socket host by default.
-        # Only parse x-forwarded-for if behind a trusted reverse proxy (e.g. Nginx, Cloudflare)
+    def __get_client_ip(self, request: Request) -> str:
         x_forwarded_for = request.headers.get("x-forwarded-for")
         if x_forwarded_for:
             return x_forwarded_for.split(",")[0].strip()
 
-        return request.client.host if request.client else None
+        return request.client.host if request.client else "127.0.0.1"
 
-    async def __call__(self, request: Request) -> bool:
+    async def __core_limit(self, request: Request, is_global: bool = False) -> bool:
         client_ip = self.__get_client_ip(request)
 
-        if not client_ip:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Không thể xác định IP của bạn",
-            )
+        endpoint = request.scope.get("endpoint")
+        if is_global:
+            func_name = "global"
+        elif endpoint:
+            func_name = f"{endpoint.__module__}.{endpoint.__qualname__}"
+        else:
+            func_name = request.url.path
 
-        cache_key = self.__cache_key(client_ip)
+        rate_key = f"ratelimit:{client_ip}:{func_name}"
 
-        # Batch both commands into a single TCP round-trip
+        # Batch cả 2 lệnh vào 1 lượt gửi TCP
         async with self.redis_service.client.pipeline(transaction=True) as pipe:
-            pipe.incr(cache_key)
-            pipe.expire(cache_key, self.windows_time, nx=True)
+            pipe.incr(rate_key)
+            # nx=True chỉ chạy trên Redis 7.0+. Nếu dùng Redis cũ hơn, hãy dùng Lua script hoặc set expire khi rq_count == 1
+            pipe.expire(rate_key, self.windows_time, nx=True)
             results = await pipe.execute()
 
         rq_count = results[0]
@@ -48,8 +46,23 @@ class RateLimit:
 
         return True
 
+    async def __call__(self, request: Request) -> bool:
+        return await self.__core_limit(request, is_global=False)
 
+    async def global_limit(self, request: Request) -> bool:
+        return await self.__core_limit(request, is_global=True)
+
+
+# Dependency cho từng Route riêng biệt
 def rate_limit(request_per_windows: int = 60, windows_time: int = 60):
     return Depends(
         RateLimit(request_per_windows=request_per_windows, windows_time=windows_time)
     )
+
+
+# Dependency toàn cục (Global Rate Limit)
+def global_rate_limit(request_per_windows: int = 300, windows_time: int = 60):
+    limiter = RateLimit(
+        request_per_windows=request_per_windows, windows_time=windows_time
+    )
+    return Depends(limiter.global_limit)

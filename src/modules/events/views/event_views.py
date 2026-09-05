@@ -11,11 +11,11 @@ admin_router = BaseRouter(
     controller="admin/events",
     tags=["admin/events"],
     dependencies=[auth(is_required_auth=True)],
+    include_in_schema=False,
 )
 
 public_router = BaseRouter(
-    controller="events",
-    tags=["events"],
+    controller="events", tags=["events"], include_in_schema=False
 )
 
 

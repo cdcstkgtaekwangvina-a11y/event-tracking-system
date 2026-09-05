@@ -48,6 +48,7 @@
             <div class="prof-summary-info">
                 <h2 class="prof-user-name" x-text="profileData.name || 'Người dùng'">Nguyễn Văn Admin</h2>
                 <div class="prof-username-text">@<span x-text="profileData.username">admin</span></div>
+                <div class="prof-summary-email" x-text="profileData.email || ''">admin@example.com</div>
                 <div class="prof-meta-row">
                     <span class="prof-role-pill">
                         <span class="material-symbols-outlined">verified_user</span>
@@ -58,7 +59,6 @@
                 </div>
             </div>
         </div>
-
         <button type="button" class="prof-edit-btn" @click="openEditModal()" title="Chỉnh sửa thông tin">
             <span class="material-symbols-outlined">edit</span>
         </button>
@@ -150,25 +150,32 @@
             <form class="prof-modal-body" @submit.prevent="saveProfile">
                 <!-- Avatar Change Row in Modal -->
                 <div class="prof-modal-avatar-row">
-                    <div class="prof-avatar-box prof-avatar-box--modal" @click="window.avatarLibraryPicker?.open()"
-                        title="Chọn ảnh từ Thư viện">
-                        <template x-if="avatarUrl">
-                            <img :src="avatarUrl" class="prof-avatar-image" alt="avatar" />
+                    <div class="prof-avatar-box prof-avatar-box--modal">
+                        <template x-if="avatarPreviewUrl || avatarUrl">
+                            <img :src="avatarPreviewUrl || avatarUrl" class="prof-avatar-image" alt="avatar" />
                         </template>
-                        <template x-if="!avatarUrl">
+                        <template x-if="!(avatarPreviewUrl || avatarUrl)">
                             <span class="prof-avatar-initials" x-text="getInitials(form.name)">VA</span>
                         </template>
                         <div class="prof-avatar-hover-icon">
-                            <span class="material-symbols-outlined">photo_library</span>
+                            <span class="material-symbols-outlined">photo_camera</span>
                         </div>
                     </div>
                     <div class="prof-modal-avatar-info">
+                        <input type="file" x-ref="avatarFileInput" accept="image/*" class="prof-file-input"
+                            style="display:none" @change="selectAvatarFile">
                         <button type="button" class="prof-btn prof-btn-secondary"
-                            @click="window.avatarLibraryPicker?.open()">
-                            <span class="material-symbols-outlined">photo_library</span>
-                            Chọn ảnh đại diện
+                            @click="$refs.avatarFileInput?.click()">
+                            <span class="material-symbols-outlined">upload</span>
+                            Tải ảnh lên
                         </button>
-                        <span class="prof-form-hint">Chọn hình ảnh có sẵn từ Thư viện Media</span>
+                        <span class="prof-form-hint">Chọn ảnh từ máy tính để cập nhật ảnh đại diện</span>
+                        <template x-if="pendingAvatarName">
+                            <span class="prof-form-hint" x-text="'Đã chọn: ' + pendingAvatarName"></span>
+                        </template>
+                        <template x-if="avatarUploadError">
+                            <span class="prof-form-hint prof-form-hint--error" x-text="avatarUploadError"></span>
+                        </template>
                     </div>
                 </div>
 
@@ -222,25 +229,57 @@
             <form class="prof-modal-body" @submit.prevent="changePassword">
                 <div class="prof-form-group">
                     <label class="prof-form-label">Mật khẩu hiện tại <span class="prof-required">*</span></label>
-                    <input type="password" class="prof-form-input" x-model="passwordForm.current_password"
-                        autocomplete="current-password" required />
+                    <div class="prof-input-wrap">
+                        <input type="password" class="prof-form-input" x-model="passwordForm.current_password"
+                            autocomplete="current-password" required :type="isHideCurrent ? 'password' : 'text'" />
+                        <button type="button" class="prof-toggle-pwd" @click="toggleHideCurrent"
+                            :title="isHideCurrent ? 'Hiển thị mật khẩu' : 'Ẩn mật khẩu'">
+                            <span class="material-symbols-outlined"
+                                x-text="isHideCurrent ? 'visibility_off' : 'visibility'"></span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="prof-form-group">
                     <label class="prof-form-label">Mật khẩu mới <span class="prof-required">*</span></label>
-                    <input type="password" class="prof-form-input" x-model="passwordForm.new_password"
-                        placeholder="Tối thiểu 8 ký tự, gồm chữ hoa, thường, số và ký tự đặc biệt"
-                        autocomplete="new-password" required />
+                    <div class="prof-input-wrap">
+                        <input type="password" class="prof-form-input" x-model="passwordForm.new_password"
+                            placeholder="Tối thiểu 8 ký tự, gồm chữ hoa, thường, số và ký tự đặc biệt"
+                            autocomplete="new-password" required :type="isHideNew ? 'password' : 'text'" />
+                        <button type="button" class="prof-toggle-pwd" @click="toggleHideNew"
+                            :title="isHideNew ? 'Hiển thị mật khẩu' : 'Ẩn mật khẩu'">
+                            <span class="material-symbols-outlined"
+                                x-text="isHideNew ? 'visibility_off' : 'visibility'"></span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="prof-form-group">
                     <label class="prof-form-label">Xác nhận mật khẩu mới <span class="prof-required">*</span></label>
-                    <input type="password" class="prof-form-input" x-model="passwordForm.confirm_new_password"
-                        placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" required />
+                    <div class="prof-input-wrap">
+                        <input type="password" class="prof-form-input" x-model="passwordForm.confirm_new_password"
+                            placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" required
+                            :type="isHideConfirm ? 'password' : 'text'" />
+                        <button type="button" class="prof-toggle-pwd" @click="toggleHideConfirm"
+                            :title="isHideConfirm ? 'Hiển thị mật khẩu' : 'Ẩn mật khẩu'">
+                            <span class="material-symbols-outlined"
+                                x-text="isHideConfirm ? 'visibility_off' : 'visibility'"></span>
+                        </button>
+                    </div>
                 </div>
 
                 <p class="prof-form-hint">Mật khẩu cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt
                     (@$!%*?&).</p>
+
+                <!-- Popover lỗi validation -->
+                <div class="pwd-popover" x-show="passwordError" x-cloak x-transition
+                    :class="{ 'pwd-popover--visible': passwordError }">
+                    <span class="material-symbols-outlined pwd-popover-icon">error</span>
+                    <span class="pwd-popover-text" x-text="passwordError"></span>
+                    <button type="button" class="pwd-popover-close" @click="passwordError = null" title="Đóng">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
 
                 <div class="prof-modal-footer">
                     <button type="button" class="prof-btn prof-btn-ghost" @click="closePasswordModal()">Huỷ</button>
@@ -322,5 +361,5 @@
         mediaManager: "{{ url_for('media_manager') }}"
     };
 </script>
-<script src="/static/js/profile.js?v=20260830-1"></script>
+<script src="/static/js/profile.js?v=20260830-2"></script>
 {% endblock %}

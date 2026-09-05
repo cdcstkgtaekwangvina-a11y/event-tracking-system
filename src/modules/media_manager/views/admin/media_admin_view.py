@@ -13,6 +13,7 @@ router = BaseRouter(
     controller=TAG_NAME,
     tags=[TAG_NAME],
     dependencies=[auth(is_required_auth=True)],
+    include_in_schema=False,
 )
 base_path = "modules/media_manager/views/admin/"
 

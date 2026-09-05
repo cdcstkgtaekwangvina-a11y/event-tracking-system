@@ -155,7 +155,7 @@
                         <span>Đăng xuất</span></button>
                 </div>
                 <button class="avatar" :class="{'border': openDropdown}" @click="openDropdown = !openDropdown"
-                    :style="`width: 90%; ${$store.screen.isMobile ? 'align-items: start;' : 'align-items: center;'}`">
+                    :style="`width: 90%; align-items: center;`">
                     {% if auth.user.avatar_url or auth.user.file_url%}
                     <img class="avatar-img"
                         src="{{ auth.user.file_url if auth.user.file_url else auth.user.avatar_url }}"
@@ -380,14 +380,15 @@
 
     .avatar {
         display: flex;
-        gap: 5px;
-        padding: 10px;
+        gap: 8px;
+        padding: 8px 12px;
         border-radius: 10px;
         cursor: pointer;
         color: var(--foreground);
         background-color: transparent;
         outline: 0;
         border: 0;
+        align-items: center;
     }
 
     .avatar:hover {
@@ -403,11 +404,46 @@
     }
 
     .avatar-img {
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border: 0;
         outline: solid 1px var(--foreground);
         border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .avatar .material-symbols-outlined {
+        font-size: 32px;
+        flex-shrink: 0;
+    }
+
+    @media (max-width: 767px) {
+        .avatar {
+            gap: 8px;
+            align-items: center;
+        }
+
+        .avatar-img {
+            width: 36px;
+            height: 36px;
+        }
+
+        .avatar-img[src],
+        .avatar .material-symbols-outlined {
+            width: 36px;
+            height: 36px;
+            display: block;
+        }
+
+        .avatar span:last-child {
+            font-size: 17.5px;
+            line-height: 1.5;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            margin: 0;
+            padding: 0;
+            align-self: center;
+        }
     }
 
     .border {

@@ -49,6 +49,7 @@ function accountFormModalComponent(canEditEmail) {
     loading: false,
     showPassword: false,
     canEditEmail: !!canEditEmail,
+    errors: {},
     form: {
       name: "",
       username: "",
@@ -61,6 +62,7 @@ function accountFormModalComponent(canEditEmail) {
     open(options = {}) {
       this.mode = options.mode || "create";
       this.showPassword = false;
+      this.errors = {};
       if (this.mode === "edit" && options.account) {
         this.account = options.account;
         this.form = {
@@ -127,59 +129,50 @@ function accountFormModalComponent(canEditEmail) {
       const email = this.form.email?.trim();
       const password = this.form.password;
 
+      this.errors = {};
+
       // 1. Validate Họ và tên (name)
       if (!name) {
-        window.notify?.toast?.error?.("Lỗi", "Họ và tên không được để trống");
+        this.errors.name = "Họ và tên không được để trống";
         return false;
       }
       if (name.length > 300) {
-        window.notify?.toast?.error?.(
-          "Lỗi",
-          "Họ và tên không được vượt quá 300 ký tự",
-        );
+        this.errors.name = "Họ và tên không được vượt quá 300 ký tự";
         return false;
       }
 
       // 2. Validate Tên đăng nhập (username)
       if (!username) {
-        window.notify?.toast?.error?.(
-          "Lỗi",
-          "Tên đăng nhập không được để trống",
-        );
+        this.errors.username = "Tên đăng nhập không được để trống";
         return false;
       }
       const usernamePattern = /^[a-zA-Z][a-zA-Z0-9_@]{2,19}$/;
       if (!usernamePattern.test(username)) {
-        window.notify?.toast?.error?.(
-          "Lỗi",
-          "Tên đăng nhập phải bắt đầu bằng chữ cái, dài 3-20 ký tự, không dấu, chỉ được chứa chữ cái, số và các ký tự _ @",
-        );
+        this.errors.username =
+          "Tên đăng nhập phải bắt đầu bằng chữ cái, dài 3-20 ký tự, không dấu, chỉ được chứa chữ cái, số và các ký tự _ @";
         return false;
       }
 
       // 3. Validate Email
       if (this.mode === "create" && !email) {
-        window.notify?.toast?.error?.("Lỗi", "Email không được để trống");
+        this.errors.email = "Email không được để trống";
         return false;
       }
       if (email && (this.mode === "create" || this.canEditEmail)) {
         const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         if (!emailPattern.test(email)) {
-          window.notify?.toast?.error?.("Lỗi", "Email không đúng định dạng");
+          this.errors.email = "Email không đúng định dạng";
           return false;
         }
         if (email.length > 300) {
-          window.notify?.toast?.error?.(
-            "Lỗi",
-            "Email không được vượt quá 300 ký tự",
-          );
+          this.errors.email = "Email không được vượt quá 300 ký tự";
           return false;
         }
       }
 
       // 4. Validate Mật khẩu (password)
       if (this.mode === "create" && (!password || !password.trim())) {
-        window.notify?.toast?.error?.("Lỗi", "Mật khẩu không được để trống");
+        this.errors.password = "Mật khẩu không được để trống";
         return false;
       }
 
@@ -187,15 +180,18 @@ function accountFormModalComponent(canEditEmail) {
         const passwordPattern =
           /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
         if (!passwordPattern.test(password.trim())) {
-          window.notify?.toast?.error?.(
-            "Lỗi",
-            "Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt (@$!%*?&)",
-          );
+          this.errors.password =
+            "Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt (@$!%*?&)";
           return false;
         }
       }
 
       return true;
+    },
+    clearFieldError(field) {
+      if (this.errors[field]) {
+        this.errors[field] = null;
+      }
     },
     async submit() {
       if (this.loading) return;

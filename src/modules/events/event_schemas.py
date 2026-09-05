@@ -127,3 +127,21 @@ class AnalyticEventResponse(BaseSchema):
     total_checked_in: int
     total_sent: int
     total_pending: int
+
+
+class BulkSendEventEmail(BaseSchema):
+    subject: str = Field(
+        default="Thư mời tham gia sự kiện {event_name} tại {event_location}"
+    )
+    employees: list[int] | None = Field(default=None, min_length=1)
+    send_all: bool = Field(default=False)
+    template_name: str | None = Field(default="default")
+
+    @model_validator(mode="after")
+    def check_send_all(self):
+        if not self.send_all:
+            if self.employees is None:
+                raise ValueError("Vui lòng chọn nhân viên")
+            if len(self.employees) == 0:
+                raise ValueError("Vui lòng chọn ít nhất một nhân viên")
+        return self

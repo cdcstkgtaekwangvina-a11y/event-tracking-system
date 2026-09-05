@@ -4,7 +4,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from src.shared.base.base_logger import get_logger
@@ -20,36 +19,36 @@ from src.shared.backgroundtasks import *
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Server is starting")
+    logger.info("🚀 Server is starting...")
+    import redis.asyncio as redis
+
     from database.models.app_db import init_db
+    from src.shared.services.redis_services import redis_pool
 
     await init_db()
 
     await queue_service.start()
     await queue_service.fill_job_from_db()
 
+    # Pre-connect Redis pool
+    async with redis.Redis.from_pool(connection_pool=redis_pool) as redis_conn:
+        try:
+            await redis_conn.ping()
+            logger.info("⚡ Redis connected successfully")
+        except Exception as e:
+            logger.error(f"❌ Redis connection failed: {e}")
+
     app.state.queue_service = queue_service
 
     yield
 
     await queue_service.stop()
-    logger.info("Server is shutdown")
+    await redis_pool.aclose()
+    logger.info("🛑 Server is shutdown")
 
 
 SRC_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SRC_DIR.parent
-
-
-class CachedStaticFiles(StaticFiles):
-    def __init__(self, *args, cache_control: str = "public, max-age=2592000", **kwargs):
-        self.cache_control = cache_control
-        super().__init__(*args, **kwargs)
-
-    def file_response(self, *args, **kwargs):
-        response = super().file_response(*args, **kwargs)
-        if response.status_code == 200:
-            response.headers["Cache-Control"] = self.cache_control
-        return response
 
 
 def create_app() -> FastAPI:
@@ -57,15 +56,36 @@ def create_app() -> FastAPI:
     from src.modules.app_routes import router as main_router
     from src.shared.base import BaseRoute
     from src.shared.base.base_config_jinja import global_values
+    from src.shared.middlewares.rate_limit import global_rate_limit
+    from src.subscription_services.cache_static_file import CachedStaticFiles
 
-    app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
+    app = FastAPI(
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+        dependencies=[global_rate_limit(request_per_windows=500, windows_time=60)],
+    )
     app.router.route_class = BaseRoute
 
-    static_cache = "public, max-age=604800" if environment == "dev" else "public, max-age=2592000, stale-while-revalidate=86400"
-    app.mount("/static", CachedStaticFiles(directory=SRC_DIR / "static", cache_control=static_cache), name="static")
+    static_cache = (
+        "public, max-age=604800"
+        if environment == "dev"
+        else "public, max-age=2592000, stale-while-revalidate=86400"
+    )
+    app.mount(
+        "/static",
+        CachedStaticFiles(directory=SRC_DIR / "static", cache_control=static_cache),
+        name="static",
+    )
     fonts_dir = PROJECT_ROOT / "public" / "fonts"
     if fonts_dir.exists():
-        app.mount("/fonts", CachedStaticFiles(directory=fonts_dir, cache_control="public, max-age=31536000, immutable"), name="fonts")
+        app.mount(
+            "/fonts",
+            CachedStaticFiles(
+                directory=fonts_dir, cache_control="public, max-age=31536000, immutable"
+            ),
+            name="fonts",
+        )
     templates = global_values(Jinja2Templates(directory=PROJECT_ROOT / "src"))
 
     app.state.templates = templates
@@ -83,6 +103,7 @@ def create_app() -> FastAPI:
 app = create_app()
 
 from fastapi.middleware.cors import CORSMiddleware
+from src.shared.middlewares.timezone_middleware import TimezoneMiddleware
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,6 +112,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TimezoneMiddleware)
 
 
 if __name__ == "__main__":

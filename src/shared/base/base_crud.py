@@ -19,7 +19,7 @@ from sqlmodel.sql.expression import Select, SelectOfScalar
 from typing_extensions import Self, overload
 
 from src.shared.base.base_logger import get_logger
-from src.shared.helpers.time_extensions import get_now_vn
+from src.shared.helpers.time_extensions import get_now_utc
 from src.shared.schemas.pagination_schemas import (
     CursorPaginationRequest,
     CursorPaginationResponse,
@@ -215,7 +215,7 @@ class BaseCrud(Generic[T]):
         db_obj = self.model(**create_data)
 
         if self.is_has_updated_at(self.model):
-            db_obj.updated_at = get_now_vn()
+            db_obj.updated_at = get_now_utc()
 
         self.session.add(db_obj)
         await self.session.flush()
@@ -310,7 +310,7 @@ class BaseCrud(Generic[T]):
 
         # 2. Kiểm tra và tự động cập nhật trường updated_at nếu có
         if hasattr(self, "is_has_updated_at") and self.is_has_updated_at(self.model):
-            update_data["updated_at"] = get_now_vn()
+            update_data["updated_at"] = get_now_utc()
 
         # 3. Xác định điều kiện WHERE (Ưu tiên id trước, condition sau)
         if id is not None and self.is_has_primary_key(self.model):
@@ -354,7 +354,7 @@ class BaseCrud(Generic[T]):
 
         if soft_delete and self.is_has_soft_delete(self.model):
             statement = (
-                update(self.model).where(where_clause).values(deleted_at=get_now_vn())
+                update(self.model).where(where_clause).values(deleted_at=get_now_utc())
             )
         else:
             statement = delete(self.model).where(where_clause)

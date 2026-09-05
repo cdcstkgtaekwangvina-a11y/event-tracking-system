@@ -3,6 +3,7 @@ channels:
 dependencies:
   - python=3.14.4
   - pip=26.0.1
+  - uvloop=0.22.1
   - pip:
       - aiosqlite==0.22.1
       - alembic==1.18.4
@@ -26,7 +27,7 @@ dependencies:
       - fastapi==0.136.1
       - fastapi-restful==0.6.0
       - fastexcel==0.20.2
-      - granian==2.7.4
+      - granian==2.8.2
       - greenlet==3.5.0
       - h11==0.16.0
       - hiredis==3.4.0
@@ -73,3 +74,5 @@ dependencies:
       - werkzeug==3.1.8
       - xlsxwriter==3.2.9
       - yarg==0.1.10
+      - aioboto3==15.5.0
+      - puremagic==2.2.0

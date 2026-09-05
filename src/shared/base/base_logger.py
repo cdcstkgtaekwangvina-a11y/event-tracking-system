@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -16,13 +15,18 @@ def _resolve_log_level() -> int:
 
 def _build_formatter(environment: str) -> logging.Formatter:
     """
-    Dev  → formatter dễ đọc, có màu qua ANSI codes.
-    Prod → formatter JSON-style cho log aggregator.
+    Dev  → formatter dễ đọc, có màu qua ANSI codes, hiển thị rõ PID và Worker ID.
+    Prod → formatter JSON-style tích hợp thêm thông tin process cho log aggregator.
     """
+    # Lấy thông tin ID của Worker từ Granian (trả về rỗng "" nếu chạy ở chế độ dev thường)
+    worker_id = os.getenv("GRANIAN_WORKER_ID", "")
+    worker_tag = f"[W:{worker_id}]" if worker_id else ""
+
     if environment == "dev":
         fmt = (
-            "\033[36m%(asctime)s\033[0m "          # cyan  – timestamp
-            "\033[1m%(name)s\033[0m "               # bold  – logger name
+            "\033[36m%(asctime)s\033[0m "  # cyan – timestamp
+            f"\033[35m[PID:%(process)d]{worker_tag}\033[0m "  # magenta – PID & Worker ID
+            "\033[1m%(name)s\033[0m "  # bold – logger name
             "[%(levelname)s] "
             "%(message)s "
             "(\033[33m%(filename)s\033[0m:%(lineno)d)"  # yellow – source loc
@@ -31,6 +35,8 @@ def _build_formatter(environment: str) -> logging.Formatter:
     else:
         fmt = (
             '{"time": "%(asctime)s", '
+            '"pid": %(process)d, '
+            f'"worker_id": "{worker_id}", '
             '"logger": "%(name)s", '
             '"level": "%(levelname)s", '
             '"message": "%(message)s", '
@@ -45,29 +51,12 @@ def _build_formatter(environment: str) -> logging.Formatter:
 class BaseLogger:
     """
     Wrapper nhẹ quanh :class:`logging.Logger` chuẩn của Python.
-
-    Mỗi class kế thừa (hoặc bất kỳ module nào) chỉ cần:
-
-    .. code-block:: python
-
-        class EmployeeService(BaseLogger):
-            def __init__(self):
-                super().__init__()          # logger lấy tên class tự động
-                # hoặc
-                super().__init__("my.custom.name")
-
-            def do_something(self):
-                self.logger.info("Done")
-                self.logger.debug("detail …")
-
-    Khi ``env=dev``  → level DEBUG, formatter dễ đọc (có màu).
-    Khi ``env=prod`` → level INFO,  formatter JSON (phù hợp log collector).
     """
 
     # Registry để tránh tạo lại handler nhiều lần cho cùng 1 logger name
     _configured: set[str] = set()
 
-    def __init__(self, name: Optional[str] = None) -> None:
+    def __init__(self, name: str | None = None) -> None:
         logger_name = name or self.__class__.__name__
         self.logger: logging.Logger = logging.getLogger(logger_name)
 
@@ -95,7 +84,7 @@ class BaseLogger:
             logger.addHandler(handler)
 
     # ------------------------------------------------------------------
-    # Convenience shortcuts (optional – dùng self.logger trực tiếp cũng OK)
+    # Convenience shortcuts
     # ------------------------------------------------------------------
 
     def log_debug(self, msg: str, *args, **kwargs) -> None:
@@ -119,22 +108,12 @@ class BaseLogger:
 
 
 # ---------------------------------------------------------------------------
-# Factory helper – dùng khi KHÔNG kế thừa (e.g. trong module-level code)
+# Factory helper
 # ---------------------------------------------------------------------------
 
+
 def get_logger(name: str) -> logging.Logger:
-    """
-    Trả về :class:`logging.Logger` đã được cấu hình theo môi trường.
-
-    Dùng ở những nơi không muốn kế thừa ``BaseLogger``:
-
-    .. code-block:: python
-
-        from src.shared.base.base_logger import get_logger
-
-        logger = get_logger(__name__)
-        logger.info("module loaded")
-    """
+    """Trả về :class:`logging.Logger` đã được cấu hình theo môi trường."""
     logger = logging.getLogger(name)
     if name not in BaseLogger._configured:
         BaseLogger._configure(logger)

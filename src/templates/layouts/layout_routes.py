@@ -66,4 +66,18 @@ def layouts_routes(app: FastAPI) -> FastAPI:
         response.delete_cookie("error_permitted")
         return response
 
+    @app.get(
+        "/email",
+        include_in_schema=False,
+        response_class=HTMLResponse,
+        name="email_test",
+    )
+    def email_test(req: BaseRequest):
+        return req.response_html(
+            name="/templates/email/index.j2",
+            context={
+                "title": "Event Tracking System",
+            },
+        )
+
     return app

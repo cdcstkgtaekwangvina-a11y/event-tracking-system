@@ -21,6 +21,11 @@ class BaseResponse(JSONResponse, Generic[T]):
         data: Optional[T] = None,
         **kwargs,
     ):
+        self.success = success
+        self.status_code = status_code
+        self.message = message
+        self.data = data
+
         content = {
             "success": success,
             "status_code": status_code,

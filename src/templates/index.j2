@@ -14,6 +14,14 @@
   {% endblock %}
   <title id="page-title">{% block title %}Event tracking system{% endblock %}</title>
   <script>
+    // Set user timezone cookie for backend middleware
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Ho_Chi_Minh';
+      if (!document.cookie.includes('user_timezone=' + encodeURIComponent(tz))) {
+        document.cookie = `user_timezone=${encodeURIComponent(tz)}; path=/; max-age=31536000; SameSite=Lax`;
+      }
+    } catch (e) {}
+
     // Universal patch for Alpine.js + HTMX compatibility
     (function () {
       const origAddEvt = document.addEventListener.bind(document);

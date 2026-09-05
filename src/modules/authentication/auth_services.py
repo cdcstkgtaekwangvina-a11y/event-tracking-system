@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import os
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from dotenv import load_dotenv
 from fastapi import HTTPException, Response
@@ -9,14 +11,17 @@ from jwt import ExpiredSignatureError, InvalidTokenError, decode, encode
 from pwdlib import PasswordHash
 from sqlmodel import or_
 
-from database.models.app_db import Depends, SessionDep
+from database.models.app_db import SessionDep
 from src.modules.user.role_constants import ROLE
-from src.modules.user.user_services import UserServices
+from src.modules.user.user_services import UserServiceDep
 from src.shared.base.base_response import BaseResponse
+from src.shared.constants.cache_tags import CacheTags
 
 from .auth_schemas import (
     LoginRequest,
+    NewPasswordRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenData,
     TokenResponse,
 )
@@ -35,7 +40,7 @@ if not SECRET_KEY or not AUDIENCE or not ISSUER:
 
 
 class AuthenticationServices:
-    def __init__(self, session: SessionDep, user_services: UserServices = Depends()):
+    def __init__(self, session: SessionDep, user_services: UserServiceDep):
 
         from database.models.users import Users
         from src.shared.base.base_crud import BaseCrud
@@ -147,3 +152,63 @@ class AuthenticationServices:
                 access_token=token,
                 message="Token không hợp lệ",
             )
+
+    async def new_password(
+        self, id: UUID, req: NewPasswordRequest
+    ) -> BaseResponse[bool]:
+
+        existing_user = await self.crud.find_by_id(id)
+        if not existing_user:
+            return BaseResponse.not_found(message="Không tìm thấy tài khoản")
+
+        if not existing_user.is_active:
+            return BaseResponse.forbidden(message="Tài khoản đã bị khóa")
+
+        password_hash = PasswordHash.recommended()
+        if not existing_user.password or not password_hash.verify(
+            req.old_password, existing_user.password
+        ):
+            return BaseResponse.fail(message="Mật khẩu cũ không chính xác")
+
+        dummy_hashh = password_hash.hash(req.new_password)
+        existing_user.password = dummy_hashh
+        existing_user.token_version += 1
+
+        self.session.add(existing_user)
+        await self.session.commit()
+        await self.user_services.cache.remove_async(f"{CacheTags.USER}:{id}")
+        return BaseResponse.ok(True)
+
+    async def reset_password(self, req: ResetPasswordRequest) -> BaseResponse[bool]:
+        from database.models.users import Users
+        from src.shared.services.verify_auth_email import send_email_auth
+
+        existing_user: Users | None = (
+            await self.crud.select(Users).where(Users.email == req.email).find_one()
+        )
+        if existing_user is None:
+            return BaseResponse.not_found("Không tìm thấy tài khoản")
+
+        if not existing_user.is_active:
+            return BaseResponse.forbidden("Tài khoản đã bị khóa")
+
+        from src.shared.helpers.random_helpers import RandomHelpers
+
+        new_pass = RandomHelpers(length=8).generate_password()
+        password_hash = PasswordHash.recommended()
+        existing_user.password = password_hash.hash(new_pass)
+        existing_user.token_version += 1
+        self.session.add(existing_user)
+
+        sent = await send_email_auth.send_reset_password_email(
+            to_email=existing_user.email,
+            new_password=new_pass,
+            user={"name": existing_user.name, "username": existing_user.username},
+        )
+        if not sent:
+            return BaseResponse.error(message="Không thể gửi email đặt lại mật khẩu")
+
+        await self.session.commit()
+        from src.shared.constants.cache_tags import CacheTags
+        await self.user_services.cache.remove_async(f"{CacheTags.USER}:{existing_user.id}")
+        return BaseResponse.ok(True)

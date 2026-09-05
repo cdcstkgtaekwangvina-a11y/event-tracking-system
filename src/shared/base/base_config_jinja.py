@@ -38,4 +38,16 @@ def global_values(templates: Jinja2Templates) -> Jinja2Templates:
         "BASE_URL", "http://localhost:8000"
     )
 
+    from src.shared.middlewares.timezone_middleware import to_user_timezone
+    from datetime import datetime
+
+    def format_user_datetime(dt: datetime | None, fmt: str = "%d/%m/%Y %H:%M") -> str:
+        if not dt:
+            return ""
+        local_dt = to_user_timezone(dt)
+        return local_dt.strftime(fmt) if local_dt else ""
+
+    templates.env.filters["user_tz"] = to_user_timezone
+    templates.env.filters["format_user_datetime"] = format_user_datetime
+
     return templates

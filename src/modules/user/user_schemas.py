@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import EmailStr, Field, field_validator, model_validator
+from pydantic import EmailStr, Field, field_validator
 
 from src.shared.base.base_schema import BaseSchema
 from src.shared.validators.account_validators import (
@@ -23,28 +23,21 @@ class UpdateProfileRequest(BaseSchema):
         return validate_username(v)
 
 
-class SetAvatarFromMediaRequest(BaseSchema):
-    """Links an already-uploaded file from the Media library as the avatar,
-    instead of uploading a new one — see `UserServices.set_avatar_from_media`."""
+# class ChangePasswordRequest(BaseSchema):
+#     current_password: str
+#     new_password: str
+#     confirm_new_password: str
 
-    media_id: int
+#     @field_validator("new_password")
+#     @classmethod
+#     def validate_new_password(cls, v: str) -> str:
+#         return validate_strong_password(v)
 
-
-class ChangePasswordRequest(BaseSchema):
-    current_password: str
-    new_password: str
-    confirm_new_password: str
-
-    @field_validator("new_password")
-    @classmethod
-    def validate_new_password(cls, v: str) -> str:
-        return validate_strong_password(v)
-
-    @model_validator(mode="after")
-    def validate_confirm_password(self) -> "ChangePasswordRequest":
-        if self.new_password != self.confirm_new_password:
-            raise ValueError("Xác nhận mật khẩu mới không khớp")
-        return self
+#     @model_validator(mode="after")
+#     def validate_confirm_password(self) -> "ChangePasswordRequest":
+#         if self.new_password != self.confirm_new_password:
+#             raise ValueError("Xác nhận mật khẩu mới không khớp")
+#         return self
 
 
 class CreateAccountRequest(BaseSchema):
@@ -105,3 +98,7 @@ class UserSchema(BaseSchema):
     file_id: int | None = None
     file_url: str | None = None
     token_version: int = 0
+
+
+class UpdateAvatarResponse(BaseSchema):
+    url: str

@@ -19,16 +19,18 @@
             <div class="acc-form-row">
                 <div class="acc-form-group acc-form-group--full">
                     <label class="acc-form-label">Họ và tên <span class="acc-required">*</span></label>
-                    <input type="text" class="acc-form-input" x-model="form.name" placeholder="Nguyễn Văn A"
-                        maxlength="300" autocomplete="off" required />
+                    <input type="text" class="acc-form-input acc-input-error" :class="{ 'acc-input-error': errors.name }" x-model="form.name" placeholder="Nguyễn Văn A"
+                        maxlength="300" autocomplete="off" required @input="clearFieldError('name')" />
+                    <p class="acc-form-error" x-show="errors.name" x-text="errors.name"></p>
                 </div>
             </div>
 
             <div class="acc-form-row">
                 <div class="acc-form-group">
                     <label class="acc-form-label">Tên đăng nhập <span class="acc-required">*</span></label>
-                    <input type="text" class="acc-form-input" x-model="form.username" placeholder="username"
-                        maxlength="20" autocomplete="off" required />
+                    <input type="text" class="acc-form-input" :class="{ 'acc-input-error': errors.username }" x-model="form.username" placeholder="username"
+                        maxlength="20" autocomplete="off" required @input="clearFieldError('username')" />
+                    <p class="acc-form-error" x-show="errors.username" x-text="errors.username"></p>
                 </div>
                 <div class="acc-form-group">
                     <label class="acc-form-label">
@@ -36,10 +38,11 @@
                         <span class="material-symbols-outlined acc-tooltip-icon" x-show="mode === 'edit' && !canEditEmail"
                             title="Chỉ Super Admin mới có quyền chỉnh sửa Email">info</span>
                     </label>
-                    <input type="email" class="acc-form-input" x-model="form.email" placeholder="name@company.com"
+                    <input type="email" class="acc-form-input" :class="{ 'acc-input-error': errors.email }" x-model="form.email" placeholder="name@company.com"
                         maxlength="300" autocomplete="off"
                         :disabled="mode === 'edit' && !canEditEmail"
-                        :required="mode === 'create'" />
+                        :required="mode === 'create'" @input="clearFieldError('email')" />
+                    <p class="acc-form-error" x-show="errors.email" x-text="errors.email"></p>
                 </div>
             </div>
 
@@ -56,13 +59,14 @@
                         </button>
                     </div>
                     <div class="acc-input-wrapper">
-                        <input :type="showPassword ? 'text' : 'password'" class="acc-form-input" x-model="form.password"
-                            placeholder="Tối thiểu 8 ký tự, gồm chữ hoa, thường, số và ký tự đặc biệt" autocomplete="new-password" :required="mode === 'create'" />
+                        <input :type="showPassword ? 'text' : 'password'" class="acc-form-input" :class="{ 'acc-input-error': errors.password }" x-model="form.password"
+                            placeholder="Tối thiểu 8 ký tự, gồm chữ hoa, thường, số và ký tự đặc biệt" autocomplete="new-password" :required="mode === 'create'" @input="clearFieldError('password')" />
                         <button type="button" class="acc-input-eye-btn" @click="showPassword = !showPassword"
                             :title="showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" tabindex="-1">
                             <span class="material-symbols-outlined" x-text="showPassword ? 'visibility_off' : 'visibility'"></span>
                         </button>
                     </div>
+                    <p class="acc-form-error" x-show="errors.password" x-text="errors.password"></p>
                 </div>
             </div>
 

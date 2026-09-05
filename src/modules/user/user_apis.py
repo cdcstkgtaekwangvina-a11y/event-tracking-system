@@ -5,12 +5,11 @@ from src.shared.base.base_route import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.auth_middlewares import AuthContext, RequireAuth, auth
 from src.shared.schemas.pagination_schemas import PaginationQuery
+from src.shared.validators.file_validators import ImageFile
 
 from .role_constants import ROLE
 from .user_schemas import (
-    ChangePasswordRequest,
     CreateAccountRequest,
-    SetAvatarFromMediaRequest,
     UpdateAccountRequest,
     UpdateProfileRequest,
 )
@@ -47,31 +46,29 @@ class UserApis:
             requester_role=auth_context.payload.role,
         )
 
-    @router.put_api("profile/avatar/media")
+    @router.put_api("profile/avatar")
     async def set_avatar_from_media(
         self,
-        payload: SetAvatarFromMediaRequest,
+        file: ImageFile,
         auth_context: AuthContext = auth(),
     ):
         if not auth_context.is_valid or not auth_context.payload.id:
             return BaseResponse.unauthorized()
 
-        return await self.services.set_avatar_from_media(
-            id=auth_context.payload.id, media_id=payload.media_id
-        )
+        return await self.services.update_avatar(id=auth_context.payload.id, file=file)
 
-    @router.put_api("profile/password")
-    async def change_password(
-        self,
-        payload: ChangePasswordRequest,
-        auth_context: AuthContext = auth(),
-    ):
-        if not auth_context.is_valid or not auth_context.payload.id:
-            return BaseResponse.unauthorized()
+    # @router.put_api("profile/password")
+    # async def change_password(
+    #     self,
+    #     payload: ChangePasswordRequest,
+    #     auth_context: AuthContext = auth(),
+    # ):
+    #     if not auth_context.is_valid or not auth_context.payload.id:
+    #         return BaseResponse.unauthorized()
 
-        return await self.services.change_password(
-            id=auth_context.payload.id, payload=payload
-        )
+    #     return await self.services.change_password(
+    #         id=auth_context.payload.id, payload=payload
+    #     )
 
 
 ACCOUNT_TAG = "account"

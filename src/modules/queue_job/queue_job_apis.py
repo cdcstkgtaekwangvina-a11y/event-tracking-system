@@ -3,12 +3,17 @@ from fastapi import Depends
 from src.modules.queue_job.queue_job_schemas import StopQueueJobSchema
 from src.shared.base import BaseRouter
 from src.shared.helpers.cbv import clean_cbv
+from src.shared.middlewares.rate_limit import rate_limit
 from src.shared.schemas.pagination_schemas import FilterRequest, PaginationQuery
 
 from .queue_job_services import QueueJobServices
 
 TAG_NAME = "queue-jobs"
-router = BaseRouter(controller=TAG_NAME, tags=[TAG_NAME])
+router = BaseRouter(
+    controller=TAG_NAME,
+    tags=[TAG_NAME],
+    dependencies=[rate_limit(request_per_windows=50)],
+)
 
 
 @clean_cbv(router)

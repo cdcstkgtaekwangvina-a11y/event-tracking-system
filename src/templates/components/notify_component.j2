@@ -110,15 +110,16 @@ Màu dùng CSS vars từ index.css (:root)
 
     .nc-toast-container {
         position: fixed;
-        top: 1rem;
-        right: 1rem;
-        z-index: 9999;
+        top: max(1rem, env(safe-area-inset-top));
+        right: max(1rem, env(safe-area-inset-right));
+        z-index: 99999;
         display: flex;
         flex-direction: column;
         gap: .625rem;
         max-width: 380px;
         width: 100%;
         pointer-events: none;
+        box-sizing: border-box;
     }
 
     .nc-toast {
@@ -134,6 +135,8 @@ Màu dùng CSS vars từ index.css (:root)
         pointer-events: auto;
         min-height: 60px;
         border-left-width: 3px;
+        box-sizing: border-box;
+        width: 100%;
     }
 
     /* Accent left border per type */
@@ -291,9 +294,31 @@ Màu dùng CSS vars từ index.css (:root)
     /* Responsive toast */
     @media (max-width: 640px) {
         .nc-toast-container {
-            left: .75rem;
-            right: .75rem;
+            top: max(1rem, calc(env(safe-area-inset-top) + 0.5rem));
+            left: max(1rem, env(safe-area-inset-left));
+            right: max(1rem, env(safe-area-inset-right));
+            width: auto;
             max-width: none;
+        }
+
+        .nc-toast-enter-start {
+            opacity: 0;
+            transform: translateY(-16px);
+        }
+
+        .nc-toast-enter-end {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .nc-toast-leave-start {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .nc-toast-leave-end {
+            opacity: 0;
+            transform: translateY(-16px);
         }
     }
 
