@@ -1,10 +1,12 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import File, Form, UploadFile
+from fastapi import Depends, Form, UploadFile
 from pydantic import Field, model_validator
 
 from src.shared.base.base_schema import BaseSchema
+from src.shared.constants.file_type import FileGroup
+from src.shared.validators.file_validators import create_file_validator
 
 
 class MediaSchema(BaseSchema):
@@ -58,7 +60,9 @@ class CreateMediaSchema(BaseSchema):
         name: str = Form(...),
         folder_id: int | None = Form(None),
         is_folder: bool = Form(False),
-        file: UploadFile | None = File(None),
+        file: UploadFile | None = Depends(
+            create_file_validator(allowed_groups=[FileGroup.ALL_TYPES])
+        ),
     ) -> "CreateMediaSchema":
         """
         Hàm helper biến Schema này thành dạng Form-Data.

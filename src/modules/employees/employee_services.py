@@ -6,7 +6,6 @@ from src.shared.base import BaseCrud, BaseResponse
 from src.shared.base.base_queue import EnqueueResponse, queue_service
 from src.shared.constants.cache_tags import CacheTags
 from src.shared.helpers.file_handel import FileHandelHelper
-from src.shared.helpers.qr_helper import CreateQRSchema, create_qr_url
 from src.shared.schemas.pagination_schemas import PaginationResponse
 from src.shared.services.redis_services import RedisDep
 
@@ -44,6 +43,8 @@ class EmployeeServices:
 
         # Tạo dict dữ liệu, loại bỏ id nếu None để DB tự sinh
         create_data = employee.model_dump(exclude_none=True)
+        from src.shared.helpers.qr_helper import CreateQRSchema, create_qr_url
+
         if employee.id is not None:
             create_data["qr_url"] = create_qr_url(CreateQRSchema(data=str(employee.id)))
 

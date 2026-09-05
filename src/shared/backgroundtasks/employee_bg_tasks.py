@@ -5,13 +5,14 @@ from typing import cast
 from uuid import UUID
 
 from polars import DataFrame
-from sqlmodel import and_, func, select
+from sqlmodel import func, select
 
 from database.models.app_db import get_session_factory
 from database.models.employees import Employees
 from database.models.events import Events
 from database.models.events_employees import EventsEmployees
-from database.models.queue_jobs import JobStatus, QueueJob, QueueJobLogs
+from database.models.queue_jobs import JobStatus, QueueJobLogs
+from src.shared.base.base_bg_task import BaseBackgroundTask
 from src.shared.base.base_client import BaseClient
 from src.shared.base.base_queue import queue_job, queue_service
 from src.shared.constants.cache_tags import CacheTags
@@ -25,7 +26,7 @@ MAX_DETAILED_ERRORS = 500
 
 
 @queue_service.register_class
-class EmployeeBackgroundTask:
+class EmployeeBackgroundTask(BaseBackgroundTask):
     def __init__(self):
         self.BATCH_SIZE = 1000
         self.redis = RedisServices()
@@ -65,15 +66,7 @@ class EmployeeBackgroundTask:
     ):
 
         async with get_session_factory()() as session:
-            query_job = await session.exec(
-                select(QueueJob).where(
-                    and_(
-                        QueueJob.id == job_id,
-                        QueueJob.status == JobStatus.RUNNING.value,
-                    )
-                )
-            )
-            job = query_job.first()
+            job = await self.get_job(session, job_id)
             if not job:
                 return
 

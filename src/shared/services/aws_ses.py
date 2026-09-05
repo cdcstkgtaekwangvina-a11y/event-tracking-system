@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 import aioboto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -308,7 +308,7 @@ class AwsSes(BaseEmailService):
             or os.getenv("AWS_SES_FROM_EMAIL")
             or os.getenv("AWS_SES_FROM")
             or os.getenv("ELASTIC_EMAIL_FROM", "")
-        )
+        ).strip("\"' ")
         self.configuration_set_name = configuration_set_name or os.getenv(
             "AWS_SES_CONFIGURATION_SET", None
         )
@@ -340,6 +340,7 @@ class AwsSes(BaseEmailService):
         self,
         req: SendBulkEmailRequest | SendMailRequest,
         jinja_data: dict[str, Any] = {},
+        template: Literal["aws_ses", "verify_auth"] = "aws_ses",
     ) -> SendBulkEmailResponse | dict[str, Any]:
         """
         Sends email in bulk via AWS SES v2 send_bulk_email API.
@@ -349,13 +350,15 @@ class AwsSes(BaseEmailService):
             if isinstance(req, SendBulkEmailRequest):
                 payload = req.model_dump(exclude_none=True)
             else:
-                from_email = req.Content.From or self.default_from_email
+                from_email = (req.Content.From or self.default_from_email or "").strip("\"' ")
                 if not from_email:
                     raise ValueError("FromEmailAddress is required")
 
                 rendered_html = req.Content.Html or ""
                 if not req.Content.TemplateName:
-                    rendered_html = self._get_email_template(data=jinja_data, email_service="aws_ses")
+                    rendered_html = self._get_email_template(
+                        data=jinja_data, email_service=template
+                    )
 
                 default_template_data = (
                     json.dumps(req.Content.Merge)
@@ -449,15 +452,15 @@ class AwsSes(BaseEmailService):
                 }
             return {"error": str(exc), "code": "UnknownError"}
 
-    async def send_email(
-        self,
-        req: SendMailRequest,
-        jinja_data: dict[str, Any] = {},
-    ) -> SendBulkEmailResponse | dict[str, Any]:
-        """
-        Alias for send_bulk_email to provide 100% API compatibility with ElasticEmail.
-        """
-        return await self.send_bulk_email(req=req, jinja_data=jinja_data)
+    # async def send_email(
+    #     self,
+    #     req: SendMailRequest,
+    #     jinja_data: dict[str, Any] = {},
+    # ) -> SendBulkEmailResponse | dict[str, Any]:
+    #     """
+    #     Alias for send_bulk_email to provide 100% API compatibility with ElasticEmail.
+    #     """
+    #     return await self.send_bulk_email(req=req, jinja_data=jinja_data)
 
     # --------------------------------------------------------------------------
     # Message Insights and Status Tracking

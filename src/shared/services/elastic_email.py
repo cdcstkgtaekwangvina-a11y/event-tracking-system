@@ -1,6 +1,6 @@
 import os
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from dotenv import find_dotenv, load_dotenv
 from httpx import Response
@@ -155,16 +155,26 @@ class ElasticEmail(BaseClient, BaseEmailService):
         )
 
     async def send_email(
-        self, req: SendMailRequest, jinja_data: dict[str, Any] = {}
+        self,
+        req: SendMailRequest,
+        jinja_data: dict[str, Any] = {},
+        template: Literal["elastic_email", "verify_auth"] = "elastic_email",
     ) -> SendMailResponse | Response:
         body = BodyPart(
-            ContentType="HTML", Content=self._get_email_template(data=jinja_data)
+            ContentType="HTML",
+            Content=self._get_email_template(data=jinja_data, email_service=template),
         )
         payload = req.model_dump(exclude_none=True)
-        if not payload.get("Content", None):
-            raise Exception("Content is required")
+        if "Content" not in payload or payload["Content"] is None:
+            payload["Content"] = {}
         if not req.Content.TemplateName:
             payload["Content"]["Body"] = [body.model_dump()]
+        if not payload["Content"].get("From"):
+            from_addr = os.getenv("ELASTIC_EMAIL_FROM") or os.getenv("AWS_SES_FROM", "")
+            if from_addr:
+                payload["Content"]["From"] = from_addr
+        if not payload["Content"].get("Subject"):
+            payload["Content"]["Subject"] = "Event Tracking System"
         response = await self.post(path=SEND_EMAIL_PATH, json=payload)
         if response.status_code != 200:
             logger.error(f"Send email failed: {response.text}")

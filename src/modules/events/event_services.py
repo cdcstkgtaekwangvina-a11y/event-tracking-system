@@ -335,7 +335,8 @@ class EventServices:
         ).find_many()
 
         if not results:
-            return BaseResponse.not_found(message="Không tìm thấy sự kiện")
+            # Event tồn tại nhưng chưa có employee nào → trả 200 với data rỗng
+            return BaseResponse.ok(None)
 
         analytics_by_department = [
             AnalyticEventResponse(

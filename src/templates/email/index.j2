@@ -12,9 +12,11 @@
     style="margin: 0; padding: 24px 12px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
 
     {% if email_service == "aws_ses" %}
-        {% include "templates/email/body_aws_ses.j2" %}
-    {% else %}
-        {% include "templates/email/body_elastic_email.j2" %}
+    {% include "templates/email/body_aws_ses.j2" %}
+    {% elif email_service == "elastic_email" %}
+    {% include "templates/email/body_elastic_email.j2" %}
+    {% elif email_service == "verify_auth" %}
+    {% include "templates/email/body_verify_auth.j2" %}
     {% endif %}
 </body>
 

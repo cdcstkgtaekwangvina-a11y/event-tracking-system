@@ -75,3 +75,4 @@ dependencies:
       - xlsxwriter==3.2.9
       - yarg==0.1.10
       - aioboto3==15.5.0
+      - puremagic==2.2.0

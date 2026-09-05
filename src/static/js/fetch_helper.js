@@ -1,6 +1,8 @@
 const getTimezone = () => {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Ho_Chi_Minh";
+    return (
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Ho_Chi_Minh"
+    );
   } catch (e) {
     return "Asia/Ho_Chi_Minh";
   }
@@ -19,6 +21,11 @@ const getToken = (name) => {
 const resolveUrl = (path = "") => {
   if (/^https?:\/\//i.test(path)) return path;
   return `${fetchHelper.baseUrl}/${path}`;
+};
+
+const buildAuthHeaders = () => {
+  const token = getToken("access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 async function returnValue(res) {
@@ -53,9 +60,7 @@ export const fetchHelper = {
         headers: {
           ...getDefaultHeaders(),
           ...(options.headers || { "Content-Type": contentType.json }),
-          ...(options.requireAuth
-            ? { Authorization: `Bearer ${getToken("access_token")}` }
-            : {}),
+          ...buildAuthHeaders(),
         },
         ...(options.fetchOptions || {}),
       });
@@ -79,9 +84,7 @@ export const fetchHelper = {
         headers: {
           ...getDefaultHeaders(),
           ...(options.headers || { "Content-Type": contentType.json }),
-          ...(options.requireAuth
-            ? { Authorization: `Bearer ${getToken("access_token")}` }
-            : {}),
+          ...buildAuthHeaders(),
         },
       });
 
@@ -102,9 +105,7 @@ export const fetchHelper = {
       const headers = {
         ...getDefaultHeaders(),
         ...options.headers,
-        ...(options.requireAuth
-          ? { Authorization: `Bearer ${getToken("access_token")}` }
-          : {}),
+        ...buildAuthHeaders(),
       };
       // Only set Content-Type if not FormData (fetch sets it automatically with boundary)
       if (!isFormData && !headers["Content-Type"]) {
@@ -113,7 +114,7 @@ export const fetchHelper = {
 
       const res = await fetch(resolveUrl(path), {
         method: "POST",
-        headers: headers,
+        headers,
         body: isFormData ? payload : JSON.stringify(payload),
       });
       return await returnValue(res);
@@ -129,16 +130,20 @@ export const fetchHelper = {
     options = { requireAuth: false, headers: {} },
   ) {
     try {
+      const isFormData = payload instanceof FormData;
+      const headers = {
+        ...getDefaultHeaders(),
+        ...(options.headers || {}),
+        ...buildAuthHeaders(),
+      };
+      if (!isFormData && !headers["Content-Type"]) {
+        headers["Content-Type"] = contentType.json;
+      }
+
       const res = await fetch(resolveUrl(path), {
         method: "PUT",
-        headers: {
-          ...getDefaultHeaders(),
-          ...(options.headers || { "Content-Type": contentType.json }),
-          ...(options.requireAuth
-            ? { Authorization: `Bearer ${getToken("access_token")}` }
-            : {}),
-        },
-        body: JSON.stringify(payload),
+        headers,
+        body: isFormData ? payload : JSON.stringify(payload),
       });
 
       return await returnValue(res);
@@ -159,9 +164,7 @@ export const fetchHelper = {
         headers: {
           ...getDefaultHeaders(),
           ...(options.headers || { "Content-Type": contentType.json }),
-          ...(options.requireAuth
-            ? { Authorization: `Bearer ${getToken("access_token")}` }
-            : {}),
+          ...buildAuthHeaders(),
         },
         body: JSON.stringify(payload),
       });
@@ -184,9 +187,7 @@ export const fetchHelper = {
         headers: {
           ...getDefaultHeaders(),
           ...(options.headers || { "Content-Type": contentType.json }),
-          ...(options.requireAuth
-            ? { Authorization: `Bearer ${getToken("access_token")}` }
-            : {}),
+          ...buildAuthHeaders(),
         },
         body: JSON.stringify(payload),
       });

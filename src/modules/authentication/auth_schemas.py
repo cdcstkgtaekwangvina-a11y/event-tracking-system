@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import EmailStr, Field, field_validator
+from pydantic import EmailStr, Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from src.shared.base.base_schema import BaseSchema
 from src.shared.validators.account_validators import (
@@ -78,3 +79,29 @@ class TokenData(BaseSchema):
     audience: str | None = None
     issuer: str | None = None
     message: str | None = None
+
+
+class ResetPasswordRequest(BaseSchema):
+    email: EmailStr = Field(description="Email của bạn")
+
+
+class NewPasswordRequest(BaseSchema):
+    old_password: str = Field(description="Mật khẩu cũ của bạn")
+    new_password: str = Field(description="Mật khẩu mới của bạn")
+    confirm_password: str = Field(description="Xác nhận mật khẩu mới của bạn")
+
+    @field_validator("new_password", "confirm_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        return validate_strong_password(v)
+
+    @model_validator(mode="after")
+    def verify_password_match(self):
+        if self.new_password != self.confirm_password:
+            raise PydanticCustomError(
+                "value_error",
+                "Mật khẩu nhập lại không trùng khớp với mật khẩu mới",
+                {"loc": ("confirm_password",)},
+            )
+
+        return self

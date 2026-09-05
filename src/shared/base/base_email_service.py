@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -8,7 +8,9 @@ class BaseEmailService:
         self,
         path: str = "/templates/email/index.j2",
         data: dict[str, Any] = {},
-        email_service: str = "elastic_email",
+        email_service: Literal[
+            "aws_ses", "elastic_email", "verify_auth"
+        ] = "elastic_email",
     ):
         env = Environment(loader=FileSystemLoader("src"))
 

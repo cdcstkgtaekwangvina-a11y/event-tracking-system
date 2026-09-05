@@ -1,7 +1,7 @@
 import asyncio
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
-from fastapi import UploadFile
+from fastapi import Depends, UploadFile
 from sqlmodel import and_, col, or_
 from uuid6 import uuid8
 
@@ -371,6 +371,9 @@ class MediaServices:
         self, ids: list[int], is_soft_delete: bool = True
     ) -> BaseResponse[bool]:
 
+        if 1 in ids:
+            return BaseResponse.fail("Folder avatar là folder hệ thống không thể xóa")
+
         # 1. Tìm các bản ghi gốc được yêu cầu xóa trực tiếp từ danh sách ids
         target_medias = (
             await self.crud.select(MediaSelect)
@@ -650,3 +653,50 @@ class MediaServices:
         await self.session.refresh(updated_media)
         await self.redis.invalidate_tags_async(CacheTags.MEDIA)
         return BaseResponse.ok(updated_media)
+
+    async def replace_or_create_file(
+        self,
+        file: UploadFile,
+        path: str | None,
+        folder_id: int | None,
+        name: str | None = None,
+    ) -> BaseResponse[str]:
+
+        if not path:
+            new_media = await self.create_media_or_fail(
+                CreateMediaSchema(
+                    file=file,
+                    folder_id=folder_id,
+                    name=name or file.filename or str(uuid8()),
+                    is_folder=False,
+                )
+            )
+
+            if new_media.success and new_media.data and new_media.data.url:
+                return BaseResponse.ok(new_media.data.url)
+
+            return BaseResponse.fail(new_media.message)
+
+        res = await self.vercel_blob.replace_file_binary(
+            file,
+            path,
+        )
+        if not res or not res.url:
+            new_media = await self.create_media_or_fail(
+                CreateMediaSchema(
+                    file=file,
+                    folder_id=folder_id,
+                    name=name or file.filename or str(uuid8()),
+                    is_folder=False,
+                )
+            )
+
+            if new_media.success and new_media.data and new_media.data.url:
+                return BaseResponse.ok(new_media.data.url)
+
+            return BaseResponse.fail(new_media.message)
+
+        return BaseResponse.ok(res.url)
+
+
+MediaServicesDep = Annotated[MediaServices, Depends()]

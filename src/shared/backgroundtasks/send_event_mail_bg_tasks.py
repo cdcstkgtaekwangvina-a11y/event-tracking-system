@@ -13,6 +13,7 @@ from database.models.app_db import get_session_factory
 from database.models.employees import Employees
 from database.models.events_employees import EVENT_EMPLOYEE_STATUS, EventsEmployees
 from database.models.queue_jobs import JobStatus, QueueJob, QueueJobLogs
+from src.shared.base.base_bg_task import BaseBackgroundTask
 from src.shared.base.base_logger import get_logger
 from src.shared.base.base_queue import queue_job, queue_service
 from src.shared.constants.queue_keys import QueueKeys
@@ -42,7 +43,7 @@ MAX_TRIES = 500
 
 
 @queue_service.register_class
-class SendEventMailBgTasks:
+class SendEventMailBgTasks(BaseBackgroundTask):
     def __init__(self):
         self.default_email_service = (
             "aws_ses"
@@ -331,15 +332,7 @@ class SendEventMailBgTasks:
         job_id: UUID,
     ):
         async with get_session_factory()() as session:
-            query_job = await session.exec(
-                select(QueueJob).where(
-                    and_(
-                        QueueJob.id == job_id,
-                        QueueJob.status == JobStatus.RUNNING.value,
-                    )
-                )
-            )
-            job = query_job.first()
+            job = await self.get_job(session, job_id)
             if not job:
                 return
 

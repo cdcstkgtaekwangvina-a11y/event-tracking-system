@@ -69,3 +69,4 @@ uuid6==2025.0.1
 uvloop==0.22.1
 aioboto3==15.5.0
 granian==2.8.2
+puremagic==2.2.0

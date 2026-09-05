@@ -1,13 +1,16 @@
+from collections.abc import Callable
 from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone, tzinfo
-from typing import Callable
+from urllib.parse import unquote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-DEFAULT_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+from src.shared.base.base_logger import get_logger
 
+DEFAULT_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+logger = get_logger(__name__)
 # ContextVar để lưu trữ timezone của request hiện tại
 current_timezone_ctx: ContextVar[tzinfo] = ContextVar(
     "current_timezone_ctx", default=DEFAULT_TIMEZONE
@@ -24,13 +27,13 @@ def parse_timezone(tz_str: str | None) -> tzinfo:
     if not tz_str:
         return DEFAULT_TIMEZONE
 
-    tz_str = tz_str.strip()
+    tz_str = unquote(tz_str).strip()
 
     # 1. Thử parse tên IANA timezone: e.g. "Asia/Ho_Chi_Minh", "UTC", "America/New_York"
     try:
         return ZoneInfo(tz_str)
-    except (ZoneInfoNotFoundError, ValueError):
-        pass
+    except (ZoneInfoNotFoundError, ValueError) as e:
+        logger.error(f"Không thể parse timezone: {e}")
 
     # 2. Thử parse dạng offset: "+07:00", "-05:00", "+0700", "+7", "-5", "7"
     try:
@@ -45,8 +48,8 @@ def parse_timezone(tz_str: str | None) -> tzinfo:
         elif clean_tz.lstrip("+-").isdigit():
             hours = int(clean_tz)
             return timezone(timedelta(hours=hours))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception(f"Không thể parse timezone: {e}")
 
     return DEFAULT_TIMEZONE
 
