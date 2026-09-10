@@ -274,3 +274,36 @@ button, input, select, textarea {
   background-color: var(--sidebar-bg);
   color: var(--foreground);
 }
+
+/* Pin Event Button */
+.btn-pin-event {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.btn-pin-event:hover {
+  background-color: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #6366f1;
+}
+
+.btn-pin-event.is-pinned {
+  background-color: rgba(99, 102, 241, 0.15);
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.btn-pin-event.is-pinned .material-symbols-outlined {
+  font-variation-settings: 'FILL' 1;
+}

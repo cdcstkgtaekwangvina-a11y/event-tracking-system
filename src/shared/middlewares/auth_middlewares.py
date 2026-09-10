@@ -7,6 +7,14 @@ from src.modules.authentication.auth_schemas import TokenData
 from src.modules.authentication.auth_services import AuthenticationServices
 
 
+def _get_fail_res(status_code: int, message: str) -> dict:
+    return {
+        "success": False,
+        "status_code": status_code,
+        "message": message,
+    }
+
+
 class AuthContext:
     payload: TokenData
     is_valid: bool
@@ -30,15 +38,19 @@ class AuthContext:
 
 class RequireAuth:
     def __init__(
-        self, roles: Sequence[str] | None = None, is_required_auth: bool = True
+        self,
+        roles: Sequence[str] = [],
+        is_required_auth: bool = True,
+        is_render_html: bool = False,
     ):
         self.roles = roles
         self.is_required_auth = is_required_auth
+        self.is_render_html = is_render_html
 
     async def __call__(
         self, req: Request, service: AuthenticationServices = Depends()
     ) -> AuthContext:
-        access_token = req.headers.get("Authorization")
+        access_token = req.headers.get("authorization")
         if access_token and access_token.lower().startswith("bearer "):
             access_token = access_token.split(" ")[1]
         else:
@@ -48,8 +60,14 @@ class RequireAuth:
         if not access_token:
             if self.is_required_auth:
                 if req.url.path.startswith("/api"):
-                    raise HTTPException(status_code=401, detail="Vui lòng đăng nhập")
-                raise HTTPException(status_code=404, detail="Vui lòng đăng nhập")
+                    raise HTTPException(
+                        status_code=401,
+                        detail=_get_fail_res(401, "Vui lòng đăng nhập để tiếp tục"),
+                    )
+                raise HTTPException(
+                    status_code=404,
+                    detail=_get_fail_res(404, "Vui lòng đăng nhập để tiếp tục"),
+                )
             return AuthContext(
                 payload=TokenData(access_token=access_token or ""), is_valid=False
             )
@@ -59,8 +77,11 @@ class RequireAuth:
         def raise_or_set_error(status_code: int, message: str):
             if self.is_required_auth:
                 if req.url.path.startswith("/api"):
-                    raise HTTPException(status_code=status_code, detail=message)
-                raise HTTPException(status_code=404, detail=message)
+                    raise HTTPException(
+                        status_code=status_code,
+                        detail=_get_fail_res(status_code, message),
+                    )
+                raise HTTPException(status_code=404, detail=_get_fail_res(404, message))
             payload.valid = False
             payload.message = message
             payload.status_code = status_code
@@ -96,4 +117,4 @@ class RequireAuth:
 
 
 def auth(roles: list[str] | None = None, is_required_auth: bool = True):
-    return Depends(RequireAuth(roles=roles, is_required_auth=is_required_auth))
+    return Depends(RequireAuth(roles=roles or [], is_required_auth=is_required_auth))

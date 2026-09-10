@@ -1,176 +1,176 @@
 {% extends "templates/layouts/admin.j2" %}
-{% block admin_title %}Quản lý Queue Jobs{% endblock %}
+{% block admin_title %}Quản lý tác vụ{% endblock %}
 
 {% block admin_body %}
 <script>
-(function() {
-    window.mapJob = {
-        "bulk_upsert_employees_task": "Import khách mời",
-        "bulk_send_event_email": "Gửi email sự kiện",
-    };
-    window.reverseMapJob = Object.fromEntries(
-        Object.entries(window.mapJob).map(([k, v]) => [v.toLowerCase(), k])
-    );
+    (function () {
+        window.mapJob = {
+            "bulk_upsert_employees_task": "Import khách mời",
+            "bulk_send_event_email": "Gửi email sự kiện",
+        };
+        window.reverseMapJob = Object.fromEntries(
+            Object.entries(window.mapJob).map(([k, v]) => [v.toLowerCase(), k])
+        );
 
-    function registerQueueJobsApp() {
-        if (!window.Alpine) return;
+        function registerQueueJobsApp() {
+            if (!window.Alpine) return;
 
-        Alpine.data('queueJobsApp', () => ({
-            jobs: [],
-            total: 0,
-            page: 1,
-            limit: 10,
-            currentStatus: '{{ status_filter or "all" }}',
-            searchQuery: '{{ search or "" }}',
-            sortField: 'created_at',
-            isDesc: true,
-            loading: false,
-            cancellingId: null,
+            Alpine.data('queueJobsApp', () => ({
+                jobs: [],
+                total: 0,
+                page: 1,
+                limit: 10,
+                currentStatus: '{{ status_filter or "all" }}',
+                searchQuery: '{{ search or "" }}',
+                sortField: 'created_at',
+                isDesc: true,
+                loading: false,
+                cancellingId: null,
 
-            async initData() {
-                await this.fetchJobs();
-            },
+                async initData() {
+                    await this.fetchJobs();
+                },
 
-            async fetchJobs(newPage = 1) {
-                this.loading = true;
-                this.page = newPage;
-                try {
-                    while (!window.fetchHelper) {
-                        await new Promise(r => setTimeout(r, 50));
+                async fetchJobs(newPage = 1) {
+                    this.loading = true;
+                    this.page = newPage;
+                    try {
+                        while (!window.fetchHelper) {
+                            await new Promise(r => setTimeout(r, 50));
+                        }
+
+                        const params = {
+                            page: this.page,
+                            limit: this.limit,
+                            sort_field: this.sortField,
+                            is_desc: this.isDesc
+                        };
+                        if (this.currentStatus && this.currentStatus !== 'all') {
+                            params.status = this.currentStatus;
+                        }
+                        if (this.searchQuery && this.searchQuery.trim()) {
+                            params.search = this.resolveSearch(this.searchQuery.trim());
+                        }
+
+                        const res = await window.fetchHelper.get('queue-jobs', params);
+                        if (res && res.status_code === 200 && res.data) {
+                            this.jobs = res.data.data || [];
+                            this.total = res.data.total_items || res.data.total || 0;
+                        } else if (res && res.data) {
+                            this.jobs = res.data.data || res.data || [];
+                            this.total = res.total_items || res.total || this.jobs.length;
+                        } else if (Array.isArray(res)) {
+                            this.jobs = res;
+                            this.total = res.length;
+                        }
+                    } catch (e) {
+                        console.error("Lỗi khi gọi API Queue Jobs:", e);
+                    } finally {
+                        this.loading = false;
                     }
+                },
 
-                    const params = {
-                        page: this.page,
-                        limit: this.limit,
-                        sort_field: this.sortField,
-                        is_desc: this.isDesc
-                    };
-                    if (this.currentStatus && this.currentStatus !== 'all') {
-                        params.status = this.currentStatus;
+                setStatus(status) {
+                    this.currentStatus = status;
+                    this.fetchJobs(1);
+                },
+
+                getJobTypeLabel(type) {
+                    if (!type) return '—';
+                    const map = window.mapJob || {};
+                    return map[type] || type;
+                },
+
+                resolveSearch(query) {
+                    const rmap = window.reverseMapJob || {};
+                    const lowerQuery = query.toLowerCase();
+                    for (const [label, dbKey] of Object.entries(rmap)) {
+                        if (label.includes(lowerQuery) || lowerQuery.includes(label)) {
+                            return dbKey;
+                        }
                     }
-                    if (this.searchQuery && this.searchQuery.trim()) {
-                        params.search = this.resolveSearch(this.searchQuery.trim());
-                    }
+                    return query;
+                },
 
-                    const res = await window.fetchHelper.get('queue-jobs', params);
-                    if (res && res.status_code === 200 && res.data) {
-                        this.jobs = res.data.data || [];
-                        this.total = res.data.total_items || res.data.total || 0;
-                    } else if (res && res.data) {
-                        this.jobs = res.data.data || res.data || [];
-                        this.total = res.total_items || res.total || this.jobs.length;
-                    } else if (Array.isArray(res)) {
-                        this.jobs = res;
-                        this.total = res.length;
-                    }
-                } catch (e) {
-                    console.error("Lỗi khi gọi API Queue Jobs:", e);
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            setStatus(status) {
-                this.currentStatus = status;
-                this.fetchJobs(1);
-            },
-
-            getJobTypeLabel(type) {
-                if (!type) return '—';
-                const map = window.mapJob || {};
-                return map[type] || type;
-            },
-
-            resolveSearch(query) {
-                const rmap = window.reverseMapJob || {};
-                const lowerQuery = query.toLowerCase();
-                for (const [label, dbKey] of Object.entries(rmap)) {
-                    if (label.includes(lowerQuery) || lowerQuery.includes(label)) {
-                        return dbKey;
-                    }
-                }
-                return query;
-            },
-
-            toggleSort(field) {
-                if (this.sortField === field) {
-                    this.isDesc = !this.isDesc;
-                } else {
-                    this.sortField = field;
-                    this.isDesc = true;
-                }
-                this.fetchJobs(1);
-            },
-
-            sortIcon(field) {
-                if (this.sortField !== field) return 'unfold_more';
-                return this.isDesc ? 'arrow_downward' : 'arrow_upward';
-            },
-
-            isSortActive(field) {
-                return this.sortField === field;
-            },
-
-            formatDate(dateStr) {
-                if (!dateStr) return '—';
-                try {
-                    const d = new Date(dateStr);
-                    if (isNaN(d.getTime())) return String(dateStr);
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const year = d.getFullYear();
-                    const hours = String(d.getHours()).padStart(2, '0');
-                    const minutes = String(d.getMinutes()).padStart(2, '0');
-                    const seconds = String(d.getSeconds()).padStart(2, '0');
-                    return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
-                } catch (e) {
-                    return String(dateStr);
-                }
-            },
-
-            showDetail(job) {
-                window.queueJobDetailModal?.open(job);
-            },
-
-            async cancelJob(job) {
-                if (this.cancellingId === job.id) return;
-                if (!confirm(`Bạn có chắc muốn dừng job "${this.getJobTypeLabel(job.type)}" không?`)) return;
-
-                this.cancellingId = job.id;
-                try {
-                    while (!window.fetchHelper) {
-                        await new Promise(r => setTimeout(r, 50));
-                    }
-                    const res = await window.fetchHelper.put('queue-jobs/cancel-job', { id: job.id });
-                    if (res && (res.status_code === 200 || res.status_code === 201)) {
-                        await this.fetchJobs(this.page);
+                toggleSort(field) {
+                    if (this.sortField === field) {
+                        this.isDesc = !this.isDesc;
                     } else {
-                        const msg = res?.message || res?.detail || 'Có lỗi xảy ra khi dừng job.';
-                        alert(msg);
+                        this.sortField = field;
+                        this.isDesc = true;
                     }
-                } catch (e) {
-                    console.error('Lỗi khi hủy job:', e);
-                    alert('Có lỗi xảy ra, vui lòng thử lại.');
-                } finally {
-                    this.cancellingId = null;
-                }
-            }
-        }));
-    }
+                    this.fetchJobs(1);
+                },
 
-    if (window.Alpine) {
-        registerQueueJobsApp();
-    } else {
-        document.addEventListener('alpine:init', registerQueueJobsApp);
-    }
-})();
+                sortIcon(field) {
+                    if (this.sortField !== field) return 'unfold_more';
+                    return this.isDesc ? 'arrow_downward' : 'arrow_upward';
+                },
+
+                isSortActive(field) {
+                    return this.sortField === field;
+                },
+
+                formatDate(dateStr) {
+                    if (!dateStr) return '—';
+                    try {
+                        const d = new Date(dateStr);
+                        if (isNaN(d.getTime())) return String(dateStr);
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const year = d.getFullYear();
+                        const hours = String(d.getHours()).padStart(2, '0');
+                        const minutes = String(d.getMinutes()).padStart(2, '0');
+                        const seconds = String(d.getSeconds()).padStart(2, '0');
+                        return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+                    } catch (e) {
+                        return String(dateStr);
+                    }
+                },
+
+                showDetail(job) {
+                    window.queueJobDetailModal?.open(job);
+                },
+
+                async cancelJob(job) {
+                    if (this.cancellingId === job.id) return;
+                    if (!confirm(`Bạn có chắc muốn dừng job "${this.getJobTypeLabel(job.type)}" không?`)) return;
+
+                    this.cancellingId = job.id;
+                    try {
+                        while (!window.fetchHelper) {
+                            await new Promise(r => setTimeout(r, 50));
+                        }
+                        const res = await window.fetchHelper.put('queue-jobs/cancel-job', { id: job.id });
+                        if (res && (res.status_code === 200 || res.status_code === 201)) {
+                            await this.fetchJobs(this.page);
+                        } else {
+                            const msg = res?.message || res?.detail || 'Có lỗi xảy ra khi dừng job.';
+                            alert(msg);
+                        }
+                    } catch (e) {
+                        console.error('Lỗi khi hủy job:', e);
+                        alert('Có lỗi xảy ra, vui lòng thử lại.');
+                    } finally {
+                        this.cancellingId = null;
+                    }
+                }
+            }));
+        }
+
+        if (window.Alpine) {
+            registerQueueJobsApp();
+        } else {
+            document.addEventListener('alpine:init', registerQueueJobsApp);
+        }
+    })();
 </script>
 
 <div class="qj-container" x-data="queueJobsApp()" x-init="initData()">
     <!-- Header -->
     <div class="qj-header">
         <div>
-            <h1 class="qj-title">Quản lý Queue Jobs</h1>
+            <h1 class="qj-title">Quản lý Tác vụ</h1>
             <p class="qj-sub">Theo dõi các tiến trình xử lý ngầm (Import nhân viên, xử lý hàng loạt...)</p>
         </div>
         <div class="qj-header-actions">
@@ -203,10 +203,13 @@
         </div>
 
         <div class="qj-search-box">
-            <label for="qj-search-input" class="sr-only" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0;">Tìm kiếm công việc</label>
+            <label for="qj-search-input" class="sr-only"
+                style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0;">Tìm
+                kiếm công việc</label>
             <span class="material-symbols-outlined qj-search-icon">search</span>
-            <input type="text" id="qj-search-input" name="search" class="qj-search-input" placeholder="Tìm kiếm công việc (nhập từ khóa)..."
-                x-model="searchQuery" @keydown.enter="fetchJobs(1)" aria-label="Tìm kiếm công việc" />
+            <input type="text" id="qj-search-input" name="search" class="qj-search-input"
+                placeholder="Tìm kiếm công việc (nhập từ khóa)..." x-model="searchQuery" @keydown.enter="fetchJobs(1)"
+                aria-label="Tìm kiếm công việc" />
         </div>
     </div>
 

@@ -13,11 +13,16 @@
         </div>
         {% endif %}
         <div class="card-body">
-            {% if event_status(event.start_at, event.end_at) == "ongoing" %}
-            <span class="event-status event-status--ongoing">Đang diễn ra</span>
-            {% else %}
-            <span class="event-status event-status--upcoming">Sắp diễn ra</span>
-            {% endif %}
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px;">
+                {% if event_status(event.start_at, event.end_at) == "ongoing" %}
+                <span class="event-status event-status--ongoing">Đang diễn ra</span>
+                {% else %}
+                <span class="event-status event-status--upcoming">Sắp diễn ra</span>
+                {% endif %}
+                <button type="button" class="btn-pin-event" data-event-id="{{ event.id }}" onclick="window.togglePinEvent({{ event.id }}, this, event)" title="Ghim sự kiện">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">push_pin</span>
+                </button>
+            </div>
             <h3 class="event-title">{{ event.name }}</h3>
 
             <div class="event-desc-block">

@@ -22,6 +22,7 @@ from .event_schemas import (
     CheckInEmployeeRequest,
     EmployeeIdsSchema,
     EmployeeInEvent,
+    EmpsCheckIn,
     EventCreateRequest,
     EventsPagination,
     EventUpdateRequest,
@@ -299,7 +300,9 @@ class EventServices:
         await self.session.commit()
 
         if check_in_employee.rowcount > 0:
-            await self.redis.invalidate_tags_async([CacheTags.EMPLOYEE])
+            await self.redis.invalidate_tags_async(
+                [CacheTags.EVENT_EMPS.value, CacheTags.EVENT.value]
+            )
             return BaseResponse.ok(True)
 
         return BaseResponse.fail(
@@ -390,3 +393,58 @@ class EventServices:
                 message="Bulk send event email thành công",
             )
         return BaseResponse.fail(message="Tạo job thất bại")
+
+    async def get_events_pined(
+        self, ids: list[int]
+    ) -> BaseResponse[list[EventsPagination]]:
+        if not ids:
+            return BaseResponse.ok([])
+        if len(ids) > 5:
+            return BaseResponse.fail("Bạn chỉ có thể ghim tối đa 5 sự kiện")
+        ids_set = set(ids)
+        events = (
+            await self.crud.select(EventsPagination)
+            .where(col(Events.id).in_(ids_set))
+            .find_many()
+        )
+        return BaseResponse.ok(
+            [
+                EventsPagination.model_validate(row, from_attributes=True)
+                for row in events
+            ]
+        )
+
+    async def emps_check_in(
+        self, pagiantion: PaginationRequest
+    ) -> BaseResponse[PaginationResponse]:
+
+        if pagiantion.sort_field is None:
+            pagiantion.sort_field = "check_in_at"
+
+        cache_key = self.redis.get_pagination_key(CacheTags.EVENT_EMPS, pagiantion)
+        pagination_emps = await self.redis.get_or_set_async(
+            key=cache_key,
+            async_func=lambda: (
+                self.ee_crud.select(
+                    EmpsCheckIn,
+                    logic_column=[
+                        col(Events.name).label(
+                            EmpsCheckIn.nameof(lambda e: e.event_name)
+                        )
+                    ],
+                )
+                .join(
+                    Events,
+                    col(EventsEmployees.event_id) == Events.id,
+                )
+                .join(
+                    Employees,
+                    col(EventsEmployees.employee_id) == Employees.id,
+                )
+                .pagination_async(pagiantion)
+            ),
+            tags=[CacheTags.EVENT_EMPS.value],
+            expires=60,
+        )
+
+        return BaseResponse.ok(pagination_emps)

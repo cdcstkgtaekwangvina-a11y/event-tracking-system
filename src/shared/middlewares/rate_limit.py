@@ -41,7 +41,10 @@ class RateLimit:
         if rq_count > self.request_per_windows:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Quá nhiều thao tác! Vui lòng thử lại sau.",
+                detail={
+                    "message": "Quá nhiều thao tác! Vui lòng thử lại sau.",
+                    "success": False,
+                },
             )
 
         return True
