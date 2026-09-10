@@ -7,7 +7,6 @@ from uuid6 import uuid8
 
 from database.models.app_db import SessionDep, SessionFactoryDep
 from database.models.media import Medias
-from src.modules.setting.setting_services import AppSettingServicesDep
 from src.shared.base import BaseCrud, BaseResponse
 from src.shared.constants.cache_tags import CacheTags
 from src.shared.schemas.pagination_schemas import (
@@ -21,6 +20,9 @@ from .media_constants import MediaType
 from .media_schemas import CreateMediaSchema, MediaMetaData, MediaSchema, UpdateMedia
 from .media_select import MediaSelect, PrefixSelect, ValidateNameSelect
 
+# Khoảng 50GB
+MAX_FILE_SIZE: int = 53687091200
+
 
 class MediaServices:
     def __init__(
@@ -28,14 +30,12 @@ class MediaServices:
         session: SessionDep,
         session_factory: SessionFactoryDep,
         vercel_blob: VercelBlobDep,
-        app_setting: AppSettingServicesDep,
         redis: RedisDep,
     ):
         self.session = session
         self.crud = BaseCrud(session, Medias)
         self.vercel_blob = vercel_blob
         self.session_factory = session_factory
-        self.app_setting = app_setting
         self.redis = redis
 
     # Validation helpers
@@ -288,24 +288,12 @@ class MediaServices:
         # 2. Xử lý trích xuất & kiểm tra File trước (Chưa upload)
         # ----------------------------------------------------------------
         if not payload.is_folder:
-            from src.modules.setting.setting_constants import AppConfigKey
-            from src.modules.setting.setting_schemas import FileConfigSchema
-
             if not payload.file:
                 return BaseResponse.fail("File không được để trống", status_code=400)
 
             # Kiểm tra dung lượng file
-            size_setting = await self.app_setting.get_setting_value(
-                AppConfigKey.file_config, model_cls=FileConfigSchema
-            )
-            if (
-                size_setting
-                and payload.file.size
-                and payload.file.size > size_setting.max_size_file
-            ):
-                return BaseResponse.fail(
-                    "Kích thước file quá lớn", status_code=400, data=size_setting
-                )
+            if payload.file.size and payload.file.size > MAX_FILE_SIZE:
+                return BaseResponse.fail("Kích thước file quá lớn")
 
             # Đọc thông tin metadata từ file gửi lên (Con trỏ file dịch chuyển về cuối)
             media_metadata = self.get_file_metadata(payload.file)

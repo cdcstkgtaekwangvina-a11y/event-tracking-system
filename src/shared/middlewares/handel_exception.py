@@ -75,7 +75,7 @@ def handle_exceptions(app: FastAPI, templates: Jinja2Templates) -> FastAPI:
             return JSONResponse(
                 status_code=status_code, content={"message": "Lỗi hệ thống"}
             )
-        return JSONResponse(status_code=status_code, content={"message": detail})
+        return JSONResponse(status_code=status_code, content=detail)
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(req: Request, exc: Exception):

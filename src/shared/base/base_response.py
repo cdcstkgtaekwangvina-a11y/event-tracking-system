@@ -1,8 +1,9 @@
+from typing import Any, Generic, TypeVar
+
 from fastapi import HTTPException
-from typing import TypeVar, Generic, Optional, Any
-from typing_extensions import Self
-from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from typing_extensions import Self
 
 T = TypeVar("T")
 
@@ -10,7 +11,7 @@ T = TypeVar("T")
 class BaseResponse(JSONResponse, Generic[T]):
     message: str
     success: bool
-    data: Optional[T] = None
+    data: T | None = None
     status_code: int
 
     def __init__(
@@ -18,7 +19,7 @@ class BaseResponse(JSONResponse, Generic[T]):
         status_code: int,
         success: bool,
         message: str,
-        data: Optional[T] = None,
+        data: T | None = None,
         **kwargs,
     ):
         self.success = success
@@ -58,7 +59,9 @@ class BaseResponse(JSONResponse, Generic[T]):
         raise HTTPException(status_code=status_code, detail=response_content)
 
     @classmethod
-    def unauthorized(cls, message="Unauthorized", status_code=401, data=None) -> Self:
+    def unauthorized(
+        cls, message="Vui lòng đăng nhập", status_code=401, data=None
+    ) -> Self:
         response_content = {
             "success": False,
             "status_code": status_code,
