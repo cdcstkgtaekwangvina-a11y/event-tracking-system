@@ -1,4 +1,740 @@
 {% extends "templates/layouts/admin.j2" %}
-{% block admin_title %}Dashboard{% endblock %}
+{% block admin_title %}Dashboard - Tổng quan hệ thống{% endblock %}
 
-{% block admin_body %}{% endblock %}
+{% block admin_body %}
+<div class="dashboard-wrapper"
+    x-data="adminDashboard({ initialPage: {{ page | default(1) }}, search: '{{ search | default('') }}', status: '{{ status | default('all') }}', sort_field: '{{ sort_field | default('check_in_at') }}', is_desc: {{ is_desc | default(true) | lower }} })"
+    x-init="init()">
+    <!-- Dashboard Header -->
+    <header class="dashboard-header">
+        <h1 class="dashboard-title">Dashboard</h1>
+        <p class="dashboard-subtitle">Tổng quan hệ thống hôm nay</p>
+    </header>
+
+    <!-- Main Grid: Left (Stats + Check-ins) | Right (Events) -->
+    <div class="dashboard-grid">
+        <!-- LEFT COLUMN -->
+        <div class="dashboard-main-col">
+            <!-- 1. Top 3 Stat Cards Row -->
+            <section class="stat-cards-row" aria-label="Thống kê tổng quan">
+                <!-- Card 1: Tổng tài khoản -->
+                <div class="stat-card">
+                    <div class="stat-card-top">
+                        <div class="stat-icon-wrapper stat-icon--accounts">
+                            <span class="material-symbols-outlined">group</span>
+                        </div>
+                        <span class="stat-trend-badge">
+                            <span class="material-symbols-outlined">trending_up</span>
+                            <span>+3 tháng này</span>
+                        </span>
+                    </div>
+                    <div class="stat-card-body">
+                        <span class="stat-label">Tổng tài khoản</span>
+                        <span class="stat-value" x-text="stats.count_acc ?? '...'"></span>
+                        <span class="stat-desc">Toàn bộ tài khoản hệ thống</span>
+                    </div>
+                </div>
+
+                <!-- Card 2: Check-in hôm nay -->
+                <div class="stat-card">
+                    <div class="stat-card-top">
+                        <div class="stat-icon-wrapper stat-icon--checkin">
+                            <span class="material-symbols-outlined">check_circle</span>
+                        </div>
+                        <span class="stat-trend-badge">
+                            <span class="material-symbols-outlined">trending_up</span>
+                            <span>+12% so với hôm qua</span>
+                        </span>
+                    </div>
+                    <div class="stat-card-body">
+                        <span class="stat-label">Điểm danh hôm nay</span>
+                        <span class="stat-value" x-text="stats.count_check_in_today ?? '...'"></span>
+                        <span class="stat-desc"
+                            x-text="stats.count_acc ? (Math.round((stats.count_check_in_today / (stats.count_acc || 1)) * 100) + '% nhân viên đã điểm danh') : 'Số lượt điểm danh hôm nay'"></span>
+                    </div>
+                </div>
+
+                <!-- Card 3: Tổng số file -->
+                <div class="stat-card">
+                    <div class="stat-card-top">
+                        <div class="stat-icon-wrapper stat-icon--files">
+                            <span class="material-symbols-outlined">folder</span>
+                        </div>
+                        <span class="stat-trend-badge">
+                            <span class="material-symbols-outlined">trending_up</span>
+                            <span>+7 tuần này</span>
+                        </span>
+                    </div>
+                    <div class="stat-card-body">
+                        <span class="stat-label">Tổng số file</span>
+                        <span class="stat-value" x-text="stats.count_file ?? '...'"></span>
+                        <span class="stat-desc">Đã tải lên hệ thống</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Recent Check-in List Section -->
+            <section class="checkin-card-container" aria-labelledby="checkin-title">
+                <div class="checkin-card-header">
+                    <div class="checkin-card-header-left">
+                        <h2 id="checkin-title" class="checkin-card-title">Danh sách điểm danh gần đây</h2>
+                        <span class="checkin-card-meta"
+                            x-text="`${checkInMeta.total} lượt - Hôm nay ${currentDateFormatted()}`"></span>
+                    </div>
+                    <div class="checkin-card-header-right">
+                        <span class="page-badge"
+                            x-text="`Trang ${checkInMeta.page}/${checkInMeta.total_pages || 1}`"></span>
+                    </div>
+                </div>
+
+                <!-- Filter / Search toolbar -->
+                <div class="checkin-toolbar">
+                    <div class="checkin-search-box">
+                        <span class="material-symbols-outlined">search</span>
+                        <input type="text" class="checkin-search-input"
+                            placeholder="Tìm kiếm nhân viên, chức vụ, sự kiện..." x-model="filters.search"
+                            @input.debounce.350ms="onFilterChange()" />
+                    </div>
+
+                    <select class="checkin-filter-select" x-model="filters.status" @change="onFilterChange()">
+                        <option value="all">Tất cả trạng thái</option>
+                        <option value="CHECK_IN">Đúng giờ / Đã điểm danh</option>
+                        <option value="PENDING">Chờ điểm danh</option>
+                        <option value="SENT">Đã gửi lời mời</option>
+                    </select>
+
+                    <select class="checkin-filter-select" x-model="filters.sort_field" @change="onFilterChange()">
+                        <option value="check_in_at">Sắp xếp theo Giờ điểm danh</option>
+                        <option value="name">Sắp xếp theo Tên nhân viên</option>
+                    </select>
+
+                    <select class="checkin-filter-select" x-model="filters.is_desc" @change="onFilterChange()">
+                        <option :value="true">Mới nhất trước</option>
+                        <option :value="false">Cũ nhất trước</option>
+                    </select>
+                </div>
+
+                <!-- Table Wrapper -->
+                <div class="checkin-table-wrapper">
+                    <table class="checkin-table">
+                        <thead>
+                            <tr>
+                                <th>Nhân viên</th>
+                                <th>Phòng ban</th>
+                                <th>Sự kiện</th>
+                                <th>Giờ</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Loading state -->
+                            <template x-if="isLoadingCheckIns">
+                                <tr>
+                                    <td colspan="5"
+                                        style="text-align: center; padding: 32px; color: var(--text-secondary);">
+                                        <div style="display: inline-flex; align-items: center; gap: 8px;">
+                                            <span class="material-symbols-outlined"
+                                                style="animation: spin 1s linear infinite;">progress_activity</span>
+                                            <span>Đang tải danh sách điểm danh...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+
+                            <!-- Data Rows -->
+                            <template x-if="!isLoadingCheckIns && checkIns.length > 0">
+                                <template x-for="(item, idx) in checkIns"
+                                    :key="item.employee_id + '_' + (item.event_id || idx)">
+                                    <tr>
+                                        <!-- Employee Info -->
+                                        <td>
+                                            <div class="employee-cell">
+                                                <div class="employee-avatar"
+                                                    :style="`background: ${getAvatarColor(item.employee_name)}`">
+                                                    <span x-text="getInitials(item.employee_name)"></span>
+                                                </div>
+                                                <div class="employee-info">
+                                                    <span class="employee-name"
+                                                        x-text="item.employee_name || 'Chưa có tên'"></span>
+                                                    <span class="employee-role"
+                                                        x-text="item.employee_position || 'Nhân viên'"></span>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <!-- Department -->
+                                        <td>
+                                            <span style="color: var(--text-secondary);"
+                                                x-text="item.employee_department || '--'"></span>
+                                        </td>
+
+                                        <!-- Event Name -->
+                                        <td>
+                                            <span class="event-name-cell" x-text="item.event_name || '--'"
+                                                :title="item.event_name"></span>
+                                        </td>
+
+                                        <!-- Check-in Time -->
+                                        <td>
+                                            <span class="time-cell" x-text="formatTime(item.check_in_at)"></span>
+                                        </td>
+
+                                        <!-- Status Badge -->
+                                        <td>
+                                            <span :class="`status-pill status-pill--${getStatusClass(item.status)}`">
+                                                <span class="status-pill-dot"></span>
+                                                <span x-text="getStatusLabel(item.status)"></span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </template>
+
+                            <!-- Empty State -->
+                            <template x-if="!isLoadingCheckIns && checkIns.length === 0">
+                                <tr>
+                                    <td colspan="5"
+                                        style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                        <div
+                                            style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                            <span class="material-symbols-outlined"
+                                                style="font-size: 36px; opacity: 0.5;">how_to_reg</span>
+                                            <span style="font-size: 14px; font-weight: 500;">Chưa có lượt điểm danh nào
+                                                phù hợp</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Bar -->
+                <div class="checkin-pagination-bar" x-show="checkInMeta.total > 0">
+                    <span class="pagination-summary" x-text="getPaginationSummary()"></span>
+                    <div class="pagination-controls">
+                        <!-- Prev Page Button -->
+                        <button type="button" class="pagination-btn" :disabled="checkInMeta.page <= 1"
+                            @click="changePage(checkInMeta.page - 1)" title="Trang trước">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">chevron_left</span>
+                        </button>
+
+                        <!-- Page Number Buttons -->
+                        <template x-for="p in getPageNumbers()" :key="p">
+                            <button type="button" class="pagination-btn" :class="{ 'active': p === checkInMeta.page }"
+                                @click="changePage(p)" x-text="p">
+                            </button>
+                        </template>
+
+                        <!-- Next Page Button -->
+                        <button type="button" class="pagination-btn"
+                            :disabled="checkInMeta.page >= checkInMeta.total_pages"
+                            @click="changePage(checkInMeta.page + 1)" title="Trang sau">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- RIGHT COLUMN: PINNED & UPCOMING EVENTS -->
+        <aside class="dashboard-side-col" aria-label="Sự kiện sắp diễn ra">
+            <!-- Side Panel Header -->
+            <div class="side-panel-header">
+                <span class="material-symbols-outlined side-panel-icon">calendar_month</span>
+                <div class="side-panel-header-text">
+                    <h2 class="side-panel-title">Sự kiện sắp diễn ra</h2>
+                    <p class="side-panel-subtitle">Ghim để theo dõi nhanh</p>
+                </div>
+            </div>
+
+            <!-- 1. SECTION: ĐÃ GHIM -->
+            <div>
+                <div class="section-label">
+                    <span class="material-symbols-outlined">push_pin</span>
+                    <span>ĐÃ GHIM</span>
+                    <span style="font-size: 10px; opacity: 0.7;" x-text="`(${pinnedEvents.length}/5)`"></span>
+                </div>
+
+                <!-- Pinned Cards List -->
+                <template x-if="pinnedEvents.length > 0">
+                    <div>
+                        <template x-for="event in pinnedEvents" :key="'pin_' + event.id">
+                            <div class="event-mini-card accent-gradient-purple">
+                                <div class="event-mini-top">
+                                    <h3 class="event-mini-title" x-text="event.name"></h3>
+                                    <button type="button" class="btn-pin-toggle is-pinned" @click="togglePin(event.id)"
+                                        title="Bỏ ghim">
+                                        <span class="material-symbols-outlined"
+                                            style="font-variation-settings: 'FILL' 1;">push_pin</span>
+                                    </button>
+                                </div>
+                                <span class="event-mini-tag" x-text="getCategory(event.name)"></span>
+                                <div class="event-mini-meta">
+                                    <div class="event-mini-meta-item">
+                                        <span class="material-symbols-outlined">calendar_today</span>
+                                        <span x-text="formatDateRange(event.start_at, event.end_at)"></span>
+                                    </div>
+                                    <div class="event-mini-meta-item" x-show="event.location">
+                                        <span class="material-symbols-outlined">location_on</span>
+                                        <span x-text="event.location"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Empty Pinned state -->
+                <template x-if="pinnedEvents.length === 0">
+                    <div class="empty-pinned-box">
+                        <span class="material-symbols-outlined"
+                            style="font-size: 24px; opacity: 0.4; display: block; margin-bottom: 4px;">keep</span>
+                        <span>Chưa có sự kiện nào được ghim. Bấm biểu tượng ghim trên sự kiện để theo dõi nhanh tại
+                            đây.</span>
+                    </div>
+                </template>
+            </div>
+
+            <!-- 2. SECTION: SẮP DIỄN RA -->
+            <div>
+                <div class="section-label">
+                    <span class="material-symbols-outlined">schedule</span>
+                    <span>SẮP DIỄN RA</span>
+                </div>
+
+                <template x-if="upcomingEvents.length > 0">
+                    <div>
+                        <template x-for="(event, idx) in upcomingEvents" :key="'up_' + event.id">
+                            <div class="event-mini-card" :class="getAccentClass(idx)">
+                                <div class="event-mini-top">
+                                    <h3 class="event-mini-title" x-text="event.name"></h3>
+                                    <button type="button" class="btn-pin-toggle"
+                                        :class="{ 'is-pinned': pinnedIds.includes(event.id) }"
+                                        @click="togglePin(event.id)"
+                                        :title="pinnedIds.includes(event.id) ? 'Bỏ ghim' : 'Ghim sự kiện'">
+                                        <span class="material-symbols-outlined"
+                                            :style="pinnedIds.includes(event.id) ? 'font-variation-settings: \'FILL\' 1;' : ''">push_pin</span>
+                                    </button>
+                                </div>
+                                <span class="event-mini-tag" x-text="getCategory(event.name)"></span>
+                                <div class="event-mini-meta">
+                                    <div class="event-mini-meta-item">
+                                        <span class="material-symbols-outlined">calendar_today</span>
+                                        <span x-text="formatDateRange(event.start_at, event.end_at)"></span>
+                                    </div>
+                                    <div class="event-mini-meta-item" x-show="event.location">
+                                        <span class="material-symbols-outlined">location_on</span>
+                                        <span x-text="event.location"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <template x-if="upcomingEvents.length === 0">
+                    <div class="empty-pinned-box">
+                        <span>Không có sự kiện nào sắp tới.</span>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Bottom Summary Widgets -->
+            <div class="side-summary-widgets">
+                <div class="side-summary-box">
+                    <span class="side-summary-number" x-text="upcomingTotal || upcomingEvents.length"></span>
+                    <span class="side-summary-text">Sự kiện</span>
+                </div>
+                <div class="side-summary-box">
+                    <span class="side-summary-number" x-text="pinnedIds.length"></span>
+                    <span class="side-summary-text">Đã ghim</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<script>
+    function adminDashboard(config) {
+        return {
+            // Stats
+            stats: {
+                count_acc: 0,
+                count_check_in_today: 0,
+                count_file: 0
+            },
+
+            // Pinned Events
+            pinnedIds: [],
+            pinnedEvents: [],
+
+            // Upcoming Events
+            upcomingEvents: [],
+            upcomingTotal: 0,
+
+            // Check-ins
+            checkIns: [],
+            isLoadingCheckIns: false,
+            checkInMeta: {
+                page: 1,
+                limit: 10,
+                total: 0,
+                total_pages: 1
+            },
+
+            // Filters (synced with URL)
+            filters: {
+                search: '',
+                status: 'all',
+                sort_field: 'check_in_at',
+                is_desc: true
+            },
+
+            async init() {
+                // 1. Use server-provided config values for filters
+                this.checkInMeta.page = config.initialPage || 1;
+                this.filters.search = config.search || '';
+                this.filters.status = config.status || 'all';
+                this.filters.sort_field = config.sort_field || 'check_in_at';
+                this.filters.is_desc = config.is_desc !== undefined ? config.is_desc : true;
+
+                // 2. Load pinned IDs from localStorage
+                try {
+                    const stored = localStorage.getItem('pinned_event_ids');
+                    this.pinnedIds = stored ? JSON.parse(stored) : [];
+                    if (!Array.isArray(this.pinnedIds)) this.pinnedIds = [];
+                } catch (e) {
+                    this.pinnedIds = [];
+                }
+
+                // Expose global helper for external cards
+                window.togglePinEventGlobal = (event, eventId) => {
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    this.togglePin(eventId);
+                };
+
+                // Listen to pin events changed from cards or other components
+                window.addEventListener('pinned-events-changed', async () => {
+                    this.pinnedIds = window.getPinnedEventIds ? window.getPinnedEventIds() : JSON.parse(localStorage.getItem('pinned_event_ids') || '[]');
+                    await this.loadPinnedEvents();
+                });
+
+                // 3. Parallel fetch data
+                await Promise.all([
+                    this.loadDashboardStats(),
+                    this.loadPinnedEvents(),
+                    this.loadUpcomingEvents(),
+                    this.loadCheckIns(this.checkInMeta.page)
+                ]);
+
+                // Listen to popstate (browser back/forward)
+                window.addEventListener('popstate', () => {
+                    const p = new URLSearchParams(window.location.search);
+                    this.checkInMeta.page = parseInt(p.get('page')) || 1;
+                    this.filters.search = p.get('search') || '';
+                    this.filters.status = p.get('status') || 'all';
+                    this.filters.sort_field = p.get('sort_field') || 'check_in_at';
+                    this.filters.is_desc = p.get('is_desc') ? (p.get('is_desc') === 'true') : true;
+                    this.loadCheckIns(this.checkInMeta.page, false);
+                });
+            },
+
+            // API 1: /api/dashboard-stats
+            async loadDashboardStats() {
+                try {
+                    const res = await fetch('/api/dashboard-stats');
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json.data) {
+                            this.stats = json.data;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Lỗi khi tải dashboard stats:', e);
+                }
+            },
+
+            // API 2: /api/events/events-pined?ids=...
+            async loadPinnedEvents() {
+                if (!this.pinnedIds || this.pinnedIds.length === 0) {
+                    this.pinnedEvents = [];
+                    return;
+                }
+                try {
+                    const queryStr = this.pinnedIds.map(id => `ids=${encodeURIComponent(id)}`).join('&');
+                    const res = await fetch(`/api/events/events-pined?${queryStr}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        this.pinnedEvents = json.data || [];
+                    }
+                } catch (e) {
+                    console.error('Lỗi khi tải sự kiện ghim:', e);
+                }
+            },
+
+            // API 3: Upcoming Events (/api/events?limit=5)
+            async loadUpcomingEvents() {
+                try {
+                    const res = await fetch('/api/events?limit=5&sort_field=start_at&is_desc=false');
+                    if (res.ok) {
+                        const json = await res.json();
+                        const pagination = json.data;
+                        if (pagination) {
+                            this.upcomingEvents = pagination.data || [];
+                            this.upcomingTotal = pagination.total || this.upcomingEvents.length;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Lỗi khi tải sự kiện gần đây:', e);
+                }
+            },
+
+            // Toggle Pin handler
+            async togglePin(eventId) {
+                eventId = parseInt(eventId);
+                if (!eventId) return;
+
+                if (typeof window.togglePinEvent === 'function') {
+                    window.togglePinEvent(eventId);
+                } else {
+                    const index = this.pinnedIds.indexOf(eventId);
+                    if (index > -1) {
+                        this.pinnedIds.splice(index, 1);
+                        localStorage.setItem('pinned_event_ids', JSON.stringify(this.pinnedIds));
+                        window.notify?.toast?.info('Đã bỏ ghim sự kiện');
+                    } else {
+                        if (this.pinnedIds.length >= 5) {
+                            window.notify?.toast?.warning('Bạn chỉ có thể ghim tối đa 5 sự kiện');
+                            return;
+                        }
+                        this.pinnedIds.push(eventId);
+                        localStorage.setItem('pinned_event_ids', JSON.stringify(this.pinnedIds));
+                        window.notify?.toast?.success('Đã ghim sự kiện thành công');
+                    }
+                }
+
+                this.pinnedIds = window.getPinnedEventIds ? window.getPinnedEventIds() : JSON.parse(localStorage.getItem('pinned_event_ids') || '[]');
+                await this.loadPinnedEvents();
+            },
+
+            // API 4: /api/events/emps-check-in
+            async loadCheckIns(page = 1, updateUrl = true) {
+                this.isLoadingCheckIns = true;
+                this.checkInMeta.page = page;
+
+                if (updateUrl) {
+                    this.syncUrl();
+                }
+
+                try {
+                    const params = new URLSearchParams();
+                    params.append('page', page);
+                    params.append('limit', 10); // Fixed limit 10 as requested
+                    if (this.filters.search && this.filters.search.trim()) {
+                        params.append('search', this.filters.search.trim());
+                    }
+                    if (this.filters.sort_field) {
+                        params.append('sort_field', this.filters.sort_field);
+                    }
+                    params.append('is_desc', this.filters.is_desc);
+
+                    if (this.filters.status && this.filters.status !== 'all') {
+                        const filterArr = [{ field: 'status', value: this.filters.status }];
+                        params.append('filters', JSON.stringify(filterArr));
+                    }
+
+                    const res = await fetch(`/api/events/emps-check-in?${params.toString()}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        const pageData = json.data;
+                        if (pageData) {
+                            this.checkIns = pageData.data || [];
+                            this.checkInMeta.total = pageData.total || 0;
+                            this.checkInMeta.total_pages = Math.ceil(pageData.total / 10) || 1;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Lỗi tải danh sách điểm danh:', e);
+                } finally {
+                    this.isLoadingCheckIns = false;
+                }
+            },
+
+            onFilterChange() {
+                this.loadCheckIns(1, true);
+            },
+
+            changePage(p) {
+                if (p < 1 || p > this.checkInMeta.total_pages) return;
+                this.loadCheckIns(p, true);
+            },
+
+            // Synchronize search, status, sort_field, is_desc, and page to URL query (WITHOUT limit)
+            syncUrl() {
+                const url = new URL(window.location.href);
+                if (this.checkInMeta.page > 1) {
+                    url.searchParams.set('page', this.checkInMeta.page);
+                } else {
+                    url.searchParams.delete('page');
+                }
+
+                if (this.filters.search && this.filters.search.trim()) {
+                    url.searchParams.set('search', this.filters.search.trim());
+                } else {
+                    url.searchParams.delete('search');
+                }
+
+                if (this.filters.status && this.filters.status !== 'all') {
+                    url.searchParams.set('status', this.filters.status);
+                } else {
+                    url.searchParams.delete('status');
+                }
+
+                if (this.filters.sort_field && this.filters.sort_field !== 'check_in_at') {
+                    url.searchParams.set('sort_field', this.filters.sort_field);
+                } else {
+                    url.searchParams.delete('sort_field');
+                }
+
+                if (this.filters.is_desc !== true) {
+                    url.searchParams.set('is_desc', 'false');
+                } else {
+                    url.searchParams.delete('is_desc');
+                }
+
+                // Explicitly ensure 'limit' is never on query
+                url.searchParams.delete('limit');
+
+                window.history.pushState(null, '', url.pathname + url.search);
+            },
+
+            // Helper UI methods
+            currentDateFormatted() {
+                const now = new Date();
+                return `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+            },
+
+            formatTime(isoString) {
+                if (!isoString) return '--:--';
+                try {
+                    const d = new Date(isoString);
+                    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                } catch (e) {
+                    return '--:--';
+                }
+            },
+
+            formatDateRange(startIso, endIso) {
+                if (!startIso) return 'Chưa xác định';
+                try {
+                    const start = new Date(startIso);
+                    const dayStr = `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')}/${start.getFullYear()}`;
+                    const startTime = start.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    if (endIso) {
+                        const end = new Date(endIso);
+                        const endTime = end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        return `${dayStr} ${startTime} - ${endTime}`;
+                    }
+                    return `${dayStr} ${startTime}`;
+                } catch (e) {
+                    return 'Chưa xác định';
+                }
+            },
+
+            getInitials(name) {
+                if (!name) return 'NV';
+                const parts = name.trim().split(/\s+/);
+                if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            },
+
+            getAvatarColor(name) {
+                const colors = [
+                    'linear-gradient(135deg, #a855f7, #6366f1)',
+                    'linear-gradient(135deg, #10b981, #059669)',
+                    'linear-gradient(135deg, #f59e0b, #d97706)',
+                    'linear-gradient(135deg, #ec4899, #f43f5e)',
+                    'linear-gradient(135deg, #06b6d4, #0284c7)',
+                    'linear-gradient(135deg, #8b5cf6, #3b82f6)'
+                ];
+                let hash = 0;
+                const str = name || 'default';
+                for (let i = 0; i < str.length; i++) {
+                    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                return colors[Math.abs(hash) % colors.length];
+            },
+
+            getStatusClass(status) {
+                if (status === 'CHECK_IN') return 'success';
+                if (status === 'PENDING') return 'warning';
+                if (status === 'SENT') return 'info';
+                if (status === 'SEND_FAIL') return 'danger';
+                return 'success';
+            },
+
+            getStatusLabel(status) {
+                if (status === 'CHECK_IN') return 'Đúng giờ';
+                if (status === 'PENDING') return 'Chờ điểm danh';
+                if (status === 'SENT') return 'Đã gửi mail';
+                if (status === 'SEND_FAIL') return 'Gửi thất bại';
+                return status || 'Đúng giờ';
+            },
+
+            getCategory(name) {
+                if (!name) return 'Hoạt động';
+                const n = name.toLowerCase();
+                if (n.includes('hội nghị') || n.includes('conference')) return 'Hội nghị';
+                if (n.includes('workshop') || n.includes('đào tạo') || n.includes('training')) return 'Đào tạo';
+                if (n.includes('gala') || n.includes('tiệc') || n.includes('dinner')) return 'Tiệc';
+                if (n.includes('kick-off') || n.includes('họp') || n.includes('meeting')) return 'Họp';
+                if (n.includes('team') || n.includes('building')) return 'Hoạt động';
+                return 'Sự kiện';
+            },
+
+            getAccentClass(idx) {
+                const classes = ['accent-teal', 'accent-coral', 'accent-amber', 'accent-blue', 'accent-gradient-purple'];
+                return classes[idx % classes.length];
+            },
+
+            getPaginationSummary() {
+                if (this.checkInMeta.total === 0) return 'Không có bản ghi';
+                const start = (this.checkInMeta.page - 1) * this.checkInMeta.limit + 1;
+                const end = Math.min(this.checkInMeta.page * this.checkInMeta.limit, this.checkInMeta.total);
+                return `Hiển thị ${start}-${end} trong ${this.checkInMeta.total} bản ghi`;
+            },
+
+            getPageNumbers() {
+                const total = this.checkInMeta.total_pages || 1;
+                const current = this.checkInMeta.page;
+                const pages = [];
+                let start = Math.max(1, current - 2);
+                let end = Math.min(total, start + 4);
+                if (end - start < 4) {
+                    start = Math.max(1, end - 4);
+                }
+                for (let i = start; i <= end; i++) {
+                    pages.push(i);
+                }
+                return pages;
+            }
+        };
+    }
+</script>
+
+<style>
+    @keyframes spin {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+{% endblock %}

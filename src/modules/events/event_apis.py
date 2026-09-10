@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 
-from fastapi import Depends
+from fastapi import Depends, Query
 from fastapi.responses import HTMLResponse
 
 from src.shared.base import BaseRouter
 from src.shared.base.base_request import BaseRequest
 from src.shared.helpers.cbv import clean_cbv
 from src.shared.middlewares.rate_limit import rate_limit
-from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagination
+from src.shared.schemas.pagination_schemas import PaginationQuery
 
 from .event_schemas import (
     AdminEventQuery,
@@ -45,6 +45,16 @@ def get_event_status(start_at: datetime | None, end_at: datetime | None) -> str:
     return "upcoming"
 
 
+def parse_pinned_ids(ids: list[str] = Query(default=[])) -> list[int]:
+    result: list[int] = []
+    for item in ids:
+        for part in str(item).split(","):
+            part = part.strip()
+            if part.isdigit():
+                result.append(int(part))
+    return result
+
+
 @clean_cbv(router)
 class EventController:
     def __init__(self, service: EventServices = Depends()):
@@ -55,7 +65,7 @@ class EventController:
         return await self.service.create_event(event)
 
     @router.get_api()
-    async def get_events(self, q: PaginationRequest = Depends(parse_pagination)):
+    async def get_events(self, q: PaginationQuery):
         return await self.service.get_events(q)
 
     @router.get_api("cards-html", response_class=HTMLResponse)
@@ -116,6 +126,18 @@ class EventController:
             },
         )
 
+    @router.get_api("events-pined")
+    async def get_events_pined(self, ids: list[int] = Depends(parse_pinned_ids)):
+        return await self.service.get_events_pined(ids)
+
+    @router.get_api("emps-check-in")
+    async def emps_check_in(self, q: PaginationQuery):
+        return await self.service.emps_check_in(q)
+
+    @router.post_api("check-in")
+    async def check_in_event(self, schema: CheckInEmployeeRequest):
+        return await self.service.check_in_employee(schema)
+
     @router.get_api("{event_id}")
     async def get_event_by_id(self, event_id: int):
         return await self.service.get_event_by_id(event_id)
@@ -139,10 +161,6 @@ class EventController:
     @router.delete_api("{event_id}/remove-registers")
     async def remove_registers_event(self, event_id: int, schema: EmployeeIdsSchema):
         return await self.service.remove_employee_froms_event(event_id, schema)
-
-    @router.post_api("check-in")
-    async def check_in_event(self, schema: CheckInEmployeeRequest):
-        return await self.service.check_in_employee(schema)
 
     @router.get_api(
         "{event_id}/analytics", dependencies=[rate_limit(request_per_windows=60)]

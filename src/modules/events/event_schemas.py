@@ -145,3 +145,16 @@ class BulkSendEventEmail(BaseSchema):
             if len(self.employees) == 0:
                 raise ValueError("Vui lòng chọn ít nhất một nhân viên")
         return self
+
+
+class EmpsCheckIn(BaseSchema):
+    status: str
+    join_at: datetime | None
+    check_in_at: datetime | None
+    send_at: datetime | None
+    event_id: int | None
+    event_name: str | None
+    employee_id: int | None
+    employee_name: str | None
+    employee_department: str | None
+    employee_position: str | None

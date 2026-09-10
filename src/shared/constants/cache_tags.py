@@ -8,3 +8,4 @@ class CacheTags(StrEnum):
     MEDIA = "media"
     QUEUE_JOB = "queue_job"
     SETTING = "setting"
+    EVENT_EMPS = "event_emps"
