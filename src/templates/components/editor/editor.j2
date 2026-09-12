@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="/static/css/editor/editor.css?v=20260813-2">
+<link rel="stylesheet" href="/static/css/editor/editor.css?v=20260912-3">
 <link rel="stylesheet" href="/static/css/media_picker.css?v=20260912-1">
 
 <div class="editor-wrapper" x-data="editorApp()" x-init="initEditor($el)"
@@ -81,7 +81,7 @@
     #}
 
     <!-- Editor Content Area -->
-    <div class="editor-container">
+    <div class="editor-container" @click="if ($event.target === $el) window.myEditor?.commands.focus('end')">
         <div id="editor"></div>
     </div>
 
@@ -646,6 +646,10 @@
                             }
                         }, 250);
                     });
+
+                    editorEl.querySelector('.editor-container')?.addEventListener('scroll', () => {
+                        this.visible = false;
+                    });
                 },
                 onMouseDown(e) {
                     if (this.activeBlock) {
@@ -767,19 +771,27 @@
 
                 let tr = state.tr;
 
+                const safeSplit = (splitPos) => {
+                    try {
+                        if (splitPos > 0 && splitPos < tr.doc.content.size) {
+                            tr.split(splitPos);
+                            return true;
+                        }
+                    } catch (e) {
+                        // Position might not be a valid split point
+                    }
+                    return false;
+                };
+
                 // 1. If selection ends before the end of its textblock, split at `to`
                 let $to = tr.doc.resolve(to);
                 if ($to.parent.isTextblock) {
                     const nextNode = tr.doc.nodeAt(to);
                     if (nextNode && nextNode.type.name === 'hard_break') {
                         tr.delete(to, to + 1);
-                        if (tr.canSplit(to)) {
-                            tr.split(to);
-                        }
+                        safeSplit(to);
                     } else if ($to.parentOffset < $to.parent.content.size && $to.parentOffset > 0) {
-                        if (tr.canSplit(to)) {
-                            tr.split(to);
-                        }
+                        safeSplit(to);
                     }
                 }
 
@@ -792,11 +804,9 @@
                         const prevNode = prevPos >= 0 ? tr.doc.nodeAt(prevPos) : null;
                         if (prevNode && prevNode.type.name === 'hard_break') {
                             tr.delete(prevPos, from);
-                            if (tr.canSplit(prevPos)) {
-                                tr.split(prevPos);
-                            }
-                        } else if (tr.canSplit(from)) {
-                            tr.split(from);
+                            safeSplit(prevPos);
+                        } else if ($from.parentOffset < $from.parent.content.size) {
+                            safeSplit(from);
                         }
                     }
                 }
@@ -837,11 +847,17 @@
                 for (let i = blockPositions.length - 1; i >= 0; i--) {
                     const { pos, node } = blockPositions[i];
                     if (targetType) {
-                        tr.setNodeMarkup(pos, targetType, { ...node.attrs, ...targetAttrs });
+                        try {
+                            tr.setNodeMarkup(pos, targetType, { ...node.attrs, ...targetAttrs });
+                        } catch (e) {
+                            console.warn('Cannot setNodeMarkup:', e);
+                        }
                     }
                 }
 
-                view.dispatch(tr);
+                if (tr.docChanged) {
+                    view.dispatch(tr);
+                }
                 window.myEditor.commands.focus();
             }
         };
@@ -853,7 +869,7 @@
     import {
         Editor, Node, Extension, InputRule, StarterKit, Image, TableKit, Underline, Highlight, TextStyle, Color,
         TextAlign, Link, Dropcursor, OrderedList, BulletList, Placeholder, Markdown
-    } from '/static/js/vendors/tiptap.js';
+    } from '/static/js/vendors/tiptap.js?v=2.1';
 
     // Markdown inline link input rule: [text](url)
     const MarkdownLinkInputRule = Extension.create({
