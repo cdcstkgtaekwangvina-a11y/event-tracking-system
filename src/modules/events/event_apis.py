@@ -146,6 +146,10 @@ class EventController:
     async def update_event(self, event_id: int, event: EventUpdateRequest):
         return await self.service.update_event(event_id, event)
 
+    @router.patch_api("{event_id}/status")
+    async def change_status(self, event_id: int):
+        return await self.service.change_status(event_id)
+
     @router.delete_api("{event_id}")
     async def delete_event(self, event_id: int):
         return await self.service.delete_event(event_id)
