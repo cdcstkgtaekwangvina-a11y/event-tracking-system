@@ -88,7 +88,7 @@
     <!-- Media Picker Modal -->
     <div class="media-picker-modal" x-show="mediaPicker.open" x-cloak
         @keydown.escape.window="mediaPicker.open && closeMediaPicker()">
-        <div class="media-picker-backdrop" @click="closeMediaPicker()"></div>
+        <div class="media-picker-backdrop" @dblclick="closeMediaPicker()"></div>
         <div class="media-picker-dialog" @click.stop>
             <div class="media-picker-header">
                 <div>
@@ -190,10 +190,6 @@
                     </div>
                     <div class="media-body media-picker-items" id="editor-media-picker-items"
                         :class="{ 'is-loading': mediaPicker.loading }">
-                        <div class="media-loading" x-show="mediaPicker.loading">
-                            <div class="spinner-sm"></div>
-                            <span>Đang tải dữ liệu...</span>
-                        </div>
                     </div>
                 </div>
                 <aside class="media-picker-sidebar">
@@ -448,7 +444,6 @@
                 }
 
                 const url = "{{ url_for('media_manager') }}/items/html?" + params.toString();
-                container.innerHTML = '<div class="media-loading"><div class="spinner-sm"></div><span>Đang tải dữ liệu...</span></div>';
                 try {
                     await htmx.ajax('GET', url, { target: '#editor-media-picker-items', swap: 'innerHTML' });
                 } finally {
@@ -578,7 +573,6 @@
                 }
 
                 this.mediaPicker.uploading = true;
-                const loadingId = window.notify?.toast?.loading?.('Đang xử lý', 'Đang tải file lên...');
                 try {
                     const formData = new FormData();
                     formData.append('name', file.name);
@@ -589,7 +583,7 @@
                     }
 
                     const res = await window.fetchHelper.post('media', formData);
-                    if (loadingId) window.notify?.toast?.dismiss?.(loadingId);
+                    this.mediaPicker.uploading = false;
 
                     if (res?.status_code === 201) {
                         window.notify?.toast?.success?.('Thành công', 'Đã tải file lên');
@@ -599,7 +593,6 @@
                     }
                 } catch (error) {
                     console.error(error);
-                    if (loadingId) window.notify?.toast?.dismiss?.(loadingId);
                     window.notify?.toast?.error?.('Lỗi', 'Có lỗi xảy ra khi tải file');
                 } finally {
                     this.mediaPicker.uploading = false;

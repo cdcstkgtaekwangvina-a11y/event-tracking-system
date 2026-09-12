@@ -138,8 +138,9 @@
          MODAL: CHỈNH SỬA THÔNG TIN CÁ NHÂN
          ============================================================ -->
     <div class="prof-modal-backdrop" x-show="editModalOpen" x-cloak style="display: none;"
-        @keydown.escape.window="closeEditModal()">
-        <div class="prof-modal" @click.outside="closeEditModal()">
+        @keydown.escape.window="closeEditModal()"
+        @dblclick.self="closeEditModal()">
+        <div class="prof-modal">
             <div class="prof-modal-header">
                 <h3 class="prof-modal-title">Chỉnh sửa thông tin cá nhân</h3>
                 <button type="button" class="prof-modal-close" @click="closeEditModal()">
@@ -217,8 +218,9 @@
          MODAL: ĐỔI MẬT KHẨU
          ============================================================ -->
     <div class="prof-modal-backdrop" x-show="passwordModalOpen" x-cloak style="display: none;"
-        @keydown.escape.window="closePasswordModal()">
-        <div class="prof-modal" @click.outside="closePasswordModal()">
+        @keydown.escape.window="closePasswordModal()"
+        @dblclick.self="closePasswordModal()">
+        <div class="prof-modal">
             <div class="prof-modal-header">
                 <h3 class="prof-modal-title">Đổi mật khẩu</h3>
                 <button type="button" class="prof-modal-close" @click="closePasswordModal()">
@@ -297,7 +299,7 @@
 <!-- Chọn ảnh đại diện có sẵn từ thư viện Media -->
 <div class="media-picker-modal" x-data="avatarLibraryPicker()" x-show="isOpen" x-cloak
     @keydown.escape.window="isOpen && close()">
-    <div class="media-picker-backdrop" @click="close()"></div>
+    <div class="media-picker-backdrop" @dblclick="close()"></div>
     <div class="media-picker-dialog media-picker-dialog--sm" @click.stop>
         <div class="media-picker-header">
             <div>

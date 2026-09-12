@@ -1,6 +1,6 @@
 <!-- Employee Import Modal -->
 <div class="emp-modal-backdrop" id="emp-import-modal-backdrop" x-show="isOpen" style="display: none;" x-cloak
-    @click.self="close" @emp-import-open.window="open()" x-data="employeeImportModal()">
+    @dblclick.self="close" @emp-import-open.window="open()" x-data="employeeImportModal()">
     <div class="emp-modal emp-modal--lg" @click.stop>
         <div class="emp-modal-header">
             <h3 class="emp-modal-title">Import nhân viên</h3>

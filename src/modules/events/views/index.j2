@@ -64,8 +64,9 @@
 
     <!-- Create/Edit Event Modal -->
     <div class="admin-modal-overlay" x-show="modalOpen" x-cloak style="display: none;"
-        @keydown.escape.window="closeModal()">
-        <div class="admin-modal-container" role="dialog" aria-modal="true" @click.outside="closeModal()">
+        @keydown.escape.window="closeModal()"
+        @dblclick.self="closeModal()">
+        <div class="admin-modal-container" role="dialog" aria-modal="true">
 
             <!-- Modal Header -->
             <div class="admin-modal-header">

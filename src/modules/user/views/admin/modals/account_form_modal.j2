@@ -3,7 +3,7 @@
      x-show="isOpen"
      style="display: none;"
      x-cloak
-     @click.self="close"
+     @dblclick.self="close"
      x-data="accountFormModal({{ can_edit_email | tojson }})">
     <div class="acc-modal" @click.stop>
         <div class="acc-modal-header">

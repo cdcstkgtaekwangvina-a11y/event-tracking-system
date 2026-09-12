@@ -216,6 +216,7 @@
     flex-direction: column;
     background: var(--background);
     overflow: hidden;
+    position: relative;
 }
 
 .media-picker-items {

@@ -3,7 +3,7 @@
      x-show="isOpen"
      style="display: none;"
      x-cloak
-     @click.self="close"
+     @dblclick.self="close"
      @emp-form-open.window="open($event.detail)"
      x-data="employeeFormModal()">
     <div class="emp-modal" @click.stop>
