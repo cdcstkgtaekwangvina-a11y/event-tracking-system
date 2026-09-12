@@ -233,6 +233,16 @@
     color: #4b5563;
 }
 
+.status-draft {
+    background-color: #fef3c7;
+    color: #b45309;
+}
+
+.status-published {
+    background-color: #dcfce7;
+    color: #15803d;
+}
+
 /* Dark mode: badge màu sáng cố định trước đây gây chói/lệch tông trên card nền tối */
 :root[data-theme="dark"] .status-upcoming {
     background-color: rgba(59, 130, 246, 0.18);
@@ -247,6 +257,16 @@
 :root[data-theme="dark"] .status-ended {
     background-color: rgba(148, 163, 184, 0.18);
     color: #cbd5e1;
+}
+
+:root[data-theme="dark"] .status-draft {
+    background-color: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+}
+
+:root[data-theme="dark"] .status-published {
+    background-color: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
 }
 
 /* Card Body Details */
@@ -419,6 +439,47 @@
 
 .btn-pin-event.is-pinned .material-symbols-outlined {
     font-variation-settings: 'FILL' 1;
+}
+
+.btn-status-toggle-card {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-color: var(--card);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-status-toggle-card.is-published {
+    color: #10b981;
+    background-color: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.btn-status-toggle-card.is-published:hover {
+    background-color: rgba(16, 185, 129, 0.2);
+}
+
+.btn-status-toggle-card.is-draft {
+    color: #f59e0b;
+    background-color: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.btn-status-toggle-card.is-draft:hover {
+    background-color: rgba(245, 158, 11, 0.2);
+}
+
+.admin-card-header-badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 /* Empty State */

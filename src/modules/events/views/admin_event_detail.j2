@@ -233,7 +233,9 @@
                 this.isSaving = true;
                 try {
                     const payload = {
-                        ...this.form,
+                        name: this.form.name,
+                        description: this.form.description,
+                        location: this.form.location,
                         start_at: this.form.start_at ? new Date(this.form.start_at).toISOString() : null,
                         end_at: this.form.end_at ? new Date(this.form.end_at).toISOString() : null,
                         url_image: this.form.url_image || null,
@@ -282,6 +284,32 @@
                 } catch (err) {
                     console.error('Lỗi khi xóa sự kiện:', err);
                     notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+                }
+            },
+
+            isChangingStatus: false,
+            async changeStatus() {
+                if (!this.eventId || this.isChangingStatus) return;
+                this.isChangingStatus = true;
+                try {
+                    const response = await fetch(`/api/events/${this.eventId}/status`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const resData = await response.json();
+                    if (response.ok) {
+                        const newStatus = resData?.data?.status || resData?.status;
+                        if (this.event) this.event.status = newStatus;
+                        const statusLabel = newStatus === 'published' ? 'Đã xuất bản' : 'Bản nháp';
+                        notify.toast.success(`Đã chuyển trạng thái sự kiện thành "${statusLabel}"`);
+                    } else {
+                        notify.toast.error('Cập nhật thất bại', resData.message || resData.detail || 'Không thể đổi trạng thái');
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi đổi trạng thái sự kiện:', err);
+                    notify.toast.error('Lỗi kết nối', 'Không thể kết nối đến máy chủ');
+                } finally {
+                    this.isChangingStatus = false;
                 }
             },
 
@@ -816,6 +844,14 @@
         </a>
 
         <div class="admin-detail-actions" x-show="!isLoading && event">
+            <button type="button" class="btn-admin-status-toggle" 
+                :class="event?.status === 'published' ? 'btn-status-published' : 'btn-status-draft'"
+                @click="changeStatus()" :disabled="isChangingStatus"
+                :title="event?.status === 'published' ? 'Sự kiện đang Xuất bản. Nhấn để chuyển sang Bản nháp.' : 'Sự kiện đang ở Bản nháp. Nhấn để Xuất bản.'">
+                <span class="material-symbols-outlined" x-show="!isChangingStatus" x-text="event?.status === 'published' ? 'public' : 'edit_note'"></span>
+                <span class="spinner-sm" x-show="isChangingStatus"></span>
+                <span x-text="event?.status === 'published' ? 'Đã xuất bản' : 'Bản nháp'"></span>
+            </button>
             <button type="button" class="btn-admin-save" :disabled="!isDirty || isSaving" @click="saveEvent()" x-show="currentTab === 'description'">
                 <span class="material-symbols-outlined" x-show="!isSaving">save</span>
                 <span class="spinner-sm" x-show="isSaving"></span>
@@ -1633,6 +1669,49 @@
 
     .btn-admin-delete:hover {
         background: rgba(239, 68, 68, 0.22);
+    }
+
+    .btn-admin-status-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+
+    .btn-status-published {
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+        border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-status-published:hover:not(:disabled) {
+        background: rgba(16, 185, 129, 0.22);
+    }
+
+    .btn-status-draft {
+        background: rgba(245, 158, 11, 0.12);
+        color: #f59e0b;
+        border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-status-draft:hover:not(:disabled) {
+        background: rgba(245, 158, 11, 0.22);
+    }
+
+    :root[data-theme="dark"] .btn-status-published {
+        background: rgba(16, 185, 129, 0.18);
+        color: #34d399;
+    }
+
+    :root[data-theme="dark"] .btn-status-draft {
+        background: rgba(245, 158, 11, 0.18);
+        color: #fbbf24;
     }
 
     /* Tabs Navigation Bar */

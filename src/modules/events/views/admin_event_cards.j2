@@ -43,7 +43,14 @@
             <!-- Card Header: Title & Status -->
             <div class="admin-card-header">
                 <h3 class="admin-event-title" title="{{ event.name }}">{{ event.name }}</h3>
-                <span class="status-badge {{ status_class }}">{{ status_text }}</span>
+                <div class="admin-card-header-badges">
+                    {% if event.status == 'published' %}
+                        <span class="status-badge status-published">Xuất bản</span>
+                    {% else %}
+                        <span class="status-badge status-draft">Bản nháp</span>
+                    {% endif %}
+                    <span class="status-badge {{ status_class }}">{{ status_text }}</span>
+                </div>
             </div>
 
             {#
@@ -165,6 +172,11 @@
                 <a href="/admin/events/{{ event.id }}" hx-get="/admin/events/{{ event.id }}" hx-target="#admin-main-content" hx-select="#admin-main-content" hx-swap="outerHTML" hx-push-url="true" class="btn-view-details">
                     Xem chi tiết
                 </a>
+                <button type="button" class="btn-status-toggle-card {{ 'is-published' if event.status == 'published' else 'is-draft' }}"
+                    onclick="window.toggleEventStatus({{ event.id }}, this, event)"
+                    title="{{ 'Sự kiện đã xuất bản (nhấn để chuyển về bản nháp)' if event.status == 'published' else 'Sự kiện là bản nháp (nhấn để xuất bản)' }}">
+                    <span class="material-symbols-outlined">{{ 'public' if event.status == 'published' else 'edit_note' }}</span>
+                </button>
                 <button type="button" class="btn-pin-event" data-event-id="{{ event.id }}"
                     onclick="window.togglePinEvent({{ event.id }}, this, event)"
                     title="Ghim sự kiện">
@@ -179,7 +191,8 @@
                         end_at: {{ (event.end_at.isoformat() if event.end_at else '') | tojson | forceescape }},
                         location: {{ (event.location or '') | tojson | forceescape }},
                         url_image: {{ (event.url_image or '') | tojson | forceescape }},
-                        url_map: {{ (event.url_map or '') | tojson | forceescape }}
+                        url_map: {{ (event.url_map or '') | tojson | forceescape }},
+                        status: {{ (event.status or 'draft') | tojson | forceescape }}
                     })">
                     <span class="material-symbols-outlined">edit</span>
                 </button>
