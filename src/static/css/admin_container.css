@@ -8,6 +8,10 @@
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.admin-main-content .admin-main-content {
+    margin-left: 0 !important;
+}
+
 @media (max-width: 768px) {
     .admin-main-content {
         margin-left: 0 !important;
