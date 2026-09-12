@@ -743,6 +743,13 @@
 
 /* Only relocate the existing editor; its own toolbar/content styling is unchanged. */
 #event-desc .editor-wrapper { margin-top: 0; }
+#event-desc .editor-container {
+    max-height: 320px;
+    min-height: 180px;
+}
+#event-desc .tiptap {
+    min-height: 160px;
+}
 
 .event-rich-input {
     width: 100%;
