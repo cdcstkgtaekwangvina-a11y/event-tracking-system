@@ -64,8 +64,9 @@
 
     <!-- Create/Edit Event Modal -->
     <div class="admin-modal-overlay" x-show="modalOpen" x-cloak style="display: none;"
-        @keydown.escape.window="closeModal()">
-        <div class="admin-modal-container" role="dialog" aria-modal="true" @click.outside="closeModal()">
+        @keydown.escape.window="closeModal()"
+        @dblclick.self="closeModal()">
+        <div class="admin-modal-container" role="dialog" aria-modal="true">
 
             <!-- Modal Header -->
             <div class="admin-modal-header">
@@ -156,12 +157,42 @@
                     <!-- Event image -->
                     <div class="admin-form-group">
                         <label>Ảnh sự kiện</label>
-                        <input x-ref="eventImage" type="file" hidden accept="image/jpeg,image/png"
-                            @change="selectEventImage($event.target.files[0]); $event.target.value = ''">
-                        <button type="button" class="event-use-media-btn" @click="openEventMediaPicker()">
-                            <span class="material-symbols-outlined">perm_media</span>
-                            Chọn ảnh từ Media
-                        </button>
+
+                        <!-- Review / Preview State (Khi đã có ảnh) -->
+                        <template x-if="imagePreview">
+                            <div class="event-image-review-card">
+                                <div class="event-image-review-preview">
+                                    <img :src="imagePreview" alt="Xem trước ảnh sự kiện" class="event-image-review-img">
+                                    <div class="event-image-review-badge">
+                                        <span class="material-symbols-outlined">image</span>
+                                        <span>Ảnh đại diện sự kiện</span>
+                                    </div>
+                                </div>
+                                <div class="event-image-review-actions">
+                                    <button type="button" class="btn-review-action btn-review-media" @click="openEventMediaPicker()">
+                                        <span class="material-symbols-outlined">photo_library</span>
+                                        Đổi ảnh từ Thư viện Media
+                                    </button>
+                                    <button type="button" class="btn-review-action btn-review-delete" @click="removeEventImage()">
+                                        <span class="material-symbols-outlined">delete</span>
+                                        Xóa ảnh
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Empty State (Khi chưa có ảnh) -->
+                        <template x-if="!imagePreview">
+                            <div class="event-image-empty-placeholder" @click="openEventMediaPicker()">
+                                <span class="material-symbols-outlined empty-icon">add_photo_alternate</span>
+                                <p class="empty-title">Chưa có ảnh đại diện sự kiện</p>
+                                <button type="button" class="btn-empty-media">
+                                    <span class="material-symbols-outlined">photo_library</span>
+                                    Chọn ảnh từ Thư viện Media
+                                </button>
+                            </div>
+                        </template>
+
                         <small class="event-field-error" x-show="errors.image" x-text="errors.image"></small>
                     </div>
                 </div>
