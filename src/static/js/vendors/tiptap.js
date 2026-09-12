@@ -1,4 +1,4 @@
-import { Editor, Node } from 'https://esm.sh/@tiptap/core'
+import { Editor, Node, Extension, InputRule } from 'https://esm.sh/@tiptap/core'
 import StarterKit from 'https://esm.sh/@tiptap/starter-kit?deps=@tiptap/core'
 import { TableKit } from 'https://esm.sh/@tiptap/extension-table?deps=@tiptap/core'
 import Image from 'https://esm.sh/@tiptap/extension-image?deps=@tiptap/core'
@@ -14,10 +14,13 @@ import { FloatingMenu } from 'https://esm.sh/@tiptap/extension-floating-menu?dep
 import OrderedList from 'https://esm.sh/@tiptap/extension-ordered-list?deps=@tiptap/core'
 import BulletList from 'https://esm.sh/@tiptap/extension-bullet-list?deps=@tiptap/core'
 import { Placeholder } from 'https://esm.sh/@tiptap/extensions/placeholder'
+import { Markdown } from 'https://esm.sh/tiptap-markdown?deps=@tiptap/core'
 
 export {
   Editor,
   Node,
+  Extension,
+  InputRule,
   StarterKit,
   Image,
   TableKit,
@@ -32,5 +35,7 @@ export {
   FloatingMenu,
   OrderedList,
   BulletList,
-  Placeholder
+  Placeholder,
+  Markdown
 }
+

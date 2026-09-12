@@ -56,7 +56,15 @@ function adminEventsApp() {
         this.$refs.titleEditor.innerHTML = this.form.name || "";
       if (this.$refs.locationEditor)
         this.$refs.locationEditor.innerHTML = this.form.location || "";
-      window.myEditor?.commands.setContent(this.form.description || "");
+      // Use importContent (exposed by editor.j2) for smart Markdown/HTML/JSON detection.
+      // Falls back to plain setContent if importContent is not yet available.
+      if (window.myEditor) {
+        if (typeof window.myEditor.importContent === "function") {
+          window.myEditor.importContent(this.form.description || "");
+        } else {
+          window.myEditor.commands.setContent(this.form.description || "");
+        }
+      }
     },
 
     activateEditor(field, element) {
