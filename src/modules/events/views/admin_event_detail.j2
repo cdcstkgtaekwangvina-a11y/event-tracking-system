@@ -810,7 +810,7 @@
     
     <!-- Top Bar Navigation & Main Actions -->
     <div class="admin-detail-topbar">
-        <a href="/admin/events" hx-get="/admin/events" hx-target="#admin-main-content" hx-push-url="true" class="btn-admin-back">
+        <a href="/admin/events" hx-get="/admin/events" hx-target="#admin-main-content" hx-select="#admin-main-content" hx-swap="outerHTML" hx-push-url="true" class="btn-admin-back">
             <span class="material-symbols-outlined">arrow_back</span>
             Danh sách sự kiện
         </a>
@@ -861,7 +861,7 @@
         <span class="material-symbols-outlined icon-huge">event_busy</span>
         <h3>Không thể tải thông tin sự kiện</h3>
         <p x-text="error"></p>
-        <a href="/admin/events" hx-get="/admin/events" hx-target="#admin-main-content" class="btn-admin-back">Quay lại danh sách</a>
+        <a href="/admin/events" hx-get="/admin/events" hx-target="#admin-main-content" hx-select="#admin-main-content" hx-swap="outerHTML" hx-push-url="true" class="btn-admin-back">Quay lại danh sách</a>
     </div>
 
     <!-- ============================================================
