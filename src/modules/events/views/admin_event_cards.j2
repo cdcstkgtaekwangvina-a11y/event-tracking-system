@@ -162,7 +162,7 @@
                 #}
                 <!-- Dùng tojson | forceescape (giống event_cards.j2 bên home) để escape đúng cho mọi ký tự
                      đặc biệt (', ", \, xuống dòng...) trong name/description/location, không bị vỡ cú pháp JS -->
-                <a href="/admin/events/{{ event.id }}" hx-get="/admin/events/{{ event.id }}" hx-target="#admin-main-content" hx-push-url="true" class="btn-view-details">
+                <a href="/admin/events/{{ event.id }}" hx-get="/admin/events/{{ event.id }}" hx-target="#admin-main-content" hx-select="#admin-main-content" hx-swap="outerHTML" hx-push-url="true" class="btn-view-details">
                     Xem chi tiết
                 </a>
                 <button type="button" class="btn-pin-event" data-event-id="{{ event.id }}"
