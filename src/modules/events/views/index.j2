@@ -109,49 +109,62 @@
                         </div>
                         <small class="event-field-error" x-show="errors.description"
                             x-text="errors.description"></small>
+                    </div>
 
-                        <!-- Location -->
-                        <div class="admin-form-group">
-                            <label>Địa điểm</label>
-                            <div class="admin-input-with-icon">
-                                <span class="material-symbols-outlined">location_on</span>
-                                <div id="event-location" x-ref="locationEditor" contenteditable="true" role="textbox"
-                                    class="event-rich-input" data-placeholder="Ví dụ: Hội trường A / Online"
-                                    @focus="activateEditor('location', $el)" @keyup="captureSelection()"
-                                    @mouseup="captureSelection()" @keydown.enter.prevent
-                                    @input="form.location = $el.innerHTML" @blur="sanitizeInlineField('location', $el)">
-                                </div>
+                    <!-- Location -->
+                    <div class="admin-form-group">
+                        <label>Địa điểm</label>
+                        <div class="admin-input-with-icon">
+                            <span class="material-symbols-outlined">location_on</span>
+                            <div id="event-location" x-ref="locationEditor" contenteditable="true" role="textbox"
+                                class="event-rich-input" data-placeholder="Ví dụ: Hội trường A / Online"
+                                @focus="activateEditor('location', $el)" @keyup="captureSelection()"
+                                @mouseup="captureSelection()" @keydown.enter.prevent
+                                @input="form.location = $el.innerHTML" @blur="sanitizeInlineField('location', $el)">
                             </div>
-                            <small class="event-field-error" x-show="errors.location" x-text="errors.location"></small>
                         </div>
+                        <small class="event-field-error" x-show="errors.location" x-text="errors.location"></small>
+                    </div>
 
-                        <!-- Start & End Date Time -->
-                        <div class="admin-form-row">
-                            <div class="admin-form-group">
-                                <label for="event-start">Thời gian bắt đầu</label>
-                                <input type="datetime-local" id="event-start" x-model="form.start_at"
-                                    class="admin-form-input" @focus="activeField = null" />
-                                <small class="event-field-error" x-show="errors.start_at"
-                                    x-text="errors.start_at"></small>
-                            </div>
-                            <div class="admin-form-group">
-                                <label for="event-end">Thời gian kết thúc</label>
-                                <input type="datetime-local" id="event-end" x-model="form.end_at"
-                                    class="admin-form-input" @focus="activeField = null" />
-                                <small class="event-field-error" x-show="errors.end_at" x-text="errors.end_at"></small>
-                            </div>
+                    <!-- Start & End Date Time -->
+                    <div class="admin-form-row">
+                        <div class="admin-form-group">
+                            <label for="event-start">Thời gian bắt đầu</label>
+                            <input type="datetime-local" id="event-start" x-model="form.start_at"
+                                class="admin-form-input" @focus="activeField = null" />
+                            <small class="event-field-error" x-show="errors.start_at"
+                                x-text="errors.start_at"></small>
+                        </div>
+                        <div class="admin-form-group">
+                            <label for="event-end">Thời gian kết thúc</label>
+                            <input type="datetime-local" id="event-end" x-model="form.end_at"
+                                class="admin-form-input" @focus="activeField = null" />
+                            <small class="event-field-error" x-show="errors.end_at" x-text="errors.end_at"></small>
                         </div>
                     </div>
 
-                    <!-- Link Google Maps -->
-                    <div class="admin-form-group">
-                        <label for="event-url-map">Link Google Maps</label>
-                        <div class="admin-input-with-icon">
-                            <span class="material-symbols-outlined">map</span>
-                            <input type="url" id="event-url-map" x-model="form.url_map" class="admin-form-input"
-                                placeholder="https://maps.google.com/?q=..." @focus="activeField = null" />
+                    <!-- Link Google Maps & Status -->
+                    <div class="admin-form-row">
+                        <div class="admin-form-group">
+                            <label for="event-url-map">Link Google Maps</label>
+                            <div class="admin-input-with-icon">
+                                <span class="material-symbols-outlined">map</span>
+                                <input type="url" id="event-url-map" x-model="form.url_map" class="admin-form-input"
+                                    placeholder="https://maps.google.com/?q=..." @focus="activeField = null" />
+                            </div>
+                            <small class="event-field-error" x-show="errors.url_map" x-text="errors.url_map"></small>
                         </div>
-                        <small class="event-field-error" x-show="errors.url_map" x-text="errors.url_map"></small>
+                        <div class="admin-form-group">
+                            <label for="event-status">Trạng thái sự kiện</label>
+                            <div class="admin-input-with-icon">
+                                <span class="material-symbols-outlined">flag</span>
+                                <select id="event-status" x-model="form.status" class="admin-form-input" @focus="activeField = null">
+                                    <option value="draft">Bản nháp (Draft)</option>
+                                    <option value="published">Xuất bản (Published)</option>
+                                </select>
+                            </div>
+                            <small class="event-field-error" x-show="errors.status" x-text="errors.status"></small>
+                        </div>
                     </div>
 
                     <!-- Event image -->

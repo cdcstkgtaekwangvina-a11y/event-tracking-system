@@ -27,6 +27,7 @@ function adminEventsApp() {
       end_at: "",
       url_image: "",
       url_map: "",
+      status: "draft",
     },
 
     resetForm() {
@@ -40,6 +41,7 @@ function adminEventsApp() {
         end_at: "",
         url_image: "",
         url_map: "",
+        status: "draft",
       };
       this.currentEventId = null;
       this.activeField = null;
@@ -414,6 +416,7 @@ function adminEventsApp() {
         const result = await response.json();
         const fullData = result?.data || result;
         if (response.ok && fullData) {
+          this.initialStatus = fullData.status || "draft";
           this.form = {
             name: fullData.name || "",
             description: fullData.description || "",
@@ -422,6 +425,7 @@ function adminEventsApp() {
             end_at: this.formatDateTimeForInput(fullData.end_at),
             url_image: fullData.url_image || "",
             url_map: fullData.url_map || "",
+            status: this.initialStatus,
           };
           this.imagePreview = this.form.url_image;
           this.$nextTick(() => this.setEditorContent());
@@ -447,50 +451,95 @@ function adminEventsApp() {
       this.form.description = window.myEditor?.getHTML() || "";
       if (!this.validateForm()) return;
       this.isLoading = true;
-      const url = this.isEdit
-        ? `/api/events/${this.currentEventId}`
-        : "/api/events/";
-      const method = this.isEdit ? "PUT" : "POST";
 
       try {
         if (this.imageFile)
           this.form.url_image = await this.uploadImage(this.imageFile);
-        const payload = {
-          ...this.form,
-          start_at: this.form.start_at
-            ? new Date(this.form.start_at).toISOString()
-            : null,
-          end_at: this.form.end_at
-            ? new Date(this.form.end_at).toISOString()
-            : null,
-          url_image: this.form.url_image || null,
-          url_map: this.form.url_map || null,
-        };
-        const response = await fetch(url, {
-          method: method,
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
 
-        const resData = await response.json();
+        if (this.isEdit) {
+          const payload = {
+            name: this.form.name,
+            description: this.form.description,
+            location: this.form.location,
+            start_at: this.form.start_at
+              ? new Date(this.form.start_at).toISOString()
+              : null,
+            end_at: this.form.end_at
+              ? new Date(this.form.end_at).toISOString()
+              : null,
+            url_image: this.form.url_image || null,
+            url_map: this.form.url_map || null,
+          };
+          const response = await fetch(`/api/events/${this.currentEventId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
 
-        if (response.ok) {
-          notify.toast.success(
-            this.isEdit ? "Cập nhật thành công" : "Tạo sự kiện thành công",
-          );
+          const resData = await response.json();
+
+          if (!response.ok) {
+            notify.toast.error(
+              "Có lỗi xảy ra",
+              resData.message ||
+                resData.detail ||
+                "Vui lòng kiểm tra lại dữ liệu",
+            );
+            return;
+          }
+
+          if (this.form.status && this.form.status !== this.initialStatus) {
+            await this.changeEventStatus(this.currentEventId);
+          }
+
+          notify.toast.success("Cập nhật thành công");
           this.modalOpen = false;
           this.resetForm();
           document.body.dispatchEvent(
             new CustomEvent("refresh-events", { bubbles: true }),
           );
         } else {
-          notify.toast.error(
-            "Có lỗi xảy ra",
-            resData.message ||
-              resData.detail ||
-              "Vui lòng kiểm tra lại dữ liệu",
+          const payload = {
+            name: this.form.name,
+            description: this.form.description,
+            location: this.form.location,
+            start_at: this.form.start_at
+              ? new Date(this.form.start_at).toISOString()
+              : null,
+            end_at: this.form.end_at
+              ? new Date(this.form.end_at).toISOString()
+              : null,
+            url_image: this.form.url_image || null,
+            url_map: this.form.url_map || null,
+            status: this.form.status || "draft",
+          };
+          const response = await fetch("/api/events/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const resData = await response.json();
+
+          if (!response.ok) {
+            notify.toast.error(
+              "Có lỗi xảy ra",
+              resData.message ||
+                resData.detail ||
+                "Vui lòng kiểm tra lại dữ liệu",
+            );
+            return;
+          }
+
+          notify.toast.success("Tạo sự kiện thành công");
+          this.modalOpen = false;
+          this.resetForm();
+          document.body.dispatchEvent(
+            new CustomEvent("refresh-events", { bubbles: true }),
           );
         }
       } catch (error) {
@@ -586,10 +635,64 @@ function adminEventsApp() {
         notify.toast.error("Lỗi kết nối", "Không thể kết nối đến máy chủ");
       }
     },
+
+    async changeEventStatus(id) {
+      if (!id) return;
+      try {
+        const response = await fetch(`/api/events/${id}/status`, {
+          method: "PATCH",
+        });
+        const resData = await response.json();
+        if (response.ok) {
+          const newStatus = resData?.data?.status || resData?.status;
+          const statusText = newStatus === "published" ? "Đã xuất bản" : "Bản nháp";
+          notify.toast.success(`Chuyển trạng thái thành ${statusText}`);
+          document.body.dispatchEvent(
+            new CustomEvent("refresh-events", { bubbles: true }),
+          );
+          return newStatus;
+        } else {
+          notify.toast.error(
+            "Cập nhật thất bại",
+            resData.message || resData.detail || "Không thể cập nhật trạng thái",
+          );
+        }
+      } catch (error) {
+        console.error("Lỗi khi đổi trạng thái sự kiện:", error);
+        notify.toast.error("Lỗi kết nối", "Không thể kết nối đến máy chủ");
+      }
+    },
   };
 }
 
 window.adminEventsApp = adminEventsApp;
+
+window.toggleEventStatus = async (id, btnElement, e) => {
+  if (e) e.stopPropagation();
+  if (!id) return;
+  try {
+    const response = await fetch(`/api/events/${id}/status`, {
+      method: "PATCH",
+    });
+    const resData = await response.json();
+    if (response.ok) {
+      const newStatus = resData?.data?.status || resData?.status;
+      const statusText = newStatus === "published" ? "Đã xuất bản" : "Bản nháp";
+      notify.toast.success(`Chuyển trạng thái thành ${statusText}`);
+      document.body.dispatchEvent(
+        new CustomEvent("refresh-events", { bubbles: true }),
+      );
+    } else {
+      notify.toast.error(
+        "Cập nhật thất bại",
+        resData.message || resData.detail || "Không thể cập nhật trạng thái",
+      );
+    }
+  } catch (error) {
+    console.error("Lỗi khi đổi trạng thái sự kiện:", error);
+    notify.toast.error("Lỗi kết nối", "Không thể kết nối đến máy chủ");
+  }
+};
 
 if (window.Alpine) {
   window.Alpine.data("adminEventsApp", adminEventsApp);

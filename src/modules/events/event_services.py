@@ -19,6 +19,7 @@ from .event_schemas import (
     AdminEventQuery,
     AnalyticEventResponse,
     BulkSendEventEmail,
+    ChangeStatusResponse,
     CheckInEmployeeRequest,
     EmployeeIdsSchema,
     EmployeeInEvent,
@@ -174,6 +175,24 @@ class EventServices:
         await self.session.commit()
         await self.session.refresh(db_obj)
         return BaseResponse.ok(db_obj, message="Cập nhật sự kiện thành công")
+
+    async def change_status(self, event_id: int) -> BaseResponse[ChangeStatusResponse]:
+        existing_event = (
+            await self.crud.select(Events).where(Events.id == event_id).find_one()
+        )
+        if existing_event is None:
+            return BaseResponse.not_found(message="Không tìm thấy sự kiện")
+
+        if existing_event.status == EVENT_STATUS.PUBLISHED.value:
+            existing_event.status = EVENT_STATUS.DRAFT.value
+        else:
+            existing_event.status = EVENT_STATUS.PUBLISHED.value
+
+        await self.session.commit()
+        return BaseResponse.ok(
+            ChangeStatusResponse(status=existing_event.status),
+            message="Cập nhật trạng thái sự kiện thành công",
+        )
 
     async def delete_event(self, event_id: int) -> BaseResponse:
         deleted = await self.crud.delete(event_id)

@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import Depends, Query
 from pydantic import Field, model_validator
 
-from database.models.events import BaseEvents
+from database.models.events import EVENT_STATUS, BaseEvents
 from src.shared.base.base_schema import BaseSchema
 from src.shared.schemas.pagination_schemas import PaginationRequest, parse_pagination
 
@@ -17,6 +17,7 @@ class EventCreateRequest(BaseEvents):
     url_image: str | None = Field(default=None)
     url_map: str | None = Field(default=None)
     location: str | None = Field(default=None, max_length=500)
+    status: str = Field(default=EVENT_STATUS.DRAFT.value)
 
 
 class EventUpdateRequest(BaseSchema):
@@ -44,6 +45,7 @@ class EventsPagination(BaseSchema):
     end_at: datetime | None = None
     url_image: str | None = None
     url_map: str | None = None
+    status: str | None = None
 
 
 class EventsSchema(BaseSchema):
@@ -55,6 +57,7 @@ class EventsSchema(BaseSchema):
     end_at: datetime | None = None
     url_image: str | None = None
     url_map: str | None = None
+    status: str | None = None
     employee_count: int = 0
 
 
@@ -158,3 +161,7 @@ class EmpsCheckIn(BaseSchema):
     employee_name: str | None
     employee_department: str | None
     employee_position: str | None
+
+
+class ChangeStatusResponse(BaseSchema):
+    status: str
