@@ -1,5 +1,5 @@
 <link rel="stylesheet" href="/static/css/editor/editor.css?v=20260813-2">
-<link rel="stylesheet" href="/static/css/media_picker.css">
+<link rel="stylesheet" href="/static/css/media_picker.css?v=20260912-1">
 
 <div class="editor-wrapper" x-data="editorApp()" x-init="initEditor($el)"
     @tiptap-selection-change.window="$event.detail.version = Date.now()"
@@ -189,12 +189,19 @@
                         <span>Đang tải media...</span>
                     </div>
                     <div class="media-body media-picker-items" id="editor-media-picker-items"
-                        :class="{ 'is-loading': mediaPicker.loading }">
+                        :class="{ 'is-loading': mediaPicker.loading, 'view-list': viewMode === 'list', 'view-grid': viewMode === 'grid' }">
                     </div>
                 </div>
-                <aside class="media-picker-sidebar">
+                <aside class="media-picker-sidebar" :class="{ 'is-open': !!mediaPicker.selected }">
                     <template x-if="mediaPicker.selected">
                         <div class="media-picker-detail">
+                            <div class="media-picker-sheet-header">
+                                <div class="media-picker-sheet-handle"></div>
+                                <div class="media-picker-sheet-title">Chi tiết tệp</div>
+                                <button type="button" class="media-picker-sheet-close" @click="mediaPicker.selected = null; syncPickerSelectionClasses()">
+                                    <span class="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
                             <div class="media-picker-preview">
                                 <template x-if="mediaPicker.selected.kind === 'folder'">
                                     <span class="material-symbols-outlined media-picker-folder-icon">folder</span>
@@ -272,11 +279,11 @@
         x-transition:enter-start="opacity-0 transform translate-y-1"
         x-transition:enter-end="opacity-100 transform translate-y-0" @mousedown.prevent>
         <button type="button" class="fm-btn" title="Tiêu đề 1"
-            @click="myEditor.chain().focus().toggleHeading({ level: 1 }).run()">📌 H1</button>
+            @click="formatHeading(1)">📌 H1</button>
         <button type="button" class="fm-btn" title="Tiêu đề 2"
-            @click="myEditor.chain().focus().toggleHeading({ level: 2 }).run()">📎 H2</button>
+            @click="formatHeading(2)">📎 H2</button>
         <button type="button" class="fm-btn" title="Tiêu đề 3"
-            @click="myEditor.chain().focus().toggleHeading({ level: 3 }).run()">🔖 H3</button>
+            @click="formatHeading(3)">🔖 H3</button>
         <div class="fm-divider"></div>
         <button type="button" class="fm-btn" title="Danh sách chấm"
             @click="myEditor.chain().focus().toggleBulletList().run()">• DS chấm</button>
@@ -446,6 +453,9 @@
                 const url = "{{ url_for('media_manager') }}/items/html?" + params.toString();
                 try {
                     await htmx.ajax('GET', url, { target: '#editor-media-picker-items', swap: 'innerHTML' });
+                    if (window.Alpine && container) {
+                        window.Alpine.initTree(container);
+                    }
                 } finally {
                     this.mediaPicker.loading = false;
                     this.syncPickerSelectionClasses();
@@ -718,6 +728,121 @@
                         window.myEditor.chain().focus().extendMarkRange('link').unsetLink().run();
                     }
                 }
+            },
+            /**
+             * formatHeading — applies heading (or paragraph) ONLY to the exact text
+             * or elements that are highlighted/selected by the user.
+             * level = 0 → paragraph; level = 1..6 → heading.
+             *
+             * If the selection starts or ends inside a textblock, the block is split
+             * at the selection boundaries so only the highlighted segment changes type.
+             * Subsequent lines and preceding lines are never affected.
+             */
+            formatHeading(level) {
+                if (!window.myEditor) return;
+                const { state, view } = window.myEditor;
+                let { from, to, empty } = state.selection;
+
+                if (empty) {
+                    // No selection – toggle at cursor
+                    if (level === 0) {
+                        window.myEditor.chain().focus().setParagraph().run();
+                    } else {
+                        const isCurrentActive = window.myEditor.isActive('heading', { level });
+                        if (isCurrentActive) {
+                            window.myEditor.chain().focus().setParagraph().run();
+                        } else {
+                            window.myEditor.chain().focus().setHeading({ level }).run();
+                        }
+                    }
+                    return;
+                }
+
+                // If selection ends right at the beginning of the next block (offset 0),
+                // shrink `to` by 1 so we never pull the next block into the formatting.
+                const $toInit = state.doc.resolve(to);
+                if ($toInit.parentOffset === 0 && to > from) {
+                    to = to - 1;
+                }
+
+                let tr = state.tr;
+
+                // 1. If selection ends before the end of its textblock, split at `to`
+                let $to = tr.doc.resolve(to);
+                if ($to.parent.isTextblock) {
+                    const nextNode = tr.doc.nodeAt(to);
+                    if (nextNode && nextNode.type.name === 'hard_break') {
+                        tr.delete(to, to + 1);
+                        if (tr.canSplit(to)) {
+                            tr.split(to);
+                        }
+                    } else if ($to.parentOffset < $to.parent.content.size && $to.parentOffset > 0) {
+                        if (tr.canSplit(to)) {
+                            tr.split(to);
+                        }
+                    }
+                }
+
+                // 2. If selection starts after the beginning of its textblock, split at `from`
+                // (splitting at `to` only altered positions >= to, so `from` is still valid)
+                let $from = tr.doc.resolve(from);
+                if ($from.parent.isTextblock) {
+                    if ($from.parentOffset > 0) {
+                        const prevPos = from - 1;
+                        const prevNode = prevPos >= 0 ? tr.doc.nodeAt(prevPos) : null;
+                        if (prevNode && prevNode.type.name === 'hard_break') {
+                            tr.delete(prevPos, from);
+                            if (tr.canSplit(prevPos)) {
+                                tr.split(prevPos);
+                            }
+                        } else if (tr.canSplit(from)) {
+                            tr.split(from);
+                        }
+                    }
+                }
+
+                // 3. Map our selection range after the splits
+                const mappedFrom = tr.mapping.map(from);
+                const mappedTo = tr.mapping.map(to);
+
+                // 4. Collect all textblocks within the mapped selection range
+                const blockPositions = [];
+                tr.doc.nodesBetween(mappedFrom, Math.max(mappedFrom, mappedTo), (node, pos) => {
+                    if (node.isBlock && node.isTextblock) {
+                        blockPositions.push({ pos, node });
+                    }
+                });
+
+                if (blockPositions.length === 0) {
+                    if (level === 0) {
+                        window.myEditor.chain().focus().setParagraph().run();
+                    } else {
+                        window.myEditor.chain().focus().setHeading({ level }).run();
+                    }
+                    return;
+                }
+
+                // Check toggle: if all selected blocks are already headings of this level, toggle to paragraph
+                const allMatch = level > 0 && blockPositions.every(({ node }) =>
+                    node.type === state.schema.nodes.heading && node.attrs.level === level
+                );
+                const targetLevel = allMatch ? 0 : level;
+
+                const targetType = targetLevel === 0
+                    ? state.schema.nodes.paragraph
+                    : state.schema.nodes.heading;
+                const targetAttrs = targetLevel === 0 ? {} : { level: targetLevel };
+
+                // Apply node markup changes in reverse order
+                for (let i = blockPositions.length - 1; i >= 0; i--) {
+                    const { pos, node } = blockPositions[i];
+                    if (targetType) {
+                        tr.setNodeMarkup(pos, targetType, { ...node.attrs, ...targetAttrs });
+                    }
+                }
+
+                view.dispatch(tr);
+                window.myEditor.commands.focus();
             }
         };
     };
@@ -726,9 +851,30 @@
 
 <script type="module">
     import {
-        Editor, Node, StarterKit, Image, TableKit, Underline, Highlight, TextStyle, Color,
-        TextAlign, Link, Dropcursor, OrderedList, BulletList, Placeholder
+        Editor, Node, Extension, InputRule, StarterKit, Image, TableKit, Underline, Highlight, TextStyle, Color,
+        TextAlign, Link, Dropcursor, OrderedList, BulletList, Placeholder, Markdown
     } from '/static/js/vendors/tiptap.js';
+
+    // Markdown inline link input rule: [text](url)
+    const MarkdownLinkInputRule = Extension.create({
+        name: 'markdownLinkInputRule',
+        addInputRules() {
+            return [
+                new InputRule({
+                    find: /\[([^\]]+)\]\(([^)]+)\)$/,
+                    handler: ({ state, range, match }) => {
+                        const { tr } = state;
+                        const [, text, href] = match;
+                        const { from, to } = range;
+                        if (text && href && state.schema.marks.link) {
+                            const mark = state.schema.marks.link.create({ href });
+                            tr.replaceWith(from, to, state.schema.text(text, [mark]));
+                        }
+                    },
+                }),
+            ];
+        },
+    });
 
     // Extend OrderedList and BulletList to support custom styling types
     const CustomOrderedList = OrderedList.extend({
@@ -1016,6 +1162,45 @@
     const editor = new Editor({
         element: document.querySelector('#editor'),
         editorProps: {
+            handlePaste(view, event, slice) {
+                const text = event.clipboardData?.getData('text/plain');
+                if (!text) return false;
+
+                // Detect if the pasted text has markdown syntax
+                const isMarkdown = (
+                    /(^#{1,6}\s+)/m.test(text) ||            // Headings: #, ##, etc.
+                    /(^\s*[-*+]\s+)/m.test(text) ||           // Lists: - item, * item, + item
+                    /(^\s*\d+\.\s+)/m.test(text) ||           // Ordered lists: 1. item
+                    /(^>\s+)/m.test(text) ||                  // Blockquote: > quote
+                    /(^---|^___|^\*\*\*)\s*$/m.test(text) ||   // Horizontal rule: ---, ***
+                    /(\*\*[^*]+\*\*|__[^_]+__)/.test(text) ||  // Bold: **text**
+                    /(\*[^*]+\*|_[^_]+_)/.test(text) ||         // Italic: *text*
+                    /(~~[^~]+~~)/.test(text) ||                // Strike: ~~text~~
+                    /(`[^`]+`)/.test(text) ||                  // Inline code: `code`
+                    /(```[\s\S]*?```)/.test(text) ||           // Code block: ```
+                    /(\[[^\]]+\]\([^)]+\))/.test(text)         // Link: [text](url)
+                );
+
+                const ed = window.myEditor || editor;
+                if (isMarkdown && ed?.storage?.markdown?.parser) {
+                    try {
+                        const parsedHtml = ed.storage.markdown.parser.parse(text);
+                        if (parsedHtml) {
+                            event.preventDefault();
+                            const isEmptyDoc = view.state.doc.textContent.trim().length === 0 && view.state.doc.childCount <= 1;
+                            if (isEmptyDoc) {
+                                ed.commands.setContent(parsedHtml);
+                            } else {
+                                ed.commands.insertContent(parsedHtml);
+                            }
+                            return true;
+                        }
+                    } catch (err) {
+                        console.error('Markdown paste parse error:', err);
+                    }
+                }
+                return false;
+            },
             handleDrop(view, event, slice, moved) {
                 if (event.dataTransfer.getData('text/x-tiptap-block')) {
                     const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
@@ -1073,6 +1258,7 @@
             }),
             CustomOrderedList,
             CustomBulletList,
+            MarkdownLinkInputRule,
             ResizableImage,
             Video,
             Audio,
@@ -1100,7 +1286,13 @@
             }),
             Placeholder.configure({
                 emptyEditorClass: 'is-editor-empty',
-                placeholder: 'Nhập nội dung tại đây 1223...',
+                placeholder: 'Nhập nội dung tại đây...',
+            }),
+            Markdown.configure({
+                html: true,           // allow HTML tags in markdown
+                tightLists: true,     // keep lists tight (no extra spacing)
+                transformPastedText: false, // Handled cleanly by custom handlePaste
+                transformCopiedText: false, // keep clipboard plain text on copy
             }),
         ],
 
@@ -1121,9 +1313,32 @@
     }
 
     function importContent(content) {
-        const jsonObject = typeof content === 'string' ? JSON.parse(content) : content;
-
-        editor.commands.setContent(jsonObject, { contentType: 'json' });
+        if (!content) {
+            editor.commands.setContent('');
+            return;
+        }
+        if (typeof content === 'string') {
+            const trimmed = content.trim();
+            // Detect whether this is JSON format
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                try {
+                    const jsonObject = JSON.parse(trimmed);
+                    editor.commands.setContent(jsonObject, { contentType: 'json' });
+                    return;
+                } catch (_) {
+                    // not valid JSON – fall through
+                }
+            }
+            // Parse through Markdown parser (handles both Markdown and HTML cleanly)
+            if (editor.storage?.markdown?.parser) {
+                const parsedHtml = editor.storage.markdown.parser.parse(content);
+                editor.commands.setContent(parsedHtml);
+            } else {
+                editor.commands.setContent(content);
+            }
+        } else {
+            editor.commands.setContent(content, { contentType: 'json' });
+        }
     }
 
     window.myEditor = editor;

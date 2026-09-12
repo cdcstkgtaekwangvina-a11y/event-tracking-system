@@ -134,6 +134,14 @@
                 const content = html !== undefined ? html : this.form.description;
                 const self = this;
 
+                const doSet = (ed, value) => {
+                    if (typeof ed.importContent === 'function') {
+                        ed.importContent(value || '');
+                    } else {
+                        ed.commands.setContent(value || '');
+                    }
+                };
+
                 const isEditorReady = () => {
                     if (!window.myEditor) return false;
                     try {
@@ -145,7 +153,7 @@
                 };
 
                 if (isEditorReady()) {
-                    window.myEditor.commands.setContent(content || '');
+                    doSet(window.myEditor, content);
                     self.saveSnapshot();
                     return;
                 }
@@ -154,7 +162,7 @@
                 const interval = setInterval(() => {
                     attempts++;
                     if (isEditorReady()) {
-                        window.myEditor.commands.setContent(content || '');
+                        doSet(window.myEditor, content);
                         self.saveSnapshot();
                         clearInterval(interval);
                     } else if (attempts > 100) {
