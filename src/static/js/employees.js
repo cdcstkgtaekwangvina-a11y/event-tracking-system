@@ -768,7 +768,9 @@ function empImportMediaPickerComponent() {
       if (this.search) params.set("search", this.search);
 
       const url =
-        window.EMP_URLS.mediaManager + "/items/html?" + params.toString();
+        (window.EMP_URLS && window.EMP_URLS.mediaManager
+            ? window.EMP_URLS.mediaManager
+            : "") + "/items/html?" + params.toString();
       container.innerHTML =
         '<div class="media-loading"><div class="spinner-sm"></div><span>Đang tải...</span></div>';
 

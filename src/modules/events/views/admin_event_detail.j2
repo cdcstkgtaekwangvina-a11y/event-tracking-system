@@ -3,6 +3,12 @@
 {% block admin_title %}Chi tiết sự kiện{% endblock %}
 
 {% block admin_body %}
+<script>
+    window.EMP_URLS = {
+        employeesTable: "{{ url_for('employees_table') }}",
+        mediaManager: "{{ url_for('media_manager') }}"
+    };
+</script>
 <link rel="stylesheet" href="/static/css/employees.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.js"></script>
 <script>
