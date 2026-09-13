@@ -59,6 +59,6 @@ class EmployeeController:
     async def import_employee(self, payload: BulkUpsertEmployeeRequest):
         return await self.service.bulk_upsert_employees(payload)
 
-    @router.post_api("read-import-file")
+    @router.post_api("preview-import")
     async def read_sheet_file(self, payload: ReadSheetFile):
         return await self.service.read_import_file(payload)
