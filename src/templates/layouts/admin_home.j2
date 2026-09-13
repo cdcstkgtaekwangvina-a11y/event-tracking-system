@@ -170,8 +170,11 @@
 
                                         <!-- Event Name -->
                                         <td>
-                                            <span class="event-name-cell" x-text="item.event_name || '--'"
-                                                :title="item.event_name"></span>
+                                            <span class="event-name-cell"
+                                                :class="{ 'clickable': item.event_id }"
+                                                @click="item.event_id && goToEventDetail(item.event_id)"
+                                                x-text="item.event_name || '--'"
+                                                :title="item.event_id ? 'Xem chi tiết sự kiện: ' + (item.event_name || '') : (item.event_name || '--')"></span>
                                         </td>
 
                                         <!-- Check-in Time -->
@@ -260,10 +263,13 @@
                 <template x-if="pinnedEvents.length > 0">
                     <div>
                         <template x-for="event in pinnedEvents" :key="'pin_' + event.id">
-                            <div class="event-mini-card accent-gradient-purple">
+                            <div class="event-mini-card accent-gradient-purple"
+                                @click="goToEventDetail(event.id)"
+                                :title="'Xem chi tiết sự kiện: ' + event.name">
                                 <div class="event-mini-top">
                                     <h3 class="event-mini-title" x-text="event.name"></h3>
-                                    <button type="button" class="btn-pin-toggle is-pinned" @click="togglePin(event.id)"
+                                    <button type="button" class="btn-pin-toggle is-pinned"
+                                        @click.stop="togglePin(event.id)"
                                         title="Bỏ ghim">
                                         <span class="material-symbols-outlined"
                                             style="font-variation-settings: 'FILL' 1;">push_pin</span>
@@ -306,12 +312,14 @@
                 <template x-if="upcomingEvents.length > 0">
                     <div>
                         <template x-for="(event, idx) in upcomingEvents" :key="'up_' + event.id">
-                            <div class="event-mini-card" :class="getAccentClass(idx)">
+                            <div class="event-mini-card" :class="getAccentClass(idx)"
+                                @click="goToEventDetail(event.id)"
+                                :title="'Xem chi tiết sự kiện: ' + event.name">
                                 <div class="event-mini-top">
                                     <h3 class="event-mini-title" x-text="event.name"></h3>
                                     <button type="button" class="btn-pin-toggle"
                                         :class="{ 'is-pinned': pinnedIds.includes(event.id) }"
-                                        @click="togglePin(event.id)"
+                                        @click.stop="togglePin(event.id)"
                                         :title="pinnedIds.includes(event.id) ? 'Bỏ ghim' : 'Ghim sự kiện'">
                                         <span class="material-symbols-outlined"
                                             :style="pinnedIds.includes(event.id) ? 'font-variation-settings: \'FILL\' 1;' : ''">push_pin</span>
@@ -353,6 +361,12 @@
             </div>
         </aside>
     </div>
+
+    <!-- Floating Guideline Button (Bottom-Right) -->
+    <a href="/admin/guideline" class="dashboard-guideline-fab" title="Hướng dẫn sử dụng hệ thống">
+        <span class="material-symbols-outlined fab-icon">menu_book</span>
+        <span class="fab-text">Hướng dẫn sử dụng</span>
+    </a>
 </div>
 
 <script>
@@ -519,6 +533,12 @@
 
                 this.pinnedIds = window.getPinnedEventIds ? window.getPinnedEventIds() : JSON.parse(localStorage.getItem('pinned_event_ids') || '[]');
                 await this.loadPinnedEvents();
+            },
+
+            // Navigation to Event Detail
+            goToEventDetail(eventId) {
+                if (!eventId) return;
+                window.location.href = `/admin/events/${eventId}`;
             },
 
             // API 4: /api/events/emps-check-in
