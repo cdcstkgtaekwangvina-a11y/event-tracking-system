@@ -1,8 +1,863 @@
-{% extends "templates/layouts/main.j2" %}
-{% block title %}Hướng dẫn{% endblock %}
-{%block body %}
-{% include "templates/headers/index.j2" %}
+{% extends "templates/layouts/admin.j2" %}
 
+{% block admin_title %}Hướng dẫn sử dụng{% endblock %}
 
+{% block admin_body %}
+<style>
+    .guide-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 30px 24px;
+    }
+    .guide-section {
+        margin-bottom: 36px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 28px 30px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    .guide-section h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--foreground);
+        margin: 0 0 6px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .guide-section h2 .guide-icon {
+        font-size: 26px;
+    }
+    .guide-section .guide-sub {
+        color: var(--text-secondary);
+        font-size: 13px;
+        margin-bottom: 22px;
+    }
+    .guide-step {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 18px;
+        align-items: flex-start;
+    }
+    .guide-step .guide-num {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--login-bg);
+        color: var(--background);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+    }
+    .guide-step .guide-text h4 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--foreground);
+        margin: 0 0 4px 0;
+    }
+    .guide-step .guide-text p {
+        font-size: 13.5px;
+        color: var(--text-secondary);
+        margin: 0;
+        line-height: 1.65;
+    }
+    .guide-note {
+        background: var(--bg-home-page);
+        border-left: 4px solid var(--login-bg);
+        border-radius: 0 8px 8px 0;
+        padding: 12px 16px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin: 14px 0 0 0;
+    }
+    .guide-tip {
+        background: rgba(16,185,129,0.08);
+        border-left: 4px solid #10b981;
+        border-radius: 0 8px 8px 0;
+        padding: 12px 16px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin: 14px 0 0 0;
+    }
+    .guide-tip strong {
+        color: var(--foreground);
+    }
+    .guide-warn {
+        background: rgba(245,158,11,0.08);
+        border-left: 4px solid #f59e0b;
+        border-radius: 0 8px 8px 0;
+        padding: 12px 16px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin: 14px 0 0 0;
+    }
+    .guide-warn strong {
+        color: var(--foreground);
+    }
+    .guide-feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 14px 0 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .guide-feature-list li {
+        font-size: 13.5px;
+        color: var(--text-secondary);
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+    }
+    .guide-feature-list li .guide-bullet {
+        color: var(--login-bg);
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .guide-flow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin: 16px 0 0 0;
+        font-size: 13px;
+    }
+    .guide-flow .guide-flow-btn {
+        background: var(--bg-home-page);
+        border: 1px solid var(--border);
+        color: var(--foreground);
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .guide-flow .guide-flow-arrow {
+        color: var(--text-secondary);
+        font-size: 16px;
+    }
+    .guide-access-path {
+        background: var(--bg-home-page);
+        border: 1px dashed var(--border);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin: 12px 0 0 0;
+    }
+    .guide-divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 24px 0;
+    }
+</style>
 
+<div class="guide-container">
+
+    <!-- ============================================================
+         TIÊU ĐỀ
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">school</span>
+            Hướng dẫn sử dụng trang Admin
+        </h2>
+        <p class="guide-sub">
+            Hệ thống Event Tracking — Quản lý sự kiện, khách mời, phân tích &amp; tác vụ
+        </p>
+        <p style="font-size:13.5px;color:var(--text-secondary);line-height:1.7;">
+            Trang admin nằm ở <code style="background:var(--bg-home-page);padding:2px 6px;border-radius:4px;">/admin</code>.
+            Từ trang chủ, nhấn vào avatar → <strong>Quản lý</strong> hoặc truy cập trực tiếp
+            <code style="background:var(--bg-home-page);padding:2px 6px;border-radius:4px;">/admin</code>.
+            Hướng dẫn sau đây áp dụng cho phiên bản hiện tại của hệ thống.
+        </p>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- ============================================================
+         0. CHUYỂN ĐI & THÊM/SỬA/XÓA (CRUD chung)
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">settings</span>
+            Phần 0 — Tổng quan CRUD &amp; cách sử dụng
+        </h2>
+        <p class="guide-sub">
+            Mọi tính năng của admin dùng cùng một cơ chế: danh sách + nút hành động + modal/thanh chỉnh sửa.
+        </p>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">1</div>
+            <div class="guide-text">
+                <h4>Nhận diện trang quản lý</h4>
+                <p>
+                    Mỗi module quản lý đều có tiêu đề ở trên cùng (ví dụ:
+                    <em>Quản lý sự kiện</em>, <em>Quản lý khách mời</em>,
+                    <em>Quản lý tài khoản</em>, <em>Quản lý File</em>,
+                    <em>Quản lý tác vụ</em>).
+                    Bên trái tiêu đề luôn có nút <strong>Tạo mới</strong> hoặc <strong>Thêm</strong>.
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">2</div>
+            <div class="guide-text">
+                <h4>Tìm kiếm &amp; lọc</h4>
+                <p>
+                    Hầu hết trang đều có ô <strong>tìm kiếm</strong> ở ngay dưới tiêu đề.
+                    Nhập từ khóa và nhấn <strong>Enter</strong> để lọc danh sách.
+                    Một số trang còn có bộ lọc trạng thái / sắp xếp (sự kiện).
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">3</div>
+            <div class="guide-text">
+                <h4>Chỉnh sửa / Xóa</h4>
+                <p>
+                    Vào chi tiết một bản ghi để xem 3 nút hành động ở góc phải trên:
+                    <strong>Lưu/Edit</strong>, <strong>Đổi trạng thái</strong>, <strong>Xóa</strong>.
+                    Xóa luôn yêu cầu xác nhận — không thể hoàn tác.
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-note">
+            <strong>Lưu ý:</strong> Trên giao diện sử dụng khung chứa modal &amp; tab con.
+            Nếu không thấy nút hành động, hãy cuộn xuống dưới trang hoặc kiểm tra các tab
+            (<em>Mô tả</em> / <em>Khách mời</em> / <em>Phân tích</em>).
+        </div>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- ============================================================
+         1. QUẢN LÝ SỰ KIỆN (EVENT LIST)
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">event</span>
+            Phần 1 — Quản lý Sự kiện
+        </h2>
+        <p class="guide-sub">
+            Trang: <code style="background:var(--bg-home-page);padding:2px 6px;border-radius:4px;">/admin/events</code>
+        </p>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">1</div>
+            <div class="guide-text">
+                <h4>Danh sách sự kiện</h4>
+                <p>
+                    Hiển thị các thẻ sự kiện (event cards) theo lưới, mỗi thẻ chứa:
+                    ảnh đại diện (hoặc icon placeholder), tên sự kiện, trạng thái
+                    <em>Xuất bản / Bản nháp</em>, trạng thái thời gian
+                    <em>Sắp diễn ra / Đang diễn ra / Đã kết thúc</em>,
+                    ngày giờ, địa điểm, và mô tả ngắn.
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">2</div>
+            <div class="guide-text">
+                <h4>Tạo sự kiện mới</h4>
+                <p>Nhấn nút <strong>Tạo sự kiện mới</strong> ở góc phải trên.</p>
+                <p>Form bên trong modal bao gồm:</p>
+                <ul class="guide-feature-list">
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Tên sự kiện</strong> <span style="color:#ef4444;">*</span></li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Mô tả</strong> (trình soạn thảo rich-text TipTap — gõ trực tiếp, sử dụng thanh công cụ bên trên để định dạng)</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Địa điểm</strong></li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Thời gian bắt đầu &amp; kết thúc</strong> (datetime-local)</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Link Google Maps</strong> (url)</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Ảnh đại diện sự kiện</strong> — chọn từ Thư viện Media hoặc changer/remove sau này</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Trạng thái</strong>: Bản nháp (Draft) / Xuất bản (Published)</li>
+                </ul>
+                <div class="guide-tip">
+                    <strong>Mẹo:</strong> Ảnh đại diện tự động kéo từ Thư viện Media.
+                    Nếu chưa chọn ảnh, thẻ sự kiện sẽ hiển thị icon placeholder
+                    (không bị lỗi chiều cao card).
+                </div>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">3</div>
+            <div class="guide-text">
+                <h4>Chỉnh sửa nhanh từ danh sách</h4>
+                <p>Mỗi thẻ sự kiện có nhiều nút hành động:</p>
+                <ul class="guide-feature-list">
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Xem chi tiết</strong> — vào trang chi tiết sự kiện (3 tab)</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Chỉnh sửa</strong> (icon bút) — mở modal edit nhanh, pré-fill dữ liệu hiện tại</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Đổi trạng thái</strong> — Published ↔ Draft, icon public/edit_note</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Ghim sự kiện</strong> (push_pin) — toggle trạng thái gắn móc</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Xóa</strong> — xác nhận xóa, điều hướng lại danh sách</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">4</div>
+            <div class="guide-text">
+                <h4>Lọc &amp; sắp xếp</h4>
+                <p>
+                    Danh sách có bộ lọc ngang phía trên: tìm kiếm theo tên/địa điểm (debounce 300ms),
+                    lọc theo trạng thái thời gian (Đang diễn ra / Sắp diễn ra / Đã kết thúc),
+                    sắp xếp theo thời gian bắt đầu / tên /Ngày tạo / Ngày cập nhật, thứ tự tăng/giảm dần.
+                </p>
+                <div class="guide-flow">
+                    <span class="guide-flow-btn">Nhập từ khóa</span>
+                    <span class="guide-flow-arrow material-symbols-outlined">arrow_forward</span>
+                    <span class="guide-flow-btn">Chú ý loại trạng thái</span>
+                    <span class="guide-flow-arrow material-symbols-outlined">arrow_forward</span>
+                    <span class="guide-flow-btn">Chọn thứ tự sắp xếp</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="guide-note">
+            <strong>Lưu ý:</strong> Trạng thái thời gian (Sắp diễn ra / Đang diễn ra / Đã kết thúc)
+            được tính tự động theo thời gian thực tại của server — không cần thiết lập thủ công.
+        </div>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- ============================================================
+         2. CHI TIẾT SỰ KIỆN — TRANG SỰ KIỆN (3 TAB)
+         TRONG ĐÓ QUAN TRỌNG: QR CHECK-IN, IMPORT KHÁCH MỜI, ANALYTIC
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">insights</span>
+            Phần 2 — Chi tiết sự kiện (TRANG NÀY QUAN TRỌNG NHẤT)
+        </h2>
+        <p class="guide-sub">
+            Trang: <code style="background:var(--bg-home-page);padding:2px 6px;border-radius:4px;">/admin/events/:id</code>
+            — 3 tab: <strong>Mô tả</strong> · <strong>Khách mời</strong> · <strong>Phân tích</strong>
+        </p>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+
+        <!-- TAB 1: MÔ TẢ -->
+        <h3 style="font-size:17px;font-weight:700;color:var(--foreground);margin:0 0 12px 0;display:flex;align-items:center;gap:8px;">
+            <span class="material-symbols-outlined" style="font-size:22px;">description</span>
+            Tab 1 — Mô tả (chỉnh sửa thông tin sự kiện)
+        </h3>
+        <p style="font-size:13.5px;color:var(--text-secondary);margin:0 0 16px 0;">
+            Tab này hiện form chỉnh sửa thông tin cơ bản của sự kiện.
+            Chỉ tab này mới hiển thị nút <strong>Lưu thông tin</strong>.
+        </p>
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">a</div>
+            <div class="guide-text">
+                <h4>Các trường có thể sửa</h4>
+                <p>Tên sự kiện, mô tả (TipTap editor), thời gian bắt đầu/kết thúc, địa điểm, link Google Maps, ảnh đại diện.</p>
+                <div class="guide-tip">
+                    <strong>Ảnh đại diện:</strong> Form có khối chọn ảnh ở dưới cùng (WordPress-style featured image).
+                    Nhấn <em>Chọn ảnh từ Thư viện Media</em> hoặc <em>Đổi ảnh</em> nếu đã có.
+                    Ảnh sẽ hiện trên thẻ sự kiện và trang công khai.
+                </div>
+            </div>
+        </div>
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">b</div>
+            <div class="guide-text">
+                <h4>Lưu thay đổi</h4>
+                <p>Nút <strong>Lưu thông tin</strong> chỉ kích hoạt khi form có thay đổi so với ban đầu (isDirty).
+                Sau khi lưu thành công sẽ có thông báo toast &amp; tự động cập nhật snapshot.</p>
+            </div>
+        </div>
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">c</div>
+            <div class="guide-text">
+                <h4>Đổi trạng thái &amp; Xóa</h4>
+                <p>Nút <strong>Đã xuất bản / Bản nháp</strong> thay đổi trạng thái sự kiện.
+                Nút <strong>Xóa sự kiện</strong> xác nhận rồi xóa — điều hướng về danh sách.</p>
+            </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0 0 0;">
+
+        <!-- TAB 2: KHÁCH MỜI -->
+        <h3 style="font-size:17px;font-weight:700;color:var(--foreground);margin:0 0 12px 0;display:flex;align-items:center;gap:8px;">
+            <span class="material-symbols-outlined" style="font-size:22px;">group</span>
+            Tab 2 — Khách mời (QUAN TRỌNG: QR Check-in + Import + Thêm)
+        </h3>
+        <p style="font-size:13.5px;color:var(--text-secondary);margin:0 0 16px 0;">
+            Đây là nơi quản lý toàn bộ khách mời của một sự kiện: danh sách, thêm thủ công,
+            import từ file Excel/CSV, và check-in bằng QR scanner.
+        </p>
+
+        <!-- 2.1 Danh sách -->
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">1</div>
+            <div class="guide-text">
+                <h4>Danh sách khách mời</h4>
+                <p>
+                    Bảng hiển thị: Mã NV (ví dụ <code>#00000123</code>), Họ và tên, Email,
+                    Phòng ban, Chức vụ, Giới tính.
+                    Ô checkbox đầu cột và từng dòng để chọn nhiều khách mời.
+                </p>
+                <p>Các nút hành động ở góc trên bên phải:</p>
+                <ul class="guide-feature-list">
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Xóa đã chọn</strong> — xóa nhiều khách mời khỏi sự kiện cùng lúc</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Check in</strong> (icon qr_code_scanner) — mở QR scanner để quét mã nhân viên</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Import Excel / CSV</strong> — mở modal import file</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span><strong>Thêm khách mời</strong> — mở modal chọn nhân viên chưa tham gia sự kiện</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 2.2 Check-in bằng QR -->
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined" style="background:#10b981;color:#fff;">2</div>
+            <div class="guide-text">
+                <h4>Check-in bằng quét mã QR (QR Scanner)</h4>
+                <p>
+                    <strong>Bước 1:</strong> Nhấn nút <strong>Check in</strong> (qr_code_scanner) ở trên bảng khách mời.
+                    Trình quét QR sẽ mở ra (yêu cầu trình duyệt hỗ trợ camera).
+                </p>
+                <p>
+                    <strong>Bước 2:</strong> Quét mã QR trên thẻ/vùng của khách mời.
+                    Mã QR hợp lệ nhận diện được: JSON <code>{"employee_id":123}</code>,
+                    URL dạng <code>/employee/123</code>, hoặc số thuần túy.
+                </p>
+                <p>
+                    <strong>Bước 3:</strong> Hệ thống tự động tìm đối tượng khách mời → mở modal
+                    xác nhận Check-in hiển thị thông tin nhân viên (tên, mã, phòng ban, email, giới tính)
+                    và trạng thái hiện tại (đã check-in hay chưa).
+                </p>
+                <p>
+                    <strong>Bước 4:</strong> Nhấn <strong>Xác nhận Check-in</strong> →
+                    trạng thái cập nhật thành <em>check_in</em>, thời gian ghi nhận,
+                    danh sách khách mời tự động làm mới.
+                    Có nút <strong>Quét người tiếp theo</strong> để quét liên tục.
+                </p>
+                <div class="guide-warn">
+                    <strong>Lưu ý:</strong> Khách mời chưa được thêm vào sự kiện
+                    hoặc không tồn tại sẽ hiển thị thông báo lỗi, không mở được modal check-in.
+                </div>
+                <div class="guide-tip">
+                    <strong>Mẹo:</strong> Nếu trình quét QR không khởi tạo được,
+                    kiểm tra rằng tính năng <code>window.qrScanner</code> đã sẵn sàng.
+                    Trên một số trình duyệt, cần cho phép quyền camera khi hỏi.
+                </div>
+            </div>
+        </div>
+
+        <!-- 2.3 Import Excel/CSV -->
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined" style="background:#3b82f6;color:#fff;">3</div>
+            <div class="guide-text">
+                <h4>Import khách mời từ Excel / CSV</h4>
+                <p>
+                    Nhấn <strong>Import Excel / CSV</strong> → modal import mở ra.
+                    Quá trình gồm 2 bước:
+                </p>
+                <div class="guide-flow">
+                    <span class="guide-flow-btn">Bước 1: Chọn file</span>
+                    <span class="guide-flow-arrow material-symbols-outlined">arrow_forward</span>
+                    <span class="guide-flow-btn">Bước 2: Map cột dữ liệu</span>
+                    <span class="guide-flow-arrow material-symbols-outlined">arrow_forward</span>
+                    <span class="guide-flow-btn">Import</span>
+                </div>
+
+                <p><strong>Bước 1 — Chọn file:</strong></p>
+                <ul class="guide-feature-list">
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Nhập đường dẫn URL file (ví dụ file trong Media Manager), hoặc nhấn
+                        <em>Chọn từ Thư viện</em> để mở Media Picker chọn file .xlsx / .xls / .csv / .json</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Thiết lập <strong>dòng tiêu đề</strong> (mặc định = 1) và <strong>số dòng preview</strong></li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Nhấn <strong>Xem trước &amp; Map cột</strong> — hệ thống tải file, hiển thị preview 5 dòng đầu và danh sách tiêu đề cột</li>
+                </ul>
+
+                <p><strong>Bước 2 — Map cột dữ liệu:</strong></p>
+                <ul class="guide-feature-list">
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Với mỗi trường bắt buộc (tên, email, phòng ban, ...), chọn cột tương ứng từ dropdown</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Preview bảng hiển thị 5 dòng đầu tiên để kiểm tra mapping</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Nhấn <strong>Import</strong> — xử lý import, hiển thị thanh spinner, thông báo thành công/koặt lỗi</li>
+                </ul>
+
+                <div class="guide-tip">
+                    <strong>Mẹo:</strong> File import cần có ít nhất 1 cột khớp với trường bắt buộc.
+                    Nếu không map được, khách mời vẫn được tạo với giá trị mặc định (rỗng) —
+                    nên kiểm tra lại sau import.
+                </div>
+                <div class="guide-warn">
+                    <strong>Lưu ý:</strong> Chỉ hỗ trợ file .xlsx, .xls, .csv, .json.
+                    File quá lớn có thể bị giới hạn và phải chia nhỏ.
+                    Xem tiến trình import chi tiết ở <strong>Tab Quản lý tác vụ</strong> (phần 5).
+                </div>
+            </div>
+        </div>
+
+        <!-- 2.4 Thêm khách mời thủ công -->
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">4</div>
+            <div class="guide-text">
+                <h4>Thêm khách mời thủ công (chọn từ danh sách nhân viên)</h4>
+                <p>
+                    Nhấn <strong>Thêm khách mời</strong> → modal mở ra với danh sách nhân viên
+                    chưa tham gia sự kiện này (dựa trên <code>ignore_event</code>).
+                </p>
+                <ul class="guide-feature-list">
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Có ô tìm kiếm để lọc nhân viên theo tên/phòng ban</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Checkboxes chọn nhiềunhân viên, chọn all</li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Nhấn <strong>Thêm vào sự kiện (n)</strong> → POST đến <code>/api/events/:id/registers</code></li>
+                    <li><span class="guide-bullet material-symbols-outlined">circle</span>Danh sách khách mời tự động làm mới, hiển thị toast thành công</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 2.5 Xóa khách mời -->
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">5</div>
+            <div class="guide-text">
+                <h4>Xóa khách mời khỏi sự kiện</h4>
+                <p>
+                    Checkbox chọn 1 hoặc nhiều dòng → nhấn <strong>Xóa đã chọn</strong>.
+                    Xác nhận số lượng, API gọi DELETE <code>/api/events/:id/remove-registers</code>.
+                    Danh sách làm mới tự động.
+                    Có thể xóa từng người bằng nút <strong>×</strong> ở cột cuối bảng.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- CHƯA KẾT: PHẦN 3 (ANALYTIC) sẽ tiếp -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">analytics</span>
+            Phần 3 — Phân tích (Analytics Dashboard)
+        </h2>
+        <p class="guide-sub">
+            Tab thứ 3 trong trang chi tiết sự kiện — thống kê khách mời theo phòng ban
+        </p>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">1</div>
+            <div class="guide-text">
+                <h4>Tải dữ liệu phân tích</h4>
+                <p>
+                    Chuyển sang tab <strong>Phân tích</strong> → nút <strong>Làm mới</strong> ở góc phải
+                    hoặc tự động tải khi tab được kích hoạt lần đầu.
+                    Dữ liệu lấy từ <code>/api/events/:id/analytics</code>.
+                </p>
+                <div class="guide-note">
+                    <strong>Lưu ý:</strong> Nếu sự kiện chưa có khách mời nào được thêm
+                    (tab Khách mời trống), tab Phân tích sẽ hiển thị <em>Chưa có dữ liệu phân tích</em>.
+                    Cần thêm khách mời trước.
+                </div>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">2</div>
+            <div class="guide-text">
+                <h4>4 thẻ số liệu tổng quan (Stat Cards)</h4>
+                <p>4 thẻ hiển thị tổng quan:</p>
+                <ul class="guide-feature-list">
+                    <li><span class="guide-bullet material-symbols-outlined" style="color:#3b82f6;">circle</span><strong>Tổng khách mời</strong> — tổng số người của tất cả phòng ban</li>
+                    <li><span class="guide-bullet material-symbols-outlined" style="color:#10b981;">circle</span><strong>Đã điểm danh</strong> — số người đã check-in + % check-in</li>
+                    <li><span class="guide-bullet material-symbols-outlined" style="color:#3b82f6;">circle</span><strong>Đã gửi thư mời</strong> — số email đã gửi kèm mã QR + %</li>
+                    <li><span class="guide-bullet material-symbols-outlined" style="color:#f59e0b;">circle</span><strong>Chưa gửi thư mời</strong> — số pending + %</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">3</div>
+            <div class="guide-text">
+                <h4>3 biểu đồ cột (Chart.js)</h4>
+                <p>3 biểu đồ so sánh theo phòng ban:</p>
+                <ul class="guide-feature-list">
+                    <li><span class="guide-bullet material-symbols-outlined" style="color:#10b981;">circle</span><strong>Đã điểm danh</strong> (bar chart màu xanh lục) — số lượng check-in theo phòng ban</li>
+                    <li><span class="guide-bullet material-symbols-outlined" style="color:#3b82f6;">circle</span><strong>Đã gửi thư mời</strong> (bar chart xanh dương) — số email đã gửi theo phòng ban</li>
+                    <li><span class="guide-bullet material-symbols-outlined" style="color:#f59e0b;">circle</span><strong>Chưa gửi thư mời</strong> (bar chart vàng) — số pending theo phòng ban</li>
+                </ul>
+                <p>
+                    Mỗi biểu đồ có tooltip (hover để xem số lượng cụ thể),
+                    tự động cách điệu khi chuyển chế độ sáng/tối.
+                    Nhấn <strong>Làm mới</strong> để tải lại dữ liệu mới nhất.
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">4</div>
+            <div class="guide-text">
+                <h4>Bảng chi tiết theo phòng ban</h4>
+                <p>
+                    Dưới 3 biểu đồ là bảng tổng hợp (table) với các cột:
+                    <em>Phòng ban · Tổng khách mời · Đã điểm danh · Tỷ lệ check-in (progress bar) ·
+                    Đã gửi mail · Chưa gửi mail</em>.
+                    Có hàng tổng cộng (Tổng cộng) ở cuối bảng.
+                </p>
+                <div class="guide-tip">
+                    <strong>Mẹo:</strong> Tỷ lệ check-in được tính bằng
+                    <code>check_in / (sent + pending) × 100</code>.
+                    Nếu chưa gửi mail, tỷ lệ check-in = 0%.
+                </div>
+            </div>
+        </div>
+
+        <div class="guide-warn">
+            <strong>Lưu ý:</strong> Đang có giới hạn tần suất gọi API analytics (429 Too Many Requests).
+            Nếu gặp lỗi này, đợi vài giây rồi nhấn <strong>Thử lại</strong>.
+        </div>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- ============================================================
+         4. QUẢN LÝ KHÁCH MỜI / NHÂN VIÊN (EMPLOYEE ADMIN)
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">people</span>
+            Phần 4 — Quản lý Khách mời (Nhân viên)
+        </h2>
+        <p class="guide-sub">
+            Trang: <code style="background:var(--bg-home-page);padding:2px 6px;border-radius:4px;">/admin/employees</code>
+        </p>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">1</div>
+            <div class="guide-text">
+                <h4>Danh sách &amp; tìm kiếm</h4>
+                <p>
+                    Danh sách nhân viên load bằng HTMX khi trang mở.
+                    Ô tìm kiếm (có lưu histori local storage) để lọc theo tên.
+                    Nhấn Enter hoặc gõ debounce để lọc danh sách.
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">2</div>
+            <div class="guide-text">
+                <h4>Thêm nhân viên</h4>
+                <p>Nhấn <strong>Thêm nhân viên</strong> → modal form mở ra, điền thông tin → lưu.
+                Có modal xóa (xác nhận) cho từng nhân viên hoặc xóa hàng loạt (bulk delete) khi chọn nhiều.</p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">3</div>
+            <div class="guide-text">
+                <h4>Import &amp; Export</h4>
+                <p>
+                    <strong>Import:</strong> Nhấn nút <em>Import</em> → cùng modal import employee như ở trang sự kiện
+                    (nhưng không cần chọn eventId — import vào toàn bộ hệ thống).
+                    <strong>Export:</strong> Mở dropdown <em>Export</em> → chọn Xuất Excel, CSV, hoặc JSON.
+                </p>
+                <div class="guide-tip">
+                    <strong>Mẹo:</strong> Export ra file sau đó chỉnh sửa mở rộng, rồi import lại.
+                    Lưu ý mapping cột giống với import (tên, email, phòng ban, ...).
+                </div>
+            </div>
+        </div>
+
+        <div class="guide-note">
+            <strong>Lưu ý:</strong> Nhân viên có thể được gán cho nhiều sự kiện khác nhau.
+            Trên tab Khách mời của sự kiện sẽ có nút <em>Thêm khách mời</em> để chọn từ
+            danh sách nhân viên chkor ban.
+        </div>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- ============================================================
+         5. QUẢN LÝ TÀI KHOẢN
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">account_circle</span>
+            Phần 5 — Quản lý Tài khoản
+        </h2>
+        <p class="guide-sub">
+            Trang: <code style="background:var(--bg-home-page);padding:2px 6px;border-radius:4px;">/admin/accounts</code>
+        </p>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">1</div>
+            <div class="guide-text">
+                <h4>Danh sách tài khoản</h4>
+                <p>
+                    Bảng tài khoản load qua HTMX. Tìm kiếm 따라 tên, tên đăng nhập, email.
+                    Nút <strong>Thêm tài khoản</strong> để mở modal tạo tài khoản mới.
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">2</div>
+            <div class="guide-text">
+                <h4>Chỉnh sửa &amp; Xóa</h4>
+                <p>
+                    Mở chi tiết tài khoản từ bảng → chỉnh sửa thông tin hoặc xóa (xác nhận).
+                    Modal account form modal được include từ <code>account_form_modal.j2</code>.
+                </p>
+                <div class="guide-warn">
+                    <strong>Lưu ý:</strong> Không nên xóa tài khoản đang dự án các sự kiện hoạt động.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- ============================================================
+         6. QUẢN LÝ FILE (MEDIA MANAGER)
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">folder</span>
+            Phần 6 — Quản lý File (Media Manager)
+        </h2>
+        <p class="guide-sub">
+            Trang: <code style="background:var(--bg-home-page);padding:2px 6px;border-radius:4px;">/admin/media</code>
+        </p>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">1</div>
+            <div class="guide-text">
+                <h4>Danh sách file</h4>
+                <p>
+                    Hiển thị grid các file (ảnh, document). Có 2 chế độ xem:
+                    <strong>grid</strong> và <strong>list</strong>, toggle trong header.
+                    File load qua HTMX từ <code>/media-manager/items/html</code>.
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">2</div>
+            <div class="guide-text">
+                <h4>Tạo file / Upload</h4>
+                <p>
+                    Nhấn <strong>Tạo file</strong> trong header → mở modal chọn hoặc tải lên file mới.
+                    File được sử dụng làm ảnh đại diện sự kiện, file import/export, ...
+                </p>
+                <div class="guide-tip">
+                    <strong>Mẹo:</strong> Ảnh sự kiện nên dùng file ảnh (jpg, png) đã được tối ưu kích thước.
+                </div>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">3</div>
+            <div class="guide-text">
+                <h4>Thùng rác</h4>
+                <p>
+                    File đã xóa đi thùng rác (trash). Có thể phục hồi hoặc xóa vĩnh viễn.
+                    Truy cập từ đường dẫn mặc định trong header.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- ============================================================
+         7. QUẢN LÝ TÁC VỤ (QUEUE JOBS)
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">pending_actions</span>
+            Phần 7 — Quản lý Tác vụ (Queue Jobs)
+        </h2>
+        <p class="guide-sub">
+            Trang: <code style="background:var(--bg-home-page);padding:2px 6px;border-radius:4px;">/admin/queue-jobs</code>
+            — Theo dõi tiến trình xử lý ngầm
+        </p>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">1</div>
+            <div class="guide-text">
+                <h4>Danh sách tác vụ</h4>
+                <p>
+                    Hiển thị danh sách các job đang chạy / đã xong / thất bại.
+                    Mỗi job hiển thị: loại tác vụ (Import khách mời, Gửi email sự kiện),
+                    trạng thái, thời gian tạo, v.v.
+                    Lọc theo trạng thái: Tất cả / Đang chạy / Thành công / Thất bại.
+                </p>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="guide-num material-symbols-outlined">2</div>
+            <div class="guide-text">
+                <h4>Theo dõi &amp; dừng tác vụ</h4>
+                <p>
+                    Nhấn vào chi tiết job để xem modal chi tiết.
+                    Có thể <strong>dừng job</strong> (cancel) nếu đang chạy (xác nhận).
+                    Nhấn <strong>Làm mới</strong> để cập nhật danh sách.
+                </p>
+                <div class="guide-tip">
+                    <strong>Mẹo:</strong> Nếu import Excel/CSV ở sự kiện tốn thời gian,
+                    truy cập trang này để theo dõi tiến trình bulk_upsert_employees_task.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="guide-divider">
+
+    <!-- ============================================================
+         TỔNG KẾT QUICK REFERENCE
+    ============================================================ -->
+    <div class="guide-section">
+        <h2>
+            <span class="guide-icon material-symbols-outlined">menu_book</span>
+            Quick reference — Mở nhanh các trang
+        </h2>
+
+        <div class="admin-access-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:16px;">
+            <a href="/admin/events" class="guide-access-path" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);">
+                <span class="material-symbols-outlined">event</span>
+                <span>Quản lý sự kiện</span>
+            </a>
+            <a href="/admin/events" class="guide-access-path" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);">
+                <span class="material-symbols-outlined">group</span>
+                <span>Chi tiết sự kiện (tab Khách mời + QR + Analytic)</span>
+            </a>
+            <a href="/admin/employees" class="guide-access-path" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);">
+                <span class="material-symbols-outlined">people</span>
+                <span>Quản lý khách mời / nhân viên</span>
+            </a>
+            <a href="/admin/accounts" class="guide-access-path" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);">
+                <span class="material-symbols-outlined">account_circle</span>
+                <span>Quản lý tài khoản</span>
+            </a>
+            <a href="/admin/media" class="guide-access-path" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);">
+                <span class="material-symbols-outlined">folder</span>
+                <span>Quản lý file / Media</span>
+            </a>
+            <a href="/admin/queue-jobs" class="guide-access-path" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--foreground);">
+                <span class="material-symbols-outlined">pending_actions</span>
+                <span>Quản lý tác vụ (Queue Jobs)</span>
+            </a>
+        </div>
+
+        <div class="guide-note" style="margin-top:22px;">
+            <strong>Ghi chú cuối:</strong> Đây là hướng dẫn cho phiên bản hiện tại của hệ thống.
+            Giao diện và tính năng có thể thay đổi theo các commit sau.
+            Nếu bạn phát hiện sai lệch so với thực tế, hãy cập nhật lại file này
+            hoặc báo cho người maintains hệ thống.
+        </div>
+    </div>
+
+</div>
 {% endblock %}
